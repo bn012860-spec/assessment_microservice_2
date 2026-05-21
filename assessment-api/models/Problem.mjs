@@ -1,10 +1,19 @@
 
 import mongoose from 'mongoose';
+import { isValidType } from '../src/utils/typeValidator.mjs';
+
 const { Schema } = mongoose;
 
 const ParameterSchema = new Schema({
   name: { type: String, required: true },
-  type: { type: String, required: true }
+  type: { 
+    type: String, 
+    required: true,
+    validate: {
+      validator: isValidType,
+      message: props => `${props.value} is not a valid platform type!`
+    }
+  }
 }, { _id: false });
 
 const CompareConfigSchema = new Schema({
@@ -19,7 +28,14 @@ const ProblemSchema = new Schema({
   difficulty: { type: String, enum: ['Easy', 'Medium', 'Hard'], required: true },
   functionName: { type: String, required: true },
   parameters: { type: [ParameterSchema], default: [] },
-  returnType: { type: String, required: true },
+  returnType: { 
+    type: String, 
+    required: true,
+    validate: {
+      validator: isValidType,
+      message: props => `${props.value} is not a valid platform type!`
+    }
+  },
   compareConfig: { type: CompareConfigSchema, default: () => ({}) },
 
   testCases: [{

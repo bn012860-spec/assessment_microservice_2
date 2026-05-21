@@ -5,7 +5,7 @@ import "judge-service-go/pkg/models"
 // LanguageAdapter isolates language-specific single-test wrapper preparation and execution.
 type LanguageAdapter interface {
 	Name() string
-	PrepareFiles(workDir string, submissionMsg models.SubmissionMessage) ([]string, error)
+	PrepareFiles(workDir string, submissionMsg models.SubmissionMessage, problem models.Problem) ([]string, error)
 	RunCommand(inputB64 string) []string
 }
 
@@ -16,7 +16,7 @@ type CompilingLanguageAdapter interface {
 
 type BatchLanguageAdapter interface {
 	LanguageAdapter
-	PrepareBatchFiles(workDir string, submissionMsg models.SubmissionMessage) ([]string, error)
+	PrepareBatchFiles(workDir string, submissionMsg models.SubmissionMessage, problem models.Problem) ([]string, error)
 	BatchRunCommand(testsB64 string) []string
 }
 

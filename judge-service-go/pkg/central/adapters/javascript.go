@@ -2,12 +2,11 @@ package adapters
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
 
+	"judge-service-go/pkg/languages"
 	"judge-service-go/pkg/models"
 	"judge-service-go/pkg/workspace"
+	"judge-service-go/pkg/wrapper"
 )
 
 type JavaScriptAdapter struct{}
@@ -16,25 +15,34 @@ func (JavaScriptAdapter) Name() string {
 	return "javascript"
 }
 
-func (JavaScriptAdapter) PrepareFiles(workDir string, submissionMsg models.SubmissionMessage) ([]string, error) {
-	tplPath := filepath.Join("pkg", "wrappers", "js_single_wrapper.tpl")
-	return prepareJavaScriptWrapper(workDir, submissionMsg, tplPath)
-}
+func (JavaScriptAdapter) PrepareFiles(workDir string, submissionMsg models.SubmissionMessage, problem models.Problem) ([]string, error) {
+	lang := languages.GetLanguage("javascript")
+	origTpl := lang.WrapperTemplate
+	lang.WrapperTemplate = "js_single_wrapper.tpl"
+	defer func() { lang.WrapperTemplate = origTpl }()
 
-func (JavaScriptAdapter) PrepareBatchFiles(workDir string, submissionMsg models.SubmissionMessage) ([]string, error) {
-	tplPath := filepath.Join("pkg", "wrappers", "js_batch_wrapper.tpl")
-	return prepareJavaScriptWrapper(workDir, submissionMsg, tplPath)
-}
-
-func prepareJavaScriptWrapper(workDir string, submissionMsg models.SubmissionMessage, tplPath string) ([]string, error) {
-	b, err := os.ReadFile(tplPath)
+	wrapperCode, err := wrapper.GenerateWrapper(problem, lang, submissionMsg.FunctionName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read template %s: %w", tplPath, err)
+		return nil, err
 	}
 
-	wrapperCode := string(b)
-	wrapperCode = strings.ReplaceAll(wrapperCode, "{{FUNCTION_NAME}}", submissionMsg.FunctionName)
-	wrapperCode = strings.Replace(wrapperCode, "// USER_CODE_MARKER", submissionMsg.Code, 1)
+	if err := workspace.WriteFile(workDir, "wrapper.js", []byte(wrapperCode), 0644); err != nil {
+		return nil, fmt.Errorf("failed to write wrapper.js: %w", err)
+	}
+
+	return []string{"wrapper.js"}, nil
+}
+
+func (JavaScriptAdapter) PrepareBatchFiles(workDir string, submissionMsg models.SubmissionMessage, problem models.Problem) ([]string, error) {
+	lang := languages.GetLanguage("javascript")
+	origTpl := lang.WrapperTemplate
+	lang.WrapperTemplate = "js_batch_wrapper.tpl"
+	defer func() { lang.WrapperTemplate = origTpl }()
+
+	wrapperCode, err := wrapper.GenerateWrapper(problem, lang, submissionMsg.FunctionName)
+	if err != nil {
+		return nil, err
+	}
 
 	if err := workspace.WriteFile(workDir, "wrapper.js", []byte(wrapperCode), 0644); err != nil {
 		return nil, fmt.Errorf("failed to write wrapper.js: %w", err)
@@ -50,3 +58,4 @@ func (JavaScriptAdapter) RunCommand(inputB64 string) []string {
 func (JavaScriptAdapter) BatchRunCommand(testsB64 string) []string {
 	return []string{"node", "/app/wrapper.js", testsB64}
 }
+

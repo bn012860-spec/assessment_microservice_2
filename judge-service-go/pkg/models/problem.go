@@ -5,7 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	// "reflect"
+
+	"judge-service-go/pkg/types"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -175,9 +176,15 @@ func (p *Problem) ValidateBasic() error {
 	if p.ReturnType == "" {
 		return errors.New("returnType is required")
 	}
+	if !types.IsValid(p.ReturnType) {
+		return fmt.Errorf("invalid returnType: %s", p.ReturnType)
+	}
 	for _, param := range p.Parameters {
 		if param.Name == "" || param.Type == "" {
 			return fmt.Errorf("invalid parameter: %+v", param)
+		}
+		if !types.IsValid(param.Type) {
+			return fmt.Errorf("invalid type for parameter %s: %s", param.Name, param.Type)
 		}
 	}
 	// Parse tests if needed

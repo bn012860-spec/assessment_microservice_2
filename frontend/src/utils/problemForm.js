@@ -1,3 +1,5 @@
+import { isValidType } from "./typeValidator";
+
 const IDENTIFIER_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 function addError(errors, key, message) {
@@ -27,6 +29,8 @@ function normalizeParameters(parameters = [], errors) {
 
     if (!parameter.type) {
       addError(errors, `parameters.${index}.type`, "Parameter type is required");
+    } else if (!isValidType(parameter.type)) {
+      addError(errors, `parameters.${index}.type`, `Invalid type: ${parameter.type}`);
     }
   });
 
@@ -105,7 +109,12 @@ export function buildProblemPayload(formData) {
   } else if (!IDENTIFIER_PATTERN.test(functionName)) {
     addError(errors, "functionName", "Function name must be a valid identifier");
   }
-  if (!returnType) addError(errors, "returnType", "Return type is required");
+  
+  if (!returnType) {
+    addError(errors, "returnType", "Return type is required");
+  } else if (!isValidType(returnType)) {
+    addError(errors, "returnType", `Invalid return type: ${returnType}`);
+  }
 
   const parameters = normalizeParameters(formData.parameters || [], errors);
   const testCases = normalizeTestCases(formData.testCases || [], parameters.length, errors);

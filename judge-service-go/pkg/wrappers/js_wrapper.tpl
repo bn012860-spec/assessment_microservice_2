@@ -1,9 +1,90 @@
 const path = require('path');
 
-// This will be replaced in Go with the raw JSON for the test array.
-// Example after replacement:
-// const tests = [{"inputs":[[1,2,3], 4], "expected": [0,3], "isHidden": false}, ...];
+class TreeNode {
+  constructor(val, left, right) {
+    this.val = (val === undefined ? 0 : val);
+    this.left = (left === undefined ? null : left);
+    this.right = (right === undefined ? null : right);
+  }
+}
+
+function buildTree(data) {
+  if (!data || data.length === 0 || data[0] === null) {
+    return null;
+  }
+
+  const root = new TreeNode(data[0]);
+  const queue = [root];
+  let i = 1;
+
+  while (queue.length > 0 && i < data.length) {
+    const node = queue.shift();
+
+    if (i < data.length) {
+      if (data[i] !== null) {
+        node.left = new TreeNode(data[i]);
+        queue.push(node.left);
+      }
+      i++;
+    }
+
+    if (i < data.length) {
+      if (data[i] !== null) {
+        node.right = new TreeNode(data[i]);
+        queue.push(node.right);
+      }
+      i++;
+    }
+  }
+
+  return root;
+}
+
+function serializeTree(root) {
+  if (!root) {
+    return [];
+  }
+
+  const result = [];
+  const queue = [root];
+
+  while (queue.length > 0) {
+    const node = queue.shift();
+
+    if (node) {
+      result.push(node.val);
+      queue.push(node.left);
+      queue.push(node.right);
+    } else {
+      result.push(null);
+    }
+  }
+
+  // Trim trailing nulls
+  while (result.length > 0 && result[result.length - 1] === null) {
+    result.pop();
+  }
+
+  return result;
+}
+
+function convertInput(val, typeStr) {
+  if (typeStr && typeStr.startsWith("tree")) {
+    return buildTree(val);
+  }
+  return val;
+}
+
+function convertOutput(val, typeStr) {
+  if (val instanceof TreeNode || (typeStr && typeStr.startsWith("tree"))) {
+    return serializeTree(val);
+  }
+  return val;
+}
+
 const tests = {{TESTS_JSON}};
+const params = {{PARAMS_JSON}};
+const returnType = "{{RETURN_TYPE}}";
 
 async function runTests(userFunction) {
   const results = [];
@@ -12,18 +93,21 @@ async function runTests(userFunction) {
     const t = tests[i];
 
     try {
-      // Ensure input is always an array of arguments
-      const input = Array.isArray(t.inputs) ? t.inputs : [t.inputs];
+      const rawInputs = Array.isArray(t.inputs) ? t.inputs : [t.inputs];
+      const convertedInputs = rawInputs.map((val, j) => {
+        const typeStr = params[j] ? params[j].type : "";
+        return convertInput(val, typeStr);
+      });
 
-      // Call the user's function (can be sync or async)
-      const out = await userFunction(...input);
+      const out = await userFunction(...convertedInputs);
+      const convertedOut = convertOutput(out, returnType);
 
-      const ok = JSON.stringify(out) === JSON.stringify(t.expected);
+      const ok = JSON.stringify(convertedOut) === JSON.stringify(t.expected);
 
       results.push({
-        test: i + 1,    // 1-based index (matches your earlier wrappers)
+        test: i + 1,
         ok,
-        output: out
+        output: convertedOut
       });
     } catch (err) {
       results.push({
@@ -43,16 +127,10 @@ async function runTests(userFunction) {
   };
 
   console.log(JSON.stringify(summary));
-  process.stdout.write("");
 }
-
-// USER_CODE_MARKER (not used for JS, but harmless here)
 
 (async () => {
   const submissionPath = path.join(__dirname, 'submission.js');
-
-  // This will be string-replaced in Go:
-  // "{{FUNCTION_NAME}}" → "twoSum", "sumOfEvenNumbers", etc.
   const { {{FUNCTION_NAME}} } = require(submissionPath);
 
   if (typeof {{FUNCTION_NAME}} !== "function") {
@@ -63,6 +141,5 @@ async function runTests(userFunction) {
     process.exit(1);
   }
 
-  const testedFunction = {{FUNCTION_NAME}}; // avoid weird name shadowing
-  await runTests(testedFunction);
+  await runTests({{FUNCTION_NAME}});
 })();

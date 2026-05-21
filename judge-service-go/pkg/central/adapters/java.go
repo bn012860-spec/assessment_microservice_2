@@ -16,12 +16,12 @@ func (JavaAdapter) Name() string {
 	return "java"
 }
 
-func (JavaAdapter) PrepareFiles(workDir string, submissionMsg models.SubmissionMessage) ([]string, error) {
+func (JavaAdapter) PrepareFiles(workDir string, submissionMsg models.SubmissionMessage, problem models.Problem) ([]string, error) {
 	tplPath := filepath.Join("pkg", "wrappers", "java_single_wrapper.tpl")
 	return prepareJavaWrapper(workDir, submissionMsg, tplPath)
 }
 
-func (JavaAdapter) PrepareBatchFiles(workDir string, submissionMsg models.SubmissionMessage) ([]string, error) {
+func (JavaAdapter) PrepareBatchFiles(workDir string, submissionMsg models.SubmissionMessage, problem models.Problem) ([]string, error) {
 	tplPath := filepath.Join("pkg", "wrappers", "java_batch_wrapper.tpl")
 	return prepareJavaWrapper(workDir, submissionMsg, tplPath)
 }

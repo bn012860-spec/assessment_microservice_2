@@ -91,6 +91,13 @@ func GenerateWrapper(p models.Problem, lang *languages.Language, submissionFuncN
 	}
 	tpl = strings.ReplaceAll(tpl, "{{TESTS_JSON}}", string(testsJSONBytes))
 
+	paramsJSONBytes, err := json.Marshal(p.Parameters)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal Parameters to JSON: %w", err)
+	}
+	tpl = strings.ReplaceAll(tpl, "{{PARAMS_JSON}}", string(paramsJSONBytes))
+	tpl = strings.ReplaceAll(tpl, "{{RETURN_TYPE}}", p.ReturnType)
+
 	tpl = strings.ReplaceAll(tpl, "{{EXPECTED_OUTPUT_TYPE}}", p.ReturnType)
 	tpl = strings.ReplaceAll(tpl, "{{COMPARE_MODE}}", "") // Default to empty string
 

@@ -2,12 +2,11 @@ package adapters
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
 
+	"judge-service-go/pkg/languages"
 	"judge-service-go/pkg/models"
 	"judge-service-go/pkg/workspace"
+	"judge-service-go/pkg/wrapper"
 )
 
 type PythonAdapter struct{}
@@ -16,25 +15,35 @@ func (PythonAdapter) Name() string {
 	return "python"
 }
 
-func (PythonAdapter) PrepareFiles(workDir string, submissionMsg models.SubmissionMessage) ([]string, error) {
-	tplPath := filepath.Join("pkg", "wrappers", "python_single_wrapper.tpl")
-	return preparePythonWrapper(workDir, submissionMsg, tplPath)
-}
+func (PythonAdapter) PrepareFiles(workDir string, submissionMsg models.SubmissionMessage, problem models.Problem) ([]string, error) {
+	lang := languages.GetLanguage("python")
+	// Save current template to restore later if needed, or just temporarily override
+	origTpl := lang.WrapperTemplate
+	lang.WrapperTemplate = "python_single_wrapper.tpl"
+	defer func() { lang.WrapperTemplate = origTpl }()
 
-func (PythonAdapter) PrepareBatchFiles(workDir string, submissionMsg models.SubmissionMessage) ([]string, error) {
-	tplPath := filepath.Join("pkg", "wrappers", "python_batch_wrapper.tpl")
-	return preparePythonWrapper(workDir, submissionMsg, tplPath)
-}
-
-func preparePythonWrapper(workDir string, submissionMsg models.SubmissionMessage, tplPath string) ([]string, error) {
-	b, err := os.ReadFile(tplPath)
+	wrapperCode, err := wrapper.GenerateWrapper(problem, lang, submissionMsg.FunctionName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read template %s: %w", tplPath, err)
+		return nil, err
 	}
 
-	wrapperCode := string(b)
-	wrapperCode = strings.ReplaceAll(wrapperCode, "{{FUNCTION_NAME}}", submissionMsg.FunctionName)
-	wrapperCode = strings.Replace(wrapperCode, "# USER_CODE_MARKER", submissionMsg.Code, 1)
+	if err := workspace.WriteFile(workDir, "wrapper.py", []byte(wrapperCode), 0644); err != nil {
+		return nil, fmt.Errorf("failed to write wrapper.py: %w", err)
+	}
+
+	return []string{"wrapper.py"}, nil
+}
+
+func (PythonAdapter) PrepareBatchFiles(workDir string, submissionMsg models.SubmissionMessage, problem models.Problem) ([]string, error) {
+	lang := languages.GetLanguage("python")
+	origTpl := lang.WrapperTemplate
+	lang.WrapperTemplate = "python_batch_wrapper.tpl"
+	defer func() { lang.WrapperTemplate = origTpl }()
+
+	wrapperCode, err := wrapper.GenerateWrapper(problem, lang, submissionMsg.FunctionName)
+	if err != nil {
+		return nil, err
+	}
 
 	if err := workspace.WriteFile(workDir, "wrapper.py", []byte(wrapperCode), 0644); err != nil {
 		return nil, fmt.Errorf("failed to write wrapper.py: %w", err)

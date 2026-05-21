@@ -104,7 +104,7 @@ func compileCentralSubmission(ctx context.Context, exec *executor.Executor, pool
 
 func runSubmissionCentralPerTest(ctx context.Context, exec *executor.Executor, pooledContainer *pool.PooledContainer, submissionMsg models.SubmissionMessage, problem models.Problem, adapter adapters.LanguageAdapter, submissionWorkspace *workspace.SubmissionWorkspace, result *models.SubmissionResult) (*models.SubmissionResult, error) {
 	testTimeout := perTestTimeout(problem)
-	baseFiles, err := adapter.PrepareFiles(submissionWorkspace.HostPath, submissionMsg)
+	baseFiles, err := adapter.PrepareFiles(submissionWorkspace.HostPath, submissionMsg, problem)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +218,7 @@ func runSubmissionCentralPerTest(ctx context.Context, exec *executor.Executor, p
 }
 
 func runSubmissionCentralBatched(ctx context.Context, exec *executor.Executor, pooledContainer *pool.PooledContainer, submissionMsg models.SubmissionMessage, problem models.Problem, adapter adapters.BatchLanguageAdapter, submissionWorkspace *workspace.SubmissionWorkspace, result *models.SubmissionResult) (*models.SubmissionResult, error) {
-	baseFiles, err := adapter.PrepareBatchFiles(submissionWorkspace.HostPath, submissionMsg)
+	baseFiles, err := adapter.PrepareBatchFiles(submissionWorkspace.HostPath, submissionMsg, problem)
 	if err != nil {
 		return nil, err
 	}
