@@ -55,6 +55,26 @@ func (e *Executor) Client() *docker.Client {
 	return e.cli
 }
 
+// UpdateContainerResources updates the resource limits of a running container.
+func (e *Executor) UpdateContainerResources(ctx context.Context, containerID string, memoryMb int64) error {
+	if memoryMb <= 0 {
+		return nil
+	}
+
+	memoryBytes := memoryMb * 1024 * 1024
+	slog.Info("Updating container resource limits", "containerId", containerID, "memoryMb", memoryMb)
+
+	opts := docker.UpdateContainerOptions{
+		Context: ctx,
+		Memory:     int(memoryBytes),
+		MemorySwap: int(memoryBytes),
+	}
+	if err := e.cli.UpdateContainer(containerID, opts); err != nil {
+		return fmt.Errorf("failed to update container memory limit: %w", err)
+	}
+	return nil
+}
+
 func (s *ExecStream) Wait() (int, error) {
 	s.waitOnce.Do(func() {
 		s.result = <-s.waitCh
@@ -360,26 +380,13 @@ func (e *Executor) collectStream(stream *ExecStream) (string, string, int, error
 }
 
 // RunInContainer executes user code in a given Docker container
-func (e *Executor) RunInContainer(ctx context.Context, containerID string, files []string, hostWorkDir string, containerWorkDir string, compileCmd []string, runCmd []string, timeout time.Duration) (string, string, error) {
+func (e *Executor) RunInContainer(ctx context.Context, containerID string, files []string, hostWorkDir string, containerWorkDir string, compileCmd []string, runCmd []string, timeout time.Duration, memoryLimitMb int64) (string, string, error) {
 	// Overall submission timeout derived from provided timeout (multiply by factor) or environment.
 	submissionTimeout := timeout * 3
 	subCtx, cancel := context.WithTimeout(ctx, submissionTimeout)
 	defer cancel()
 
-	// Upload current submission files into the container.
-	if err := e.copyFilesToContainer(containerID, hostWorkDir, containerWorkDir, files); err != nil {
-		return "", "", err
-	}
-
-	// Compile step (if present)
-	if len(compileCmd) > 0 {
-		compileStdout, compileStderr, _, err := e.runExecWithTimeout(subCtx, containerID, containerWorkDir, rewriteCommandForWorkspace(compileCmd, containerWorkDir), timeout)
-		if err != nil {
-			return compileStdout, compileStderr, NewExecutionError(ErrCompilationFailed, err.Error(), -1)
-		}
-	}
-
-	stream, err := e.RunInContainerStream(subCtx, containerID, nil, "", containerWorkDir, nil, runCmd, timeout)
+	stream, err := e.RunInContainerStream(subCtx, containerID, files, hostWorkDir, containerWorkDir, compileCmd, runCmd, timeout, memoryLimitMb)
 	if err != nil {
 		return "", "", err
 	}
@@ -404,7 +411,7 @@ func (e *Executor) CompileInContainer(ctx context.Context, containerID string, f
 	return compileStdout, compileStderr, nil
 }
 
-func (e *Executor) RunInContainerStream(ctx context.Context, containerID string, files []string, hostWorkDir string, containerWorkDir string, compileCmd []string, runCmd []string, timeout time.Duration) (*ExecStream, error) {
+func (e *Executor) RunInContainerStream(ctx context.Context, containerID string, files []string, hostWorkDir string, containerWorkDir string, compileCmd []string, runCmd []string, timeout time.Duration, memoryLimitMb int64) (*ExecStream, error) {
 	submissionTimeout := timeout * 3
 	subCtx, cancel := context.WithTimeout(ctx, submissionTimeout)
 
@@ -423,6 +430,13 @@ func (e *Executor) RunInContainerStream(ctx context.Context, containerID string,
 		}
 	}
 
+	// Apply memory limit AFTER compilation
+	if memoryLimitMb > 0 {
+		if err := e.UpdateContainerResources(subCtx, containerID, memoryLimitMb); err != nil {
+			slog.Warn("failed to apply memory limit", "containerId", containerID, "error", err)
+		}
+	}
+
 	stream, err := e.runExecStreamWithTimeout(subCtx, containerID, containerWorkDir, rewriteCommandForWorkspace(runCmd, containerWorkDir), timeout)
 	if err != nil {
 		cancel()
@@ -437,6 +451,14 @@ func (e *Executor) RunInContainerStream(ctx context.Context, containerID string,
 	go func() {
 		exitCode, waitErr := stream.Wait()
 		cancel()
+
+		// Reset limit AFTER execution completes
+		if memoryLimitMb > 0 {
+			if err := e.UpdateContainerResources(context.Background(), containerID, 256); err != nil {
+				slog.Error("failed to reset memory limit", "containerId", containerID, "error", err)
+			}
+		}
+
 		wrapped.waitCh <- execWaitResult{exitCode: exitCode, err: waitErr}
 	}()
 

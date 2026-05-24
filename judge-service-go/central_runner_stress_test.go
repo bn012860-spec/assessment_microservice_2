@@ -102,6 +102,9 @@ func setupCentralStress(t *testing.T, languageID string) (*executor.Executor, *p
 	}
 
 	p := pool.NewPool(exec.Client(), stressPoolSize)
+	t.Cleanup(func() {
+		p.Shutdown(context.Background())
+	})
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 

@@ -12,7 +12,7 @@ for module_name in [
     if module_name in globals():
         del globals()[module_name]
 
-restricted_builtins = ['__import__', 'eval', 'exec', 'compile', 'open', 'file', 'input']
+restricted_builtins = ['eval', 'exec', 'compile', 'open', 'file', 'input']
 for builtin_name in restricted_builtins:
     if hasattr(__builtins__, builtin_name):
         delattr(__builtins__, builtin_name)

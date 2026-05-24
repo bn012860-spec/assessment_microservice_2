@@ -1,8 +1,9 @@
 import express from "express";
-import { previewWrapper } from "../controllers/preview.controller.js";
+import { previewWrapper, validateProblem } from "../controllers/preview.controller.js";
 
 const router = express.Router();
 
 router.post("/", previewWrapper);
+router.post("/validate", validateProblem);
 
 export default router;

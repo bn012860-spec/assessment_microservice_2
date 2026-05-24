@@ -181,7 +181,20 @@ function parsePagination(query) {
 function buildProblemFilter(query) {
   const filter = {};
   if (query.difficulty) filter.difficulty = query.difficulty;
-  if (query.tag) filter.tags = query.tag;
+  
+  if (query.tag) {
+    const tags = Array.isArray(query.tag) 
+      ? query.tag 
+      : query.tag.split(',').map(t => t.trim()).filter(Boolean);
+    if (tags.length > 0) {
+      filter.tags = { $in: tags };
+    }
+  }
+
+  if (query.search) {
+    filter.title = { $regex: query.search, $options: 'i' };
+  }
+  
   return filter;
 }
 

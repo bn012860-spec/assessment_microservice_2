@@ -105,7 +105,17 @@ const ProblemPage = () => {
     <div className="container">
       <div className="problem-card">
         <h2>{problem.title} <Link to={`/problems/${problem._id}/edit`} className="button">Edit</Link></h2>
+        <div className="flex-gap mb-20">
+          <span className={`tag difficulty-${problem.difficulty.toLowerCase()}`}>{problem.difficulty}</span>
+          {(problem.tags || []).map(tag => (
+            <span key={tag} className="tag">{tag}</span>
+          ))}
+        </div>
         <p>{problem.description}</p>
+        <div className="flex-gap mt-10">
+          <p><strong>Submissions:</strong> {problem.submissionCount || 0}</p>
+          <p><strong>Acceptance:</strong> {problem.submissionCount > 0 ? ((problem.acceptedCount / problem.submissionCount) * 100).toFixed(1) + '%' : '0%'}</p>
+        </div>
         <p><strong>Function:</strong> {problem.functionName}</p>
         <p><strong>Return Type:</strong> {problem.returnType}</p>
         <p><strong>Parameters:</strong> {(problem.parameters || []).map((p) => `${p.name}: ${p.type}`).join(', ') || 'None'}</p>

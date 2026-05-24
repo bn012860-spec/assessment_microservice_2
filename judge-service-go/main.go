@@ -266,7 +266,7 @@ func fallbackResultForExecutionFailure(executionPath string, execErr error, stdo
 	return result
 }
 
-func processAndStoreResults(ctx context.Context, executionPath string, stdout, stderr string, execErr error, submissionMsg models.SubmissionMessage, submissionsCollection *mongo.Collection, redisClient *redis.Client) {
+func processAndStoreResults(ctx context.Context, executionPath string, stdout, stderr string, execErr error, submissionMsg models.SubmissionMessage, submissionsCollection *mongo.Collection, problemsCollection *mongo.Collection, redisClient *redis.Client) {
 	var result models.SubmissionResult
 	submissionStatus := models.StatusError
 	submissionOutput := stderr
@@ -282,7 +282,7 @@ func processAndStoreResults(ctx context.Context, executionPath string, stdout, s
 				submissionStatus = models.StatusSuccess
 			case models.SubmissionStatusWrongAnswer:
 				submissionStatus = models.StatusFail
-			case models.SubmissionStatusRuntimeError, models.SubmissionStatusTimeLimitExceeded:
+			case models.SubmissionStatusCompilationError, models.SubmissionStatusRuntimeError, models.SubmissionStatusTimeLimitExceeded, models.SubmissionStatusMemoryLimitExceeded:
 				submissionStatus = models.StatusError
 			default:
 				submissionStatus = models.StatusError
@@ -291,14 +291,22 @@ func processAndStoreResults(ctx context.Context, executionPath string, stdout, s
 		} else {
 			slog.Error("Error unmarshalling stdout to result", "submissionId", submissionMsg.SubmissionID, "error", err, "stdout", stdout)
 			submissionTestResult = fallbackResultForExecutionFailure(executionPath, execErr, stdout)
-			submissionOutput = fmt.Sprintf("Invalid judge output: %v\nStdout: %s", err, stdout)
-			if execErr != nil {
-				submissionOutput += fmt.Sprintf("\nExecution Error: %v\nStderr: %s", execErr, stderr)
+			if submissionTestResult.Status == models.SubmissionStatusCompilationError {
+				submissionOutput = stderr
+			} else {
+				submissionOutput = fmt.Sprintf("Invalid judge output: %v\nStdout: %s", err, stdout)
+				if execErr != nil {
+					submissionOutput += fmt.Sprintf("\nExecution Error: %v\nStderr: %s", execErr, stderr)
+				}
 			}
 		}
 	} else if execErr != nil {
 		submissionTestResult = fallbackResultForExecutionFailure(executionPath, execErr, stdout)
-		submissionOutput = fmt.Sprintf("Execution Error: %v\nStderr: %s", execErr, stderr)
+		if submissionTestResult.Status == models.SubmissionStatusCompilationError {
+			submissionOutput = stderr
+		} else {
+			submissionOutput = fmt.Sprintf("Execution Error: %v\nStderr: %s", execErr, stderr)
+		}
 	}
 
 	submissionObjID, err := primitive.ObjectIDFromHex(submissionMsg.SubmissionID)
@@ -321,9 +329,21 @@ func processAndStoreResults(ctx context.Context, executionPath string, stdout, s
 		// Not returning error, as we will still try to update Redis
 	}
 
+	// Update problem analytics
+	problemObjID, err := primitive.ObjectIDFromHex(submissionMsg.ProblemID)
+	if err == nil {
+		inc := bson.M{"submissionCount": 1}
+		if submissionStatus == models.StatusSuccess {
+			inc["acceptedCount"] = 1
+		}
+		_, err = problemsCollection.UpdateByID(ctx, problemObjID, bson.M{"$inc": inc})
+		if err != nil {
+			slog.Error("Error updating problem analytics", "problemId", submissionMsg.ProblemID, "error", err)
+		}
+	}
+
 	// Fetch full submission to get CreatedAt and UserID for Redis
 	var originalSubmission models.Submission
-	problemObjID, _ := primitive.ObjectIDFromHex(submissionMsg.ProblemID)
 	err = submissionsCollection.FindOne(ctx, bson.M{"_id": submissionObjID}).Decode(&originalSubmission)
 	if err != nil {
 		slog.Warn("Could not fetch original submission for Redis update", "submissionId", submissionMsg.SubmissionID, "error", err)
@@ -410,7 +430,7 @@ func processSubmission(d amqp.Delivery, problemsCollection *mongo.Collection, su
 			d.Nack(false, false)
 			return
 		}
-		processAndStoreResults(ctx, models.ExecutionPathCentral, string(resultBytes), "", nil, submissionMsg, submissionsCollection, redisClient)
+		processAndStoreResults(ctx, models.ExecutionPathCentral, string(resultBytes), "", nil, submissionMsg, submissionsCollection, problemsCollection, redisClient)
 
 		d.Ack(false)
 		return
@@ -448,10 +468,11 @@ func processSubmission(d amqp.Delivery, problemsCollection *mongo.Collection, su
 		compileCmd,
 		runCmd,
 		defaultSandboxTimeout,
+		problem.MemoryLimitMb,
 	)
 	slog.Info("Execution finished", "submissionId", submissionMsg.SubmissionID, "error", execErr)
 
-	processAndStoreResults(ctx, models.ExecutionPathLegacy, stdout, stderr, execErr, submissionMsg, submissionsCollection, redisClient)
+	processAndStoreResults(ctx, models.ExecutionPathLegacy, stdout, stderr, execErr, submissionMsg, submissionsCollection, problemsCollection, redisClient)
 
 	d.Ack(false)
 }
@@ -480,7 +501,20 @@ func isCentralCompareEnabled(language string) bool {
 
 func main() {
 	// Initialize Structured Logging
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	logLevel := slog.LevelInfo
+	if envLevel := os.Getenv("LOG_LEVEL"); envLevel != "" {
+		switch strings.ToLower(envLevel) {
+		case "debug":
+			logLevel = slog.LevelDebug
+		case "info":
+			logLevel = slog.LevelInfo
+		case "warn":
+			logLevel = slog.LevelWarn
+		case "error":
+			logLevel = slog.LevelError
+		}
+	}
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
 	slog.SetDefault(logger)
 
 	slog.Info("Go Judge Service starting...")

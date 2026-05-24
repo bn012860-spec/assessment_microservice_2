@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import { buildProblemPayload, collectErrorMessages } from '../utils/problemForm';
+import { PROBLEM_TEMPLATES } from '../utils/problemTemplates';
 
 const AddProblemPage = () => {
   const navigate = useNavigate();
@@ -24,6 +25,8 @@ const AddProblemPage = () => {
   const [apiError, setApiError] = useState('');
   const [apiErrors, setApiErrors] = useState([]);
   const [formErrors, setFormErrors] = useState({});
+  const [validationReport, setValidationReport] = useState(null);
+  const [isValidating, setIsValidating] = useState(false);
 
   const fieldError = (key) => formErrors[key];
   const fieldClassName = (key) => fieldError(key) ? 'input-error' : '';
@@ -92,6 +95,49 @@ const AddProblemPage = () => {
     }
   };
 
+  const handleValidate = async () => {
+    setApiError('');
+    setApiErrors([]);
+    setValidationReport(null);
+    setIsValidating(true);
+
+    const { errors, payload } = buildProblemPayload(formData);
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      setIsValidating(false);
+      return;
+    }
+    setFormErrors({});
+
+    try {
+      const resp = await api.post('/api/preview/validate', payload);
+      setValidationReport(resp.data);
+    } catch (err) {
+      const data = err.response?.data;
+      setApiError(data?.error || 'Validation request failed');
+      setApiErrors(Array.isArray(data?.errors) ? data.errors : []);
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const handleTemplateSelect = (e) => {
+    const templateId = e.target.value;
+    if (!templateId) return;
+
+    const template = PROBLEM_TEMPLATES.find(t => t.id === templateId);
+    if (!template) return;
+
+    if (window.confirm(`Applying template "${template.label}" will overwrite current function, parameters, and test cases. Continue?`)) {
+      setFormData({
+        ...formData,
+        ...template.data
+      });
+    }
+    // reset selector
+    e.target.value = "";
+  };
+
   return (
     <div className="container">
       <h2>Add New Problem</h2>
@@ -103,13 +149,44 @@ const AddProblemPage = () => {
       )}
       {apiError && (
         <div className="error-box">
-          <strong>Unable to create problem.</strong>
+          <strong>Error:</strong>
           <div>{apiError}</div>
           {apiErrors.length > 0 && (
             <ul>{apiErrors.map((error, index) => <li key={index}>{error}</li>)}</ul>
           )}
         </div>
       )}
+
+      {validationReport && (
+        <div className={`report-box ${validationReport.schemaValid && validationReport.typeValidation && validationReport.wrapperGeneration ? 'success' : 'failure'}`}>
+          <h3>Validation Report</h3>
+          <ul className="report-list">
+            <li>{validationReport.schemaValid ? '✅' : '✗'} Schema Validation</li>
+            <li>{validationReport.typeValidation ? '✅' : '✗'} Type Conversion Validation</li>
+            <li>{validationReport.wrapperGeneration ? '✅' : '✗'} Wrapper Generation (JS, Python, Java)</li>
+          </ul>
+          {validationReport.errors.length > 0 && (
+            <div className="mt-10">
+              <strong>Details:</strong>
+              <ul>{validationReport.errors.map((err, i) => <li key={i}>{err}</li>)}</ul>
+            </div>
+          )}
+          {validationReport.schemaValid && validationReport.typeValidation && validationReport.wrapperGeneration && (
+            <div className="mt-10 success-text">✓ This problem is valid and ready to be published.</div>
+          )}
+        </div>
+      )}
+
+      <div className="form-group problem-card">
+        <label>Start from a template:</label>
+        <select onChange={handleTemplateSelect} defaultValue="">
+          <option value="" disabled>Select a template...</option>
+          {PROBLEM_TEMPLATES.map(t => (
+            <option key={t.id} value={t.id}>{t.label}</option>
+          ))}
+        </select>
+        <p className="form-hint">Selecting a template auto-fills the function name, parameters, and return type.</p>
+      </div>
 
       <form onSubmit={handleSubmit}>
         <div className="form-group">
@@ -219,7 +296,12 @@ const AddProblemPage = () => {
           </label>
         </div>
 
-        <button type="submit" className="button mt-20">Create Problem</button>
+        <div className="mt-20 flex-gap">
+          <button type="button" onClick={handleValidate} className="button secondary" disabled={isValidating}>
+            {isValidating ? 'Validating...' : 'Validate Problem'}
+          </button>
+          <button type="submit" className="button">Create Problem</button>
+        </div>
       </form>
     </div>
   );

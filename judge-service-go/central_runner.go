@@ -90,7 +90,7 @@ func compileCentralSubmission(ctx context.Context, exec *executor.Executor, pool
 		submissionWorkspace.HostPath,
 		submissionWorkspace.ContainerPath,
 		compilingAdapter.CompileCommand(),
-		defaultSandboxTimeout,
+		30*time.Second,
 	)
 	if err != nil {
 		if strings.TrimSpace(stderr) != "" {
@@ -144,6 +144,7 @@ func runSubmissionCentralPerTest(ctx context.Context, exec *executor.Executor, p
 			nil,
 			adapter.RunCommand(inputB64),
 			testTimeout,
+			problem.MemoryLimitMb,
 		)
 		cancel()
 
@@ -154,22 +155,17 @@ func runSubmissionCentralPerTest(ctx context.Context, exec *executor.Executor, p
 		tr.Stdout = stdoutForResult
 
 		if runErr != nil {
-			var execErr *executor.ExecutionError
-			if errors.As(runErr, &execErr) {
-				switch execErr.Type {
-				case executor.ErrTimeLimitExceeded:
-					markTestFailed(&tr, models.SubmissionStatusTimeLimitExceeded)
-				case executor.ErrMemoryLimitExceeded:
-					markTestFailed(&tr, models.SubmissionStatusMemoryLimitExceeded)
-				default:
-					markTestFailed(&tr, models.SubmissionStatusRuntimeError)
+			errStr := strings.ToLower(runErr.Error())
+			switch {
+			case errors.Is(runErr, executor.ErrTimeLimitExceeded) || errors.Is(runErr, context.DeadlineExceeded) || strings.Contains(errStr, "deadline exceeded") || strings.Contains(errStr, "timed out"):
+				markTestFailed(&tr, models.SubmissionStatusTimeLimitExceeded)
+			case errors.Is(runErr, executor.ErrMemoryLimitExceeded) || strings.Contains(errStr, "memory limit exceeded"):
+				markTestFailed(&tr, models.SubmissionStatusMemoryLimitExceeded)
+			default:
+				markTestFailed(&tr, models.SubmissionStatusRuntimeError)
+				if !errors.Is(runErr, context.DeadlineExceeded) && !strings.Contains(strings.ToLower(runErr.Error()), "deadline exceeded") {
 					result.InternalError = models.InternalErrorWrapper
 				}
-			} else if errors.Is(runErr, context.DeadlineExceeded) || strings.Contains(strings.ToLower(runErr.Error()), "deadline exceeded") {
-				markTestFailed(&tr, models.SubmissionStatusTimeLimitExceeded)
-			} else {
-				markTestFailed(&tr, models.SubmissionStatusRuntimeError)
-				result.InternalError = models.InternalErrorWrapper
 			}
 			slog.Error("runtime error", "submissionId", submissionMsg.SubmissionID, "test", i+1, "error", runErr)
 			if stderrForLog != "" {
@@ -199,7 +195,11 @@ func runSubmissionCentralPerTest(ctx context.Context, exec *executor.Executor, p
 		}
 
 		if out.Error != "" {
-			markTestFailed(&tr, models.SubmissionStatusRuntimeError)
+			reason := models.SubmissionStatusRuntimeError
+			if strings.Contains(strings.ToLower(out.Error), "outofmemory") || strings.Contains(strings.ToLower(out.Traceback), "outofmemory") {
+				reason = models.SubmissionStatusMemoryLimitExceeded
+			}
+			markTestFailed(&tr, reason)
 			if out.Traceback != "" {
 				tracebackForLog, tbTruncated := truncateString(out.Traceback, maxLogOutputBytes)
 				slog.Error("wrapper traceback", "submissionId", submissionMsg.SubmissionID, "test", i+1, "traceback", tracebackForLog, "truncated", tbTruncated)
@@ -267,6 +267,7 @@ func runSubmissionCentralBatched(ctx context.Context, exec *executor.Executor, p
 		nil,
 		adapter.BatchRunCommand(base64.StdEncoding.EncodeToString(testsJSON)),
 		runTimeout,
+		problem.MemoryLimitMb,
 	)
 	if err != nil {
 		return nil, err
@@ -373,7 +374,11 @@ func appendBatchedResults(result *models.SubmissionResult, stdout io.Reader, pro
 			Output:   out.Output,
 		}
 		if out.Error != "" {
-			markTestFailed(&tr, models.SubmissionStatusRuntimeError)
+			reason := models.SubmissionStatusRuntimeError
+			if strings.Contains(strings.ToLower(out.Error), "outofmemory") {
+				reason = models.SubmissionStatusMemoryLimitExceeded
+			}
+			markTestFailed(&tr, reason)
 		} else {
 			tr.Passed = comparator.Compare(tc.Expected, out.Output, problem.CompareConfig)
 			tr.Ok = tr.Passed
@@ -401,12 +406,13 @@ func appendMissingBatchedResults(result *models.SubmissionResult, problem models
 func markTestFailed(tr *models.TestResult, reason string) {
 	tr.Passed = false
 	tr.Ok = false
+	tr.Error = reason
 	switch reason {
 	case models.SubmissionStatusTimeLimitExceeded:
-		tr.Error = models.SubmissionStatusTimeLimitExceeded
 		tr.ErrorType = models.ErrorTypeTimeout
-	case models.SubmissionStatusRuntimeError:
-		tr.Error = models.SubmissionStatusRuntimeError
+	case models.SubmissionStatusMemoryLimitExceeded:
+		tr.ErrorType = models.ErrorTypeMemoryLimit
+	case models.SubmissionStatusRuntimeError, models.SubmissionStatusCompilationError:
 		tr.ErrorType = models.ErrorTypeRuntime
 	default:
 		tr.ErrorType = models.ErrorTypeWrongAnswer

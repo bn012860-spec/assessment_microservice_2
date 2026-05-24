@@ -43,6 +43,14 @@
       "type": "string",
       "minLength": 1
     },
+    "timeLimitMs": {
+      "type": "integer",
+      "minimum": 100
+    },
+    "memoryLimitMb": {
+      "type": "integer",
+      "minimum": 32
+    },
     "compareConfig": {
       "type": "object",
       "properties": {

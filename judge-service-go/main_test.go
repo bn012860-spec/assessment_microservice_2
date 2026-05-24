@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"judge-service-go/pkg/executor"
 	"judge-service-go/pkg/models"
 )
 
@@ -69,26 +70,31 @@ func TestFallbackResultForExecutionFailureClassification(t *testing.T) {
 		execErr      error
 		stdout       string
 		wantInternal string
+		wantStatus   string
 	}{
 		{
 			name:         "invalid judge output becomes judge error",
 			stdout:       "not-json",
 			wantInternal: models.InternalErrorJudge,
+			wantStatus:   models.SubmissionStatusRuntimeError,
 		},
 		{
 			name:         "non-timeout exec error becomes wrapper error",
 			execErr:      errors.New("execution failed with exit code 2"),
 			wantInternal: models.InternalErrorWrapper,
+			wantStatus:   models.SubmissionStatusRuntimeError,
 		},
 		{
 			name:         "timeout exec error is not internal",
-			execErr:      errors.New("execution timed out after 5s"),
+			execErr:      executor.NewExecutionError(executor.ErrTimeLimitExceeded, "", 0),
 			wantInternal: "",
+			wantStatus:   models.SubmissionStatusTimeLimitExceeded,
 		},
 		{
 			name:         "compilation failure is not internal",
-			execErr:      errors.New("compilation failed with exit code 1"),
+			execErr:      executor.NewExecutionError(executor.ErrCompilationFailed, "", 1),
 			wantInternal: "",
+			wantStatus:   models.SubmissionStatusCompilationError,
 		},
 	}
 
@@ -98,8 +104,8 @@ func TestFallbackResultForExecutionFailureClassification(t *testing.T) {
 			if result.ExecutionPath != models.ExecutionPathLegacy {
 				t.Fatalf("expected legacy executionPath, got %+v", result)
 			}
-			if result.Status != models.SubmissionStatusRuntimeError {
-				t.Fatalf("expected runtime error status, got %+v", result)
+			if result.Status != tt.wantStatus {
+				t.Fatalf("expected status %q, got %+v", tt.wantStatus, result)
 			}
 			if result.InternalError != tt.wantInternal {
 				t.Fatalf("expected internalError %q, got %+v", tt.wantInternal, result)
@@ -129,6 +135,16 @@ func TestIsCentralCompareEnabled_DefaultsAndOverrides(t *testing.T) {
 		}
 	})
 
+	t.Run("java defaults enabled", func(t *testing.T) {
+		restoreEnv(t, centralCompareJavaEnv)
+		if err := os.Unsetenv(centralCompareJavaEnv); err != nil {
+			t.Fatalf("unsetenv failed: %v", err)
+		}
+		if !isCentralCompareEnabled("java") {
+			t.Fatalf("expected java central compare enabled by default")
+		}
+	})
+
 	t.Run("python explicit false disables", func(t *testing.T) {
 		t.Setenv(centralComparePythonEnv, "false")
 		if isCentralCompareEnabled("python") {
@@ -144,18 +160,11 @@ func TestIsCentralCompareEnabled_DefaultsAndOverrides(t *testing.T) {
 	})
 
 	t.Run("unsupported language stays legacy", func(t *testing.T) {
-		if isCentralCompareEnabled("java") {
-			t.Fatalf("expected java to remain on legacy path")
-		}
 		if isCentralCompareEnabled("c") {
 			t.Fatalf("expected c to remain on legacy path")
 		}
-	})
-
-	t.Run("java explicit true enables", func(t *testing.T) {
-		t.Setenv(centralCompareJavaEnv, "true")
-		if !isCentralCompareEnabled("java") {
-			t.Fatalf("expected java central compare enabled when env=true")
+		if isCentralCompareEnabled("csharp") {
+			t.Fatalf("expected csharp to remain on legacy path")
 		}
 	})
 

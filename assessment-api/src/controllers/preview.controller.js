@@ -1,4 +1,4 @@
-import { buildPreview } from "../services/preview.service.js";
+import { buildPreview, validateProblemDefinition } from "../services/preview.service.js";
 
 export async function previewWrapper(req, res, next) {
   try {
@@ -8,6 +8,15 @@ export async function previewWrapper(req, res, next) {
     if (err.status && err.body) {
       return res.status(err.status).json(err.body);
     }
+    next(err);
+  }
+}
+
+export async function validateProblem(req, res, next) {
+  try {
+    const result = await validateProblemDefinition(req.body || {});
+    return res.json(result);
+  } catch (err) {
     next(err);
   }
 }

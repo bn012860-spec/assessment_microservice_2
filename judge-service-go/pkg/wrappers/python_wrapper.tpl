@@ -14,7 +14,7 @@ for module_name in [
         del globals()[module_name]
 
 # Restrict built-in functions
-restricted_builtins = ['__import__', 'eval', 'exec', 'compile', 'open', 'file', 'input']
+restricted_builtins = ['eval', 'exec', 'compile', 'open', 'file', 'input']
 for builtin_name in restricted_builtins:
     if hasattr(__builtins__, builtin_name):
         delattr(__builtins__, builtin_name)

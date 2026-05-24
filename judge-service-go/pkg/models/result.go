@@ -144,16 +144,23 @@ func (sr *SubmissionResult) UpdateStatus() {
 	}
 
 	hasRuntimeError := false
+	hasMemoryLimitError := false
 	for _, detail := range sr.Details {
 		switch detail.ErrorType {
 		case ErrorTypeTimeout:
 			sr.Status = SubmissionStatusTimeLimitExceeded
 			return
+		case ErrorTypeMemoryLimit:
+			hasMemoryLimitError = true
 		case ErrorTypeRuntime:
 			hasRuntimeError = true
 		}
 	}
 
+	if hasMemoryLimitError {
+		sr.Status = SubmissionStatusMemoryLimitExceeded
+		return
+	}
 	if hasRuntimeError {
 		sr.Status = SubmissionStatusRuntimeError
 		return
@@ -216,6 +223,8 @@ func (tr *TestResult) Normalize() {
 	switch tr.Error {
 	case SubmissionStatusTimeLimitExceeded:
 		tr.ErrorType = ErrorTypeTimeout
+	case SubmissionStatusMemoryLimitExceeded:
+		tr.ErrorType = ErrorTypeMemoryLimit
 	case SubmissionStatusRuntimeError:
 		tr.ErrorType = ErrorTypeRuntime
 	default:

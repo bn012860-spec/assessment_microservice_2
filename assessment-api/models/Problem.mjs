@@ -36,6 +36,8 @@ const ProblemSchema = new Schema({
       message: props => `${props.value} is not a valid platform type!`
     }
   },
+  timeLimitMs: { type: Number, default: 2000 },
+  memoryLimitMb: { type: Number, default: 256 },
   compareConfig: { type: CompareConfigSchema, default: () => ({}) },
 
   testCases: [{
@@ -49,6 +51,10 @@ const ProblemSchema = new Schema({
 
   tags: [String],
   isPremium: { type: Boolean, default: false },
+
+  submissionCount: { type: Number, default: 0 },
+  acceptedCount: { type: Number, default: 0 },
+
   createdAt: { type: Date, default: Date.now }
 });
 

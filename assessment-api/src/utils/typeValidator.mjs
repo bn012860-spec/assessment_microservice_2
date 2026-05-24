@@ -47,3 +47,68 @@ export function isValidType(typeStr) {
 
   return true;
 }
+
+/**
+ * Validates actual data against a type string.
+ * @param {any} data 
+ * @param {string} typeStr 
+ * @returns {{valid: boolean, error?: string}}
+ */
+export function validateData(data, typeStr) {
+  const s = (typeStr || '').trim();
+  const match = s.match(TYPE_REGEX);
+  if (!match) return { valid: false, error: `Invalid type string: ${typeStr}` };
+
+  const kind = match[1];
+  const inner = match[2];
+
+  switch (kind) {
+    case "number":
+      if (typeof data !== 'number') return { valid: false, error: `Expected number, got ${typeof data}` };
+      return { valid: true };
+    case "string":
+      if (typeof data !== 'string') return { valid: false, error: `Expected string, got ${typeof data}` };
+      return { valid: true };
+    case "boolean":
+      if (typeof data !== 'boolean') return { valid: false, error: `Expected boolean, got ${typeof data}` };
+      return { valid: true };
+    case "void":
+      if (data !== null && data !== undefined && data !== "") return { valid: false, error: `Expected void (null/empty), got ${typeof data}` };
+      return { valid: true };
+    case "array":
+      if (!Array.isArray(data)) return { valid: false, error: `Expected array, got ${typeof data}` };
+      for (let i = 0; i < data.length; i++) {
+        const res = validateData(data[i], inner);
+        if (!res.valid) return { valid: false, error: `Array item at [${i}]: ${res.error}` };
+      }
+      return { valid: true };
+    case "matrix":
+      if (!Array.isArray(data)) return { valid: false, error: `Expected matrix (array), got ${typeof data}` };
+      for (let i = 0; i < data.length; i++) {
+        if (!Array.isArray(data[i])) return { valid: false, error: `Matrix row at [${i}] is not an array` };
+        for (let j = 0; j < data[i].length; j++) {
+          const res = validateData(data[i][j], inner);
+          if (!res.valid) return { valid: false, error: `Matrix item at [${i}][${j}]: ${res.error}` };
+        }
+      }
+      return { valid: true };
+    case "tree":
+      // Trees are represented as arrays in Level Order (LeetCode style)
+      if (!Array.isArray(data)) return { valid: false, error: `Expected tree representation as array, got ${typeof data}` };
+      for (let i = 0; i < data.length; i++) {
+        if (data[i] === null) continue;
+        const res = validateData(data[i], inner);
+        if (!res.valid) return { valid: false, error: `Tree node at [${i}]: ${res.error}` };
+      }
+      return { valid: true };
+    case "linkedlist":
+      if (!Array.isArray(data)) return { valid: false, error: `Expected linked list representation as array, got ${typeof data}` };
+      for (let i = 0; i < data.length; i++) {
+        const res = validateData(data[i], inner);
+        if (!res.valid) return { valid: false, error: `Linked list node at [${i}]: ${res.error}` };
+      }
+      return { valid: true };
+    default:
+      return { valid: false, error: `Unsupported validation for kind: ${kind}` };
+  }
+}
