@@ -49,6 +49,10 @@ func twoSumProblemJS() models.Problem {
 		Description:  "integration test",
 		FunctionName: "twoSum",
 		ReturnType:   "array",
+		Parameters: []models.Parameter{
+			{Name: "nums", Type: "array<number>"},
+			{Name: "target", Type: "number"},
+		},
 		TestCases: []models.TestCase{
 			{
 				Input:    []interface{}{[]interface{}{float64(2), float64(7), float64(11), float64(15)}, float64(9)},
@@ -66,7 +70,7 @@ func runCentralJSOnce(t *testing.T, exec *executor.Executor, pc *pool.PooledCont
 		SubmissionID: "integration-test-js",
 		ProblemID:    "integration-problem-js",
 		Language:     "javascript",
-		FunctionName: "twoSum",
+		FunctionName: problem.FunctionName,
 		Code:         code,
 	}
 

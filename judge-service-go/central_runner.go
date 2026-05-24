@@ -9,7 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
@@ -46,7 +46,7 @@ func runSubmissionCentral(ctx context.Context, exec *executor.Executor, pooledCo
 	}
 	defer func() {
 		if cleanupErr := workspace.CleanupSubmissionWorkspace(submissionWorkspace.HostPath); cleanupErr != nil {
-			log.Printf("[submission=%s] failed to cleanup workspace %s: %v", submissionMsg.SubmissionID, submissionWorkspace.HostPath, cleanupErr)
+			slog.Error("failed to cleanup workspace", "submissionId", submissionMsg.SubmissionID, "path", submissionWorkspace.HostPath, "error", cleanupErr)
 		}
 	}()
 
@@ -154,16 +154,26 @@ func runSubmissionCentralPerTest(ctx context.Context, exec *executor.Executor, p
 		tr.Stdout = stdoutForResult
 
 		if runErr != nil {
-			runErrText := strings.ToLower(runErr.Error())
-			if strings.Contains(runErrText, "timed out") || strings.Contains(runErrText, "deadline exceeded") {
+			var execErr *executor.ExecutionError
+			if errors.As(runErr, &execErr) {
+				switch execErr.Type {
+				case executor.ErrTimeLimitExceeded:
+					markTestFailed(&tr, models.SubmissionStatusTimeLimitExceeded)
+				case executor.ErrMemoryLimitExceeded:
+					markTestFailed(&tr, models.SubmissionStatusMemoryLimitExceeded)
+				default:
+					markTestFailed(&tr, models.SubmissionStatusRuntimeError)
+					result.InternalError = models.InternalErrorWrapper
+				}
+			} else if errors.Is(runErr, context.DeadlineExceeded) || strings.Contains(strings.ToLower(runErr.Error()), "deadline exceeded") {
 				markTestFailed(&tr, models.SubmissionStatusTimeLimitExceeded)
 			} else {
 				markTestFailed(&tr, models.SubmissionStatusRuntimeError)
 				result.InternalError = models.InternalErrorWrapper
 			}
-			log.Printf("[submission=%s test=%d] runtime error: %v", submissionMsg.SubmissionID, i+1, runErr)
+			slog.Error("runtime error", "submissionId", submissionMsg.SubmissionID, "test", i+1, "error", runErr)
 			if stderrForLog != "" {
-				log.Printf("[submission=%s test=%d] runtime stderr%s: %s", submissionMsg.SubmissionID, i+1, map[bool]string{true: " (truncated)", false: ""}[stderrTruncated], stderrForLog)
+				slog.Error("runtime stderr", "submissionId", submissionMsg.SubmissionID, "test", i+1, "stderr", stderrForLog, "truncated", stderrTruncated)
 			}
 			tr.TimeMs = time.Since(testStart).Milliseconds()
 			result.AddTestResult(tr)
@@ -183,7 +193,7 @@ func runSubmissionCentralPerTest(ctx context.Context, exec *executor.Executor, p
 			markTestFailed(&tr, models.SubmissionStatusRuntimeError)
 			result.InternalError = models.InternalErrorJudge
 			tr.TimeMs = time.Since(testStart).Milliseconds()
-			log.Printf("[submission=%s test=%d] invalid wrapper output: %v | stdout=%q", submissionMsg.SubmissionID, i+1, parseErr, stdoutForResult)
+			slog.Error("invalid wrapper output", "submissionId", submissionMsg.SubmissionID, "test", i+1, "error", parseErr, "stdout", stdoutForResult)
 			result.AddTestResult(tr)
 			continue
 		}
@@ -192,7 +202,7 @@ func runSubmissionCentralPerTest(ctx context.Context, exec *executor.Executor, p
 			markTestFailed(&tr, models.SubmissionStatusRuntimeError)
 			if out.Traceback != "" {
 				tracebackForLog, tbTruncated := truncateString(out.Traceback, maxLogOutputBytes)
-				log.Printf("[submission=%s test=%d] wrapper traceback%s: %s", submissionMsg.SubmissionID, i+1, map[bool]string{true: " (truncated)", false: ""}[tbTruncated], tracebackForLog)
+				slog.Error("wrapper traceback", "submissionId", submissionMsg.SubmissionID, "test", i+1, "traceback", tracebackForLog, "truncated", tbTruncated)
 			}
 			tr.TimeMs = time.Since(testStart).Milliseconds()
 			result.AddTestResult(tr)
@@ -287,7 +297,7 @@ func runSubmissionCentralBatched(ctx context.Context, exec *executor.Executor, p
 	stderrTrimmed := strings.TrimSpace(stderrBuf.String())
 	if stderrTrimmed != "" {
 		stderrForLog, stderrTruncated := truncateString(stderrTrimmed, maxLogOutputBytes)
-		log.Printf("[submission=%s] batched stderr%s: %s", submissionMsg.SubmissionID, map[bool]string{true: " (truncated)", false: ""}[stderrTruncated], stderrForLog)
+		slog.Error("batched stderr", "submissionId", submissionMsg.SubmissionID, "stderr", stderrForLog, "truncated", stderrTruncated)
 	}
 
 	remainingReason := ""
@@ -310,10 +320,10 @@ func runSubmissionCentralBatched(ctx context.Context, exec *executor.Executor, p
 		result.InternalError = models.InternalErrorWrapper
 	}
 	if parseErr != nil {
-		log.Printf("[submission=%s] batched output parse error after %d tests: %v", submissionMsg.SubmissionID, processed, parseErr)
+		slog.Error("batched output parse error", "submissionId", submissionMsg.SubmissionID, "processed", processed, "error", parseErr)
 	}
 	if runErr != nil {
-		log.Printf("[submission=%s] batched execution error after %d tests: %v", submissionMsg.SubmissionID, processed, runErr)
+		slog.Error("batched execution error", "submissionId", submissionMsg.SubmissionID, "processed", processed, "error", runErr)
 	}
 	if remainingReason != "" {
 		appendMissingBatchedResults(result, problem, processed, remainingReason)

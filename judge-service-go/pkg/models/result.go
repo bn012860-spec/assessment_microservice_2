@@ -6,17 +6,20 @@ import (
 )
 
 const (
-	SubmissionStatusAccepted          = "Accepted"
-	SubmissionStatusWrongAnswer       = "Wrong Answer"
-	SubmissionStatusRuntimeError      = "Runtime Error"
-	SubmissionStatusTimeLimitExceeded = "Time Limit Exceeded"
-	ExecutionPathCentral              = "central"
-	ExecutionPathLegacy               = "legacy"
-	InternalErrorJudge                = "judge_error"
-	InternalErrorWrapper              = "wrapper_error"
-	ErrorTypeTimeout                  = "timeout"
-	ErrorTypeRuntime                  = "runtime"
-	ErrorTypeWrongAnswer              = "wrong_answer"
+	SubmissionStatusAccepted            = "Accepted"
+	SubmissionStatusWrongAnswer         = "Wrong Answer"
+	SubmissionStatusRuntimeError        = "Runtime Error"
+	SubmissionStatusTimeLimitExceeded   = "Time Limit Exceeded"
+	SubmissionStatusCompilationError    = "Compilation Error"
+	SubmissionStatusMemoryLimitExceeded = "Memory Limit Exceeded"
+	ExecutionPathCentral                = "central"
+	ExecutionPathLegacy                 = "legacy"
+	InternalErrorJudge                  = "judge_error"
+	InternalErrorWrapper                = "wrapper_error"
+	ErrorTypeTimeout                    = "timeout"
+	ErrorTypeRuntime                    = "runtime"
+	ErrorTypeWrongAnswer                = "wrong_answer"
+	ErrorTypeMemoryLimit                = "memory_limit"
 )
 
 // TestResult represents the result of a single test case.

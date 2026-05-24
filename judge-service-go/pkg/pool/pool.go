@@ -4,11 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	docker "github.com/fsouza/go-dockerclient"
 
@@ -30,6 +31,7 @@ type ContainerPool struct {
 	available  map[string][]*PooledContainer // language -> idle containers
 	inUse      map[string]*PooledContainer   // containerID -> container
 	maxPerLang int
+	images     map[string]string // language -> image name
 }
 
 // NewPool creates a new container pool.
@@ -39,6 +41,7 @@ func NewPool(cli *docker.Client, maxPerLang int) *ContainerPool {
 		available:  make(map[string][]*PooledContainer),
 		inUse:      make(map[string]*PooledContainer),
 		maxPerLang: maxPerLang,
+		images:     make(map[string]string),
 	}
 }
 
@@ -73,6 +76,8 @@ func (p *ContainerPool) WarmUp(ctx context.Context, lang string, image string, c
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	p.images[lang] = image
+
 	if err := p.pullImage(ctx, image); err != nil {
 		return fmt.Errorf("failed to pull image %s: %w", image, err)
 	}
@@ -89,6 +94,114 @@ func (p *ContainerPool) WarmUp(ctx context.Context, lang string, image string, c
 		})
 	}
 	return nil
+}
+
+// Shutdown stops and removes all containers in the pool.
+func (p *ContainerPool) Shutdown(ctx context.Context) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	slog.Info("Shutting down container pool", "total_available", len(p.available), "total_in_use", len(p.inUse))
+
+	var wg sync.WaitGroup
+
+	remove := func(c *PooledContainer) {
+		defer wg.Done()
+		slog.Debug("Removing container", "containerId", c.ID, "language", c.Language)
+		err := p.cli.RemoveContainer(docker.RemoveContainerOptions{
+			ID:    c.ID,
+			Force: true,
+		})
+		if err != nil {
+			slog.Error("Failed to remove container during shutdown", "containerId", c.ID, "error", err)
+		}
+		// Also cleanup the workdir
+		if err := workspace.CleanupSubmissionWorkspace(c.WorkDir); err != nil {
+			slog.Error("Failed to cleanup workdir during shutdown", "workdir", c.WorkDir, "error", err)
+		}
+	}
+
+	for _, containers := range p.available {
+		for _, c := range containers {
+			wg.Add(1)
+			go remove(c)
+		}
+	}
+
+	for _, c := range p.inUse {
+		wg.Add(1)
+		go remove(c)
+	}
+
+	wg.Wait()
+	p.available = make(map[string][]*PooledContainer)
+	p.inUse = make(map[string]*PooledContainer)
+}
+
+// StartMonitor starts a background goroutine to monitor container health.
+func (p *ContainerPool) StartMonitor(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				ticker.Stop()
+				return
+			case <-ticker.C:
+				p.checkHealth(ctx)
+			}
+		}
+	}()
+}
+
+func (p *ContainerPool) checkHealth(ctx context.Context) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	for lang, containers := range p.available {
+		var healthy []*PooledContainer
+		for _, c := range containers {
+			if p.isContainerHealthy(c.ID) {
+				healthy = append(healthy, c)
+			} else {
+				slog.Warn("Container found unhealthy, removing", "containerId", c.ID, "language", lang)
+				p.removeContainer(c)
+
+				// Recreate replacement
+				image := p.images[lang]
+				if image != "" {
+					id, workDir, err := p.createContainer(ctx, image, lang)
+					if err == nil {
+						healthy = append(healthy, &PooledContainer{
+							ID:       id,
+							Language: lang,
+							WorkDir:  workDir,
+						})
+						slog.Info("Replaced unhealthy container", "oldId", c.ID, "newId", id, "language", lang)
+					} else {
+						slog.Error("Failed to recreate replacement container", "language", lang, "error", err)
+					}
+				}
+			}
+		}
+		p.available[lang] = healthy
+	}
+}
+
+func (p *ContainerPool) isContainerHealthy(id string) bool {
+	container, err := p.cli.InspectContainer(id)
+	if err != nil {
+		return false
+	}
+	return container.State.Running && !container.State.Paused
+}
+
+func (p *ContainerPool) removeContainer(c *PooledContainer) {
+	_ = p.cli.RemoveContainer(docker.RemoveContainerOptions{
+		ID:    c.ID,
+		Force: true,
+	})
+	_ = workspace.CleanupSubmissionWorkspace(c.WorkDir)
 }
 
 // createContainer creates a new Docker container with a tmpfs volume mount.
@@ -167,7 +280,7 @@ func (p *ContainerPool) createContainer(ctx context.Context, image string, lang 
 		return "", "", fmt.Errorf("failed to start container: %w", err)
 	}
 
-	log.Printf("Started container %s for language %s with workdir %s", container.ID, lang, filepath.Clean(hostWorkDir))
+	slog.Info("Started container", "containerId", container.ID, "language", lang, "workdir", filepath.Clean(hostWorkDir))
 
 	return container.ID, hostWorkDir, nil
 }
@@ -188,7 +301,7 @@ func (p *ContainerPool) pullImage(ctx context.Context, image string) error {
 		repo, tag = parts[0], parts[1]
 	}
 
-	log.Printf("Pulling image: %s:%s", repo, tag)
+	slog.Info("Pulling image", "repository", repo, "tag", tag)
 	pullOptions := docker.PullImageOptions{
 		Repository:   repo,
 		Tag:          tag,

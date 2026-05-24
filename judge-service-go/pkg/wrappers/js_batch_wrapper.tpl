@@ -9,6 +9,13 @@ class TreeNode {
   }
 }
 
+class ListNode {
+  constructor(val, next) {
+    this.val = (val === undefined ? 0 : val);
+    this.next = (next === undefined ? null : next);
+  }
+}
+
 function buildTree(data) {
   if (!data || data.length === 0 || data[0] === null) {
     return null;
@@ -69,9 +76,37 @@ function serializeTree(root) {
   return result;
 }
 
+function buildLinkedList(data) {
+  if (!data || data.length === 0) {
+    return null;
+  }
+
+  const dummy = new ListNode();
+  let curr = dummy;
+  for (const v of data) {
+    curr.next = new ListNode(v);
+    curr = curr.next;
+  }
+
+  return dummy.next;
+}
+
+function serializeLinkedList(head) {
+  const result = [];
+  let curr = head;
+  while (curr) {
+    result.push(curr.val);
+    curr = curr.next;
+  }
+  return result;
+}
+
 function convertInput(val, typeStr) {
   if (typeStr && typeStr.startsWith("tree")) {
     return buildTree(val);
+  }
+  if (typeStr && typeStr.startsWith("linkedlist")) {
+    return buildLinkedList(val);
   }
   return val;
 }
@@ -79,6 +114,9 @@ function convertInput(val, typeStr) {
 function convertOutput(val, typeStr) {
   if (val instanceof TreeNode || (typeStr && typeStr.startsWith("tree"))) {
     return serializeTree(val);
+  }
+  if (val instanceof ListNode || (typeStr && typeStr.startsWith("linkedlist"))) {
+    return serializeLinkedList(val);
   }
   return val;
 }
@@ -99,7 +137,7 @@ async function runAll() {
       tests = JSON.parse(fs.readFileSync(0, "utf8"));
     }
     
-    const params = {{PARAMS_JSON}};
+    const params = {{PARAMS_JSON}} || [];
     const returnType = "{{RETURN_TYPE}}";
 
     for (let i = 0; i < tests.length; i++) {
@@ -113,7 +151,12 @@ async function runAll() {
         });
 
         let out = await {{FUNCTION_NAME}}(...convertedInputs);
-        const convertedOut = convertOutput(out, returnType);
+        let convertedOut;
+        if (returnType === "void" && convertedInputs.length > 0) {
+          convertedOut = convertOutput(convertedInputs[0], params[0] ? params[0].type : "");
+        } else {
+          convertedOut = convertOutput(out, returnType);
+        }
         emit({ test: i + 1, output: convertedOut });
       } catch (exc) {
         emit({

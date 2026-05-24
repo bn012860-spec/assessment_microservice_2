@@ -1,18 +1,168 @@
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
+import com.google.gson.TypeAdapter;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonToken;
+import com.google.gson.stream.JsonWriter;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
+import java.util.*;
+
+class TreeNode {
+    int val;
+    TreeNode left;
+    TreeNode right;
+    TreeNode() {}
+    TreeNode(int val) { this.val = val; }
+    TreeNode(int val, TreeNode left, TreeNode right) {
+        this.val = val;
+        this.left = left;
+        this.right = right;
+    }
+}
+
+class ListNode {
+    int val;
+    ListNode next;
+    ListNode() {}
+    ListNode(int val) { this.val = val; }
+    ListNode(int val, ListNode next) { this.val = val; this.next = next; }
+}
 
 public class Main {
-    private static final Gson GSON = new Gson();
+    private static class TreeNodeAdapter extends TypeAdapter<TreeNode> {
+        @Override
+        public void write(JsonWriter out, TreeNode root) throws IOException {
+            if (root == null) {
+                out.nullValue();
+                return;
+            }
+            List<Integer> result = new ArrayList<>();
+            Queue<TreeNode> queue = new LinkedList<>();
+            queue.add(root);
+            while (!queue.isEmpty()) {
+                TreeNode node = queue.poll();
+                if (node != null) {
+                    result.add(node.val);
+                    queue.add(node.left);
+                    queue.add(node.right);
+                } else {
+                    result.add(null);
+                }
+            }
+            while (!result.isEmpty() && result.get(result.size() - 1) == null) {
+                result.remove(result.size() - 1);
+            }
+            out.beginArray();
+            for (Integer val : result) {
+                if (val == null) out.nullValue();
+                else out.value(val);
+            }
+            out.endArray();
+        }
+
+        @Override
+        public TreeNode read(JsonReader in) throws IOException {
+            if (in.peek() == JsonToken.NULL) {
+                in.nextNull();
+                return null;
+            }
+            List<Integer> data = new ArrayList<>();
+            in.beginArray();
+            while (in.hasNext()) {
+                if (in.peek() == JsonToken.NULL) {
+                    in.nextNull();
+                    data.add(null);
+                } else {
+                    data.add(in.nextInt());
+                }
+            }
+            in.endArray();
+
+            if (data.isEmpty() || data.get(0) == null) return null;
+
+            TreeNode root = new TreeNode(data.get(0));
+            Queue<TreeNode> queue = new LinkedList<>();
+            queue.add(root);
+            int i = 1;
+            while (!queue.isEmpty() && i < data.size()) {
+                TreeNode node = queue.poll();
+                if (i < data.size()) {
+                    Integer leftVal = data.get(i++);
+                    if (leftVal != null) {
+                        node.left = new TreeNode(leftVal);
+                        queue.add(node.left);
+                    }
+                }
+                if (i < data.size()) {
+                    Integer rightVal = data.get(i++);
+                    if (rightVal != null) {
+                        node.right = new TreeNode(rightVal);
+                        queue.add(node.right);
+                    }
+                }
+            }
+            return root;
+        }
+    }
+
+    private static class ListNodeAdapter extends TypeAdapter<ListNode> {
+        @Override
+        public void write(JsonWriter out, ListNode head) throws IOException {
+            if (head == null) {
+                out.nullValue();
+                return;
+            }
+            out.beginArray();
+            ListNode curr = head;
+            while (curr != null) {
+                out.value(curr.val);
+                curr = curr.next;
+            }
+            out.endArray();
+        }
+
+        @Override
+        public ListNode read(JsonReader in) throws IOException {
+            if (in.peek() == JsonToken.NULL) {
+                in.nextNull();
+                return null;
+            }
+            List<Integer> data = new ArrayList<>();
+            in.beginArray();
+            while (in.hasNext()) {
+                if (in.peek() == JsonToken.NULL) {
+                    in.nextNull(); // Should not happen for linked list in LeetCode usually
+                } else {
+                    data.add(in.nextInt());
+                }
+            }
+            in.endArray();
+
+            if (data.isEmpty()) return null;
+            ListNode dummy = new ListNode();
+            ListNode curr = dummy;
+            for (Integer val : data) {
+                curr.next = new ListNode(val == null ? 0 : val);
+                curr = curr.next;
+            }
+            return dummy.next;
+        }
+    }
+
+    private static final Gson GSON = new GsonBuilder()
+        .registerTypeAdapter(TreeNode.class, new TreeNodeAdapter())
+        .registerTypeAdapter(ListNode.class, new ListNodeAdapter())
+        .create();
 
     public static void main(String[] args) {
         try {
@@ -22,10 +172,15 @@ public class Main {
             );
             JsonArray inputs = payload.getAsJsonArray("inputs");
             Method method = resolveMethod(inputs == null ? 0 : inputs.size());
-            Object output = invoke(method, inputs);
+            Object[] argsValues = prepareArgs(method, inputs);
+            Object output = invoke(method, argsValues);
 
             JsonObject result = new JsonObject();
-            result.add("output", GSON.toJsonTree(output));
+            if (method.getReturnType().equals(Void.TYPE) && argsValues.length > 0) {
+                result.add("output", GSON.toJsonTree(argsValues[0]));
+            } else {
+                result.add("output", GSON.toJsonTree(output));
+            }
             System.out.println(GSON.toJson(result));
         } catch (InvocationTargetException err) {
             Throwable cause = err.getCause() != null ? err.getCause() : err;
@@ -53,15 +208,17 @@ public class Main {
         throw new NoSuchMethodException("method {{FUNCTION_NAME}} with " + argCount + " arguments not found");
     }
 
-    private static Object invoke(Method method, JsonArray inputs) throws InvocationTargetException, IllegalAccessException {
+    private static Object[] prepareArgs(Method method, JsonArray inputs) {
         Type[] parameterTypes = method.getGenericParameterTypes();
         Object[] args = new Object[parameterTypes.length];
-
         for (int i = 0; i < parameterTypes.length; i++) {
             JsonElement input = inputs != null && i < inputs.size() ? inputs.get(i) : JsonNull.INSTANCE;
             args[i] = GSON.fromJson(input, parameterTypes[i]);
         }
+        return args;
+    }
 
+    private static Object invoke(Method method, Object[] args) throws InvocationTargetException, IllegalAccessException {
         Solution solution = new Solution();
         return method.invoke(solution, args);
     }

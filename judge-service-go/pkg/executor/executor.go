@@ -4,9 +4,10 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -107,6 +108,9 @@ func (e *Executor) runExecWithTimeout(ctx context.Context, containerID string, w
 	select {
 	case err := <-done:
 		if err != nil {
+			if errors.Is(err, context.DeadlineExceeded) || childCtx.Err() == context.DeadlineExceeded || strings.Contains(strings.ToLower(err.Error()), "deadline exceeded") {
+				return stdoutBuf.String(), stderrBuf.String(), -1, NewExecutionError(ErrTimeLimitExceeded, fmt.Sprintf("execution timed out after %v", timeout), -1)
+			}
 			return stdoutBuf.String(), stderrBuf.String(), -1, err
 		}
 	case <-childCtx.Done():
@@ -115,11 +119,11 @@ func (e *Executor) runExecWithTimeout(ctx context.Context, containerID string, w
 		select {
 		case <-done:
 		case <-time.After(2 * time.Second):
-			log.Printf("[container=%s] exec waiter did not exit promptly after cancellation: %v", containerID, cmd)
+			slog.Warn("exec waiter did not exit promptly after cancellation", "containerId", containerID, "cmd", cmd)
 		}
 		if childCtx.Err() == context.DeadlineExceeded {
-			log.Printf("[container=%s] exec timed out after %v: %v", containerID, timeout, cmd)
-			return stdoutBuf.String(), stderrBuf.String(), -1, fmt.Errorf("execution timed out after %v", timeout)
+			slog.Warn("exec timed out", "containerId", containerID, "timeout", timeout, "cmd", cmd)
+			return stdoutBuf.String(), stderrBuf.String(), -1, NewExecutionError(ErrTimeLimitExceeded, fmt.Sprintf("execution timed out after %v", timeout), -1)
 		}
 		return stdoutBuf.String(), stderrBuf.String(), -1, childCtx.Err()
 	case <-ctx.Done():
@@ -128,7 +132,7 @@ func (e *Executor) runExecWithTimeout(ctx context.Context, containerID string, w
 		select {
 		case <-done:
 		case <-time.After(2 * time.Second):
-			log.Printf("[container=%s] exec waiter did not exit promptly after caller cancellation: %v", containerID, cmd)
+			slog.Warn("exec waiter did not exit promptly after caller cancellation", "containerId", containerID, "cmd", cmd)
 		}
 		return stdoutBuf.String(), stderrBuf.String(), -1, ctx.Err()
 	}
@@ -137,6 +141,13 @@ func (e *Executor) runExecWithTimeout(ctx context.Context, containerID string, w
 	inspect, err := e.cli.InspectExec(execObj.ID)
 	if err != nil {
 		return stdoutBuf.String(), stderrBuf.String(), -1, fmt.Errorf("failed to inspect exec: %w", err)
+	}
+
+	if inspect.ExitCode != 0 {
+		if inspect.ExitCode == 137 {
+			return stdoutBuf.String(), stderrBuf.String(), inspect.ExitCode, NewExecutionError(ErrMemoryLimitExceeded, "process killed (possibly OOM)", inspect.ExitCode)
+		}
+		return stdoutBuf.String(), stderrBuf.String(), inspect.ExitCode, NewExecutionError(ErrRuntimeError, fmt.Sprintf("exit code %d", inspect.ExitCode), inspect.ExitCode)
 	}
 
 	return stdoutBuf.String(), stderrBuf.String(), inspect.ExitCode, nil
@@ -271,7 +282,11 @@ func (e *Executor) runExecStreamWithTimeout(ctx context.Context, containerID str
 		select {
 		case err := <-done:
 			if err != nil {
-				waitResult.err = err
+				if errors.Is(err, context.DeadlineExceeded) || childCtx.Err() == context.DeadlineExceeded || strings.Contains(strings.ToLower(err.Error()), "deadline exceeded") {
+					waitResult.err = NewExecutionError(ErrTimeLimitExceeded, fmt.Sprintf("execution timed out after %v", timeout), -1)
+				} else {
+					waitResult.err = err
+				}
 				stream.waitCh <- waitResult
 				return
 			}
@@ -280,11 +295,11 @@ func (e *Executor) runExecStreamWithTimeout(ctx context.Context, containerID str
 			select {
 			case <-done:
 			case <-time.After(2 * time.Second):
-				log.Printf("[container=%s] exec waiter did not exit promptly after cancellation: %v", containerID, cmd)
+				slog.Warn("exec waiter did not exit promptly after cancellation", "containerId", containerID, "cmd", cmd)
 			}
 			if childCtx.Err() == context.DeadlineExceeded {
-				log.Printf("[container=%s] exec timed out after %v: %v", containerID, timeout, cmd)
-				waitResult.err = fmt.Errorf("execution timed out after %v", timeout)
+				slog.Warn("exec timed out", "containerId", containerID, "timeout", timeout, "cmd", cmd)
+				waitResult.err = NewExecutionError(ErrTimeLimitExceeded, fmt.Sprintf("execution timed out after %v", timeout), -1)
 			} else {
 				waitResult.err = childCtx.Err()
 			}
@@ -295,7 +310,7 @@ func (e *Executor) runExecStreamWithTimeout(ctx context.Context, containerID str
 			select {
 			case <-done:
 			case <-time.After(2 * time.Second):
-				log.Printf("[container=%s] exec waiter did not exit promptly after caller cancellation: %v", containerID, cmd)
+				slog.Warn("exec waiter did not exit promptly after caller cancellation", "containerId", containerID, "cmd", cmd)
 			}
 			waitResult.err = ctx.Err()
 			stream.waitCh <- waitResult
@@ -310,6 +325,13 @@ func (e *Executor) runExecStreamWithTimeout(ctx context.Context, containerID str
 		}
 
 		waitResult.exitCode = inspect.ExitCode
+		if inspect.ExitCode != 0 {
+			if inspect.ExitCode == 137 {
+				waitResult.err = NewExecutionError(ErrMemoryLimitExceeded, "process killed (possibly OOM)", inspect.ExitCode)
+			} else {
+				waitResult.err = NewExecutionError(ErrRuntimeError, fmt.Sprintf("exit code %d", inspect.ExitCode), inspect.ExitCode)
+			}
+		}
 		stream.waitCh <- waitResult
 	}()
 
@@ -351,12 +373,9 @@ func (e *Executor) RunInContainer(ctx context.Context, containerID string, files
 
 	// Compile step (if present)
 	if len(compileCmd) > 0 {
-		compileStdout, compileStderr, exitCode, err := e.runExecWithTimeout(subCtx, containerID, containerWorkDir, rewriteCommandForWorkspace(compileCmd, containerWorkDir), timeout)
+		compileStdout, compileStderr, _, err := e.runExecWithTimeout(subCtx, containerID, containerWorkDir, rewriteCommandForWorkspace(compileCmd, containerWorkDir), timeout)
 		if err != nil {
-			return compileStdout, compileStderr, fmt.Errorf("compilation command failed: %w", err)
-		}
-		if exitCode != 0 {
-			return compileStdout, compileStderr, fmt.Errorf("compilation failed with exit code %d", exitCode)
+			return compileStdout, compileStderr, NewExecutionError(ErrCompilationFailed, err.Error(), -1)
 		}
 	}
 
@@ -364,15 +383,8 @@ func (e *Executor) RunInContainer(ctx context.Context, containerID string, files
 	if err != nil {
 		return "", "", err
 	}
-	runStdout, runStderr, exitCode, err := e.collectStream(stream)
-	if err != nil {
-		return runStdout, runStderr, fmt.Errorf("execution command failed: %w", err)
-	}
-	if exitCode != 0 {
-		return runStdout, runStderr, fmt.Errorf("execution failed with exit code %d", exitCode)
-	}
-
-	return runStdout, runStderr, nil
+	runStdout, runStderr, _, err := e.collectStream(stream)
+	return runStdout, runStderr, err
 }
 
 func (e *Executor) CompileInContainer(ctx context.Context, containerID string, files []string, hostWorkDir string, containerWorkDir string, compileCmd []string, timeout time.Duration) (string, string, error) {
@@ -384,12 +396,9 @@ func (e *Executor) CompileInContainer(ctx context.Context, containerID string, f
 		return "", "", err
 	}
 
-	compileStdout, compileStderr, exitCode, err := e.runExecWithTimeout(subCtx, containerID, containerWorkDir, rewriteCommandForWorkspace(compileCmd, containerWorkDir), timeout)
+	compileStdout, compileStderr, _, err := e.runExecWithTimeout(subCtx, containerID, containerWorkDir, rewriteCommandForWorkspace(compileCmd, containerWorkDir), timeout)
 	if err != nil {
-		return compileStdout, compileStderr, fmt.Errorf("compilation command failed: %w", err)
-	}
-	if exitCode != 0 {
-		return compileStdout, compileStderr, fmt.Errorf("compilation failed with exit code %d", exitCode)
+		return compileStdout, compileStderr, NewExecutionError(ErrCompilationFailed, err.Error(), -1)
 	}
 
 	return compileStdout, compileStderr, nil
@@ -407,21 +416,17 @@ func (e *Executor) RunInContainerStream(ctx context.Context, containerID string,
 	}
 
 	if len(compileCmd) > 0 {
-		compileStdout, compileStderr, exitCode, err := e.runExecWithTimeout(subCtx, containerID, containerWorkDir, rewriteCommandForWorkspace(compileCmd, containerWorkDir), timeout)
+		compileStdout, compileStderr, _, err := e.runExecWithTimeout(subCtx, containerID, containerWorkDir, rewriteCommandForWorkspace(compileCmd, containerWorkDir), timeout)
 		if err != nil {
 			cancel()
-			return nil, fmt.Errorf("compilation command failed: %w | stdout=%s stderr=%s", err, compileStdout, compileStderr)
-		}
-		if exitCode != 0 {
-			cancel()
-			return nil, fmt.Errorf("compilation failed with exit code %d | stdout=%s stderr=%s", exitCode, compileStdout, compileStderr)
+			return nil, NewExecutionError(ErrCompilationFailed, fmt.Sprintf("%v | stdout=%s stderr=%s", err, compileStdout, compileStderr), -1)
 		}
 	}
 
 	stream, err := e.runExecStreamWithTimeout(subCtx, containerID, containerWorkDir, rewriteCommandForWorkspace(runCmd, containerWorkDir), timeout)
 	if err != nil {
 		cancel()
-		return nil, fmt.Errorf("execution command failed: %w", err)
+		return nil, err
 	}
 
 	wrapped := &ExecStream{

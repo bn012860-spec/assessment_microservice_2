@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"fmt"
+	"strings"
 
 	"judge-service-go/pkg/languages"
 	"judge-service-go/pkg/models"
@@ -26,7 +27,9 @@ func (JavaScriptAdapter) PrepareFiles(workDir string, submissionMsg models.Submi
 		return nil, err
 	}
 
-	if err := workspace.WriteFile(workDir, "wrapper.js", []byte(wrapperCode), 0644); err != nil {
+	finalCode := strings.Replace(wrapperCode, "// USER_CODE_MARKER", submissionMsg.Code, 1)
+
+	if err := workspace.WriteFile(workDir, "wrapper.js", []byte(finalCode), 0644); err != nil {
 		return nil, fmt.Errorf("failed to write wrapper.js: %w", err)
 	}
 
@@ -44,7 +47,9 @@ func (JavaScriptAdapter) PrepareBatchFiles(workDir string, submissionMsg models.
 		return nil, err
 	}
 
-	if err := workspace.WriteFile(workDir, "wrapper.js", []byte(wrapperCode), 0644); err != nil {
+	finalCode := strings.Replace(wrapperCode, "// USER_CODE_MARKER", submissionMsg.Code, 1)
+
+	if err := workspace.WriteFile(workDir, "wrapper.js", []byte(finalCode), 0644); err != nil {
 		return nil, fmt.Errorf("failed to write wrapper.js: %w", err)
 	}
 

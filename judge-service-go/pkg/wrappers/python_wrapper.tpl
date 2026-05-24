@@ -28,6 +28,14 @@ class TreeNode:
     def __repr__(self):
         return f"TreeNode({self.val})"
 
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val = val
+        self.next = next
+    
+    def __repr__(self):
+        return f"ListNode({self.val})"
+
 def build_tree(data):
     if not data or data[0] is None:
         return None
@@ -65,14 +73,36 @@ def serialize_tree(root):
         result.pop()
     return result
 
+def build_linked_list(data):
+    if not data:
+        return None
+    dummy = ListNode()
+    curr = dummy
+    for v in data:
+        curr.next = ListNode(v)
+        curr = curr.next
+    return dummy.next
+
+def serialize_linked_list(head):
+    result = []
+    curr = head
+    while curr:
+        result.append(curr.val)
+        curr = curr.next
+    return result
+
 def convert_input(val, type_str):
     if type_str.startswith("tree"):
         return build_tree(val)
+    if type_str.startswith("linkedlist"):
+        return build_linked_list(val)
     return val
 
 def convert_output(val, type_str):
     if isinstance(val, TreeNode) or type_str.startswith("tree"):
         return serialize_tree(val)
+    if isinstance(val, ListNode) or type_str.startswith("linkedlist"):
+        return serialize_linked_list(val)
     return val
 
 # --- user code will be inserted above this block ---
@@ -84,7 +114,7 @@ def run_tests():
     return_type = '''{{RETURN_TYPE}}'''
     
     tests = json.loads(test_cases_json)
-    params = json.loads(params_json)
+    params = json.loads(params_json) or []
     
     results = []
     for i, t in enumerate(tests):
@@ -97,7 +127,11 @@ def run_tests():
             
             out = {{FUNCTION_NAME}}(*converted_inputs)
             
-            converted_out = convert_output(out, return_type)
+            if return_type == "void" and len(converted_inputs) > 0:
+                converted_out = convert_output(converted_inputs[0], params[0]["type"] if params else "")
+            else:
+                converted_out = convert_output(out, return_type)
+
             expected = t.get("expected")
             
             ok = converted_out == expected

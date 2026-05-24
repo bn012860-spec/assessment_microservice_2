@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"fmt"
+	"strings"
 
 	"judge-service-go/pkg/languages"
 	"judge-service-go/pkg/models"
@@ -27,7 +28,10 @@ func (PythonAdapter) PrepareFiles(workDir string, submissionMsg models.Submissio
 		return nil, err
 	}
 
-	if err := workspace.WriteFile(workDir, "wrapper.py", []byte(wrapperCode), 0644); err != nil {
+	finalCode := strings.Replace(wrapperCode, "// USER_CODE_MARKER", submissionMsg.Code, 1)
+	finalCode = strings.Replace(finalCode, "# USER_CODE_MARKER", submissionMsg.Code, 1)
+
+	if err := workspace.WriteFile(workDir, "wrapper.py", []byte(finalCode), 0644); err != nil {
 		return nil, fmt.Errorf("failed to write wrapper.py: %w", err)
 	}
 
@@ -45,7 +49,10 @@ func (PythonAdapter) PrepareBatchFiles(workDir string, submissionMsg models.Subm
 		return nil, err
 	}
 
-	if err := workspace.WriteFile(workDir, "wrapper.py", []byte(wrapperCode), 0644); err != nil {
+	finalCode := strings.Replace(wrapperCode, "// USER_CODE_MARKER", submissionMsg.Code, 1)
+	finalCode = strings.Replace(finalCode, "# USER_CODE_MARKER", submissionMsg.Code, 1)
+
+	if err := workspace.WriteFile(workDir, "wrapper.py", []byte(finalCode), 0644); err != nil {
 		return nil, fmt.Errorf("failed to write wrapper.py: %w", err)
 	}
 

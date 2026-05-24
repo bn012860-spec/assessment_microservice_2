@@ -48,6 +48,10 @@ func twoSumProblemJava() models.Problem {
 		Description:  "integration test",
 		FunctionName: "twoSum",
 		ReturnType:   "array",
+		Parameters: []models.Parameter{
+			{Name: "nums", Type: "array<number>"},
+			{Name: "target", Type: "number"},
+		},
 		TestCases: []models.TestCase{
 			{
 				Input:    []interface{}{[]interface{}{float64(2), float64(7), float64(11), float64(15)}, float64(9)},
@@ -65,7 +69,7 @@ func runCentralJavaOnce(t *testing.T, exec *executor.Executor, pc *pool.PooledCo
 		SubmissionID: "integration-test-java",
 		ProblemID:    "integration-problem-java",
 		Language:     "java",
-		FunctionName: "twoSum",
+		FunctionName: problem.FunctionName,
 		Code:         code,
 	}
 

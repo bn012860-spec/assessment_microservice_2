@@ -3,14 +3,17 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/url"
 	"os"
+	"os/signal"
 	"regexp"
 	"runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -56,7 +59,8 @@ func toSnakeCase(str string) string {
 
 func failOnError(err error, msg string) {
 	if err != nil {
-		log.Panicf("%s: %s", msg, err)
+		slog.Error(msg, "error", err)
+		os.Exit(1)
 	}
 }
 
@@ -122,7 +126,7 @@ func validateAndDecodeSubmission(d amqp.Delivery) (models.SubmissionMessage, err
 	}
 
 	// Log ASAP, but validation will catch missing ID.
-	log.Printf("[submission=%s] Received a message", msg.SubmissionID)
+	slog.Info("Received a message", "submissionId", msg.SubmissionID)
 
 	if err := msg.Validate(); err != nil {
 		return msg, fmt.Errorf("invalid submission message: %w", err)
@@ -130,7 +134,7 @@ func validateAndDecodeSubmission(d amqp.Delivery) (models.SubmissionMessage, err
 
 	sanitizedName, ok := msg.SanitizeFunctionName()
 	if !ok {
-		log.Printf("[submission=%s] sanitized function name %q -> %q", msg.SubmissionID, msg.FunctionName, sanitizedName)
+		slog.Debug("sanitized function name", "submissionId", msg.SubmissionID, "old", msg.FunctionName, "new", sanitizedName)
 		msg.FunctionName = sanitizedName
 	}
 
@@ -242,12 +246,19 @@ func fallbackResultForExecutionFailure(executionPath string, execErr error, stdo
 	}
 
 	if execErr != nil {
-		errText := strings.ToLower(execErr.Error())
-		if strings.Contains(errText, "compilation failed") || strings.Contains(errText, "compilation command failed") {
-			return result
-		}
-		if strings.Contains(errText, "timed out") || strings.Contains(errText, "deadline exceeded") {
-			return result
+		var execErrObj *executor.ExecutionError
+		if errors.As(execErr, &execErrObj) {
+			switch execErrObj.Type {
+			case executor.ErrCompilationFailed:
+				result.Status = models.SubmissionStatusCompilationError
+				return result
+			case executor.ErrTimeLimitExceeded:
+				result.Status = models.SubmissionStatusTimeLimitExceeded
+				return result
+			case executor.ErrMemoryLimitExceeded:
+				result.Status = models.SubmissionStatusMemoryLimitExceeded
+				return result
+			}
 		}
 	}
 
@@ -278,7 +289,7 @@ func processAndStoreResults(ctx context.Context, executionPath string, stdout, s
 			}
 			submissionOutput = stdout
 		} else {
-			log.Printf("[submission=%s] Error unmarshalling stdout to result: %v, Stdout: %s", submissionMsg.SubmissionID, err, stdout)
+			slog.Error("Error unmarshalling stdout to result", "submissionId", submissionMsg.SubmissionID, "error", err, "stdout", stdout)
 			submissionTestResult = fallbackResultForExecutionFailure(executionPath, execErr, stdout)
 			submissionOutput = fmt.Sprintf("Invalid judge output: %v\nStdout: %s", err, stdout)
 			if execErr != nil {
@@ -292,7 +303,7 @@ func processAndStoreResults(ctx context.Context, executionPath string, stdout, s
 
 	submissionObjID, err := primitive.ObjectIDFromHex(submissionMsg.SubmissionID)
 	if err != nil {
-		log.Printf("[submission=%s] Invalid SubmissionID for result update: %v", submissionMsg.SubmissionID, err)
+		slog.Error("Invalid SubmissionID for result update", "submissionId", submissionMsg.SubmissionID, "error", err)
 		return
 	}
 
@@ -306,7 +317,7 @@ func processAndStoreResults(ctx context.Context, executionPath string, stdout, s
 	}
 	_, err = submissionsCollection.UpdateByID(ctx, submissionObjID, update)
 	if err != nil {
-		log.Printf("[submission=%s] Error updating submission in MongoDB: %v", submissionMsg.SubmissionID, err)
+		slog.Error("Error updating submission in MongoDB", "submissionId", submissionMsg.SubmissionID, "error", err)
 		// Not returning error, as we will still try to update Redis
 	}
 
@@ -315,7 +326,7 @@ func processAndStoreResults(ctx context.Context, executionPath string, stdout, s
 	problemObjID, _ := primitive.ObjectIDFromHex(submissionMsg.ProblemID)
 	err = submissionsCollection.FindOne(ctx, bson.M{"_id": submissionObjID}).Decode(&originalSubmission)
 	if err != nil {
-		log.Printf("[submission=%s] Could not fetch original submission for Redis update: %v", submissionMsg.SubmissionID, err)
+		slog.Warn("Could not fetch original submission for Redis update", "submissionId", submissionMsg.SubmissionID, "error", err)
 		// Continue without full data if necessary
 	}
 
@@ -336,7 +347,7 @@ func processAndStoreResults(ctx context.Context, executionPath string, stdout, s
 	if err == nil {
 		err := redisClient.Set(ctx, fmt.Sprintf("submission:%s", submissionMsg.SubmissionID), jsonSubmission, 3600*time.Second).Err()
 		if err != nil {
-			log.Printf("[submission=%s] Error updating submission in Redis: %v", submissionMsg.SubmissionID, err)
+			slog.Error("Error updating submission in Redis", "submissionId", submissionMsg.SubmissionID, "error", err)
 		}
 	}
 }
@@ -347,28 +358,28 @@ func processSubmission(d amqp.Delivery, problemsCollection *mongo.Collection, su
 
 	submissionMsg, err := validateAndDecodeSubmission(d)
 	if err != nil {
-		log.Printf("Validation failed: %v", err)
+		slog.Error("Validation failed", "error", err)
 		d.Nack(false, false) // Permanent failure
 		return
 	}
 
 	problem, err := fetchProblemData(ctx, problemsCollection, submissionMsg.ProblemID)
 	if err != nil {
-		log.Printf("[submission=%s] %v", submissionMsg.SubmissionID, err)
+		slog.Error("Failed to fetch problem data", "submissionId", submissionMsg.SubmissionID, "error", err)
 		d.Nack(false, true) // Transient failure (DB might be down)
 		return
 	}
 
 	// Validate the problem data and parse/normalize test cases from the problem doc.
 	if err := problem.ValidateBasic(); err != nil {
-		log.Printf("[submission=%s] Invalid problem data: %v", submissionMsg.SubmissionID, err)
+		slog.Error("Invalid problem data", "submissionId", submissionMsg.SubmissionID, "error", err)
 		d.Nack(false, false) // Permanent failure, bad data
 		return
 	}
 
 	lang := languages.GetLanguage(submissionMsg.Language)
 	if lang == nil {
-		log.Printf("[submission=%s] Unsupported language: %s", submissionMsg.SubmissionID, submissionMsg.Language)
+		slog.Error("Unsupported language", "submissionId", submissionMsg.SubmissionID, "language", submissionMsg.Language)
 		d.Nack(false, false)
 		return
 	}
@@ -376,7 +387,7 @@ func processSubmission(d amqp.Delivery, problemsCollection *mongo.Collection, su
 	// Acquire a container from the pool
 	pooledContainer := containerPool.Acquire(lang.ID)
 	if pooledContainer == nil {
-		log.Printf("[submission=%s] No available containers for language %s, retrying...", submissionMsg.SubmissionID, lang.ID)
+		slog.Warn("No available containers for language, retrying...", "submissionId", submissionMsg.SubmissionID, "language", lang.ID)
 		d.Nack(false, true)
 		return
 	}
@@ -388,14 +399,14 @@ func processSubmission(d amqp.Delivery, problemsCollection *mongo.Collection, su
 
 		result, err := runSubmissionCentral(execCtx, executor, pooledContainer, submissionMsg, problem, adapter)
 		if err != nil {
-			log.Printf("[submission=%s] Central %s execution setup failed: %v", submissionMsg.SubmissionID, adapter.Name(), err)
+			slog.Error("Central execution setup failed", "submissionId", submissionMsg.SubmissionID, "adapter", adapter.Name(), "error", err)
 			d.Nack(false, false)
 			return
 		}
 
 		resultBytes, err := result.ToJSON()
 		if err != nil {
-			log.Printf("[submission=%s] Failed to marshal central result: %v", submissionMsg.SubmissionID, err)
+			slog.Error("Failed to marshal central result", "submissionId", submissionMsg.SubmissionID, "error", err)
 			d.Nack(false, false)
 			return
 		}
@@ -407,19 +418,19 @@ func processSubmission(d amqp.Delivery, problemsCollection *mongo.Collection, su
 
 	submissionWorkspace, err := workspace.NewSubmissionWorkspace(pooledContainer.WorkDir, submissionMsg.SubmissionID)
 	if err != nil {
-		log.Printf("[submission=%s] Failed to create submission workspace: %v", submissionMsg.SubmissionID, err)
+		slog.Error("Failed to create submission workspace", "submissionId", submissionMsg.SubmissionID, "error", err)
 		d.Nack(false, true)
 		return
 	}
 	defer func() {
 		if cleanupErr := workspace.CleanupSubmissionWorkspace(submissionWorkspace.HostPath); cleanupErr != nil {
-			log.Printf("[submission=%s] Failed to cleanup submission workspace %s: %v", submissionMsg.SubmissionID, submissionWorkspace.HostPath, cleanupErr)
+			slog.Error("Failed to cleanup submission workspace", "submissionId", submissionMsg.SubmissionID, "path", submissionWorkspace.HostPath, "error", cleanupErr)
 		}
 	}()
 
 	filesToCopy, compileCmd, runCmd, err := prepareSubmissionFiles(submissionMsg, problem, lang, submissionWorkspace.HostPath)
 	if err != nil {
-		log.Printf("[submission=%s] Failed to prepare submission files: %v", submissionMsg.SubmissionID, err)
+		slog.Error("Failed to prepare submission files", "submissionId", submissionMsg.SubmissionID, "error", err)
 		d.Nack(false, false)
 		return
 	}
@@ -438,7 +449,7 @@ func processSubmission(d amqp.Delivery, problemsCollection *mongo.Collection, su
 		runCmd,
 		defaultSandboxTimeout,
 	)
-	log.Printf("Execution finished for submission %s. Stdout: %s, Stderr: %s, Error: %v", submissionMsg.SubmissionID, stdout, stderr, execErr)
+	slog.Info("Execution finished", "submissionId", submissionMsg.SubmissionID, "error", execErr)
 
 	processAndStoreResults(ctx, models.ExecutionPathLegacy, stdout, stderr, execErr, submissionMsg, submissionsCollection, redisClient)
 
@@ -468,7 +479,11 @@ func isCentralCompareEnabled(language string) bool {
 }
 
 func main() {
-	fmt.Println("Go Judge Service starting...")
+	// Initialize Structured Logging
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
+
+	slog.Info("Go Judge Service starting...")
 
 	// Load environment variables or use defaults
 	rabbitmqURL := os.Getenv("RABBITMQ_URL")
@@ -488,40 +503,54 @@ func main() {
 		redisURI = defaultRedisURI
 	}
 
+	poolSize := defaultPoolSizePerLang
+	if val := os.Getenv("DEFAULT_POOL_SIZE"); val != "" {
+		if i, err := fmt.Sscanf(val, "%d", &poolSize); err == nil && i > 0 {
+			slog.Info("Using configured pool size", "size", poolSize)
+		}
+	}
+
 	// Initialize Docker Executor
 	executor, err := executor.NewExecutor()
 	failOnError(err, "Failed to create Docker executor")
 
 	// Initialize Container Pool
-	containerPool := pool.NewPool(executor.Client(), defaultPoolSizePerLang)
-	log.Println("Warming up container pool...")
+	containerPool := pool.NewPool(executor.Client(), poolSize)
+	slog.Info("Warming up container pool...")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	workspace.StartSweeper(
-		context.Background(),
+		ctx,
 		workspace.RootDir,
 		5*time.Minute,
 		time.Hour,
 	)
+
 	var wg sync.WaitGroup
 	for _, lang := range languages.GetSupportedLanguages() {
 		wg.Add(1)
 		go func(l *languages.Language) {
 			defer wg.Done()
-			log.Printf("Warming up pool for %s...", l.ID)
-			err := containerPool.WarmUp(context.Background(), l.ID, l.Image, defaultPoolSizePerLang)
+			slog.Info("Warming up pool", "language", l.ID)
+			err := containerPool.WarmUp(ctx, l.ID, l.Image, poolSize)
 			if err != nil {
-				log.Printf("Failed to warm up pool for %s: %v", l.ID, err)
+				slog.Error("Failed to warm up pool", "language", l.ID, "error", err)
 			}
 		}(lang)
 	}
 	wg.Wait()
-	log.Println("Container pool warmed up.")
+	slog.Info("Container pool warmed up.")
+
+	containerPool.StartMonitor(ctx, time.Minute)
 
 	// Connect to MongoDB
-	mongoClient, err := mongo.Connect(context.Background(), options.Client().ApplyURI(mongoURI))
+	mongoClient, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
 	failOnError(err, "Failed to connect to MongoDB")
 	defer func() {
 		if err = mongoClient.Disconnect(context.Background()); err != nil {
-			log.Printf("Error disconnecting from MongoDB: %v", err)
+			slog.Error("Error disconnecting from MongoDB", "error", err)
 		}
 	}()
 
@@ -543,7 +572,7 @@ func main() {
 		Addr: redisAddr,
 		DB:   0, // use default DB
 	})
-	_, err = redisClient.Ping(context.Background()).Result()
+	_, err = redisClient.Ping(ctx).Result()
 	failOnError(err, "Failed to connect to Redis")
 
 	// Connect to RabbitMQ
@@ -554,6 +583,9 @@ func main() {
 	ch, err := conn.Channel()
 	failOnError(err, "Failed to open a channel")
 	defer ch.Close()
+
+	err = ch.Qos(runtime.NumCPU(), 0, false)
+	failOnError(err, "Failed to set QoS")
 
 	_, err = ch.QueueDeclare(
 		submissionQueueName, // name
@@ -576,17 +608,43 @@ func main() {
 	)
 	failOnError(err, "Failed to register a consumer")
 
-	log.Printf(" [*] Waiting for messages in %s. To exit press CTRL+C", submissionQueueName)
+	slog.Info("Waiting for messages", "queue", submissionQueueName)
 
-	forever := make(chan struct{})
+	// Graceful Shutdown implementation
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	for i := 0; i < runtime.NumCPU(); i++ { // Number of concurrent workers
-		go func() {
+	workerWg := sync.WaitGroup{}
+	numWorkers := runtime.NumCPU()
+
+	for i := 0; i < numWorkers; i++ {
+		workerWg.Add(1)
+		go func(workerID int) {
+			defer workerWg.Done()
+			slog.Debug("Worker started", "workerId", workerID)
 			for d := range msgs {
 				processSubmission(d, problemsCollection, submissionsCollection, redisClient, executor, containerPool)
 			}
-		}()
+			slog.Debug("Worker stopped", "workerId", workerID)
+		}(i)
 	}
 
-	<-forever
+	sig := <-sigChan
+	slog.Info("Received signal, shutting down...", "signal", sig.String())
+
+	// 1. Stop consuming (closing the channel or cancelling the consumer)
+	err = ch.Cancel("", false)
+	if err != nil {
+		slog.Error("Error cancelling consumer", "error", err)
+	}
+
+	// 2. Wait for active workers to finish
+	slog.Info("Waiting for active workers to finish...")
+	workerWg.Wait()
+
+	// 3. Cleanup pool
+	slog.Info("Cleaning up container pool...")
+	containerPool.Shutdown(context.Background())
+
+	slog.Info("Shutdown complete.")
 }

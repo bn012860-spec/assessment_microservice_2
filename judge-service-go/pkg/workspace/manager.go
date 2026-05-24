@@ -3,7 +3,7 @@ package workspace
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -71,11 +71,11 @@ func StartSweeper(ctx context.Context, root string, interval time.Duration, maxA
 			case <-ticker.C:
 				removed, err := SweepSubmissionWorkspaces(root, maxAge, time.Now())
 				if err != nil {
-					log.Printf("workspace sweeper failed: %v", err)
+					slog.Error("workspace sweeper failed", "error", err)
 					continue
 				}
 				if removed > 0 {
-					log.Printf("workspace sweeper removed %d stale submission workspaces", removed)
+					slog.Info("workspace sweeper cleaned up stale workspaces", "count", removed)
 				}
 			}
 		}

@@ -26,6 +26,14 @@ class TreeNode:
     def __repr__(self):
         return f"TreeNode({self.val})"
 
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val = val
+        self.next = next
+    
+    def __repr__(self):
+        return f"ListNode({self.val})"
+
 def build_tree(data):
     if not data or data[0] is None:
         return None
@@ -63,14 +71,36 @@ def serialize_tree(root):
         result.pop()
     return result
 
+def build_linked_list(data):
+    if not data:
+        return None
+    dummy = ListNode()
+    curr = dummy
+    for v in data:
+        curr.next = ListNode(v)
+        curr = curr.next
+    return dummy.next
+
+def serialize_linked_list(head):
+    result = []
+    curr = head
+    while curr:
+        result.append(curr.val)
+        curr = curr.next
+    return result
+
 def convert_input(val, type_str):
     if type_str.startswith("tree"):
         return build_tree(val)
+    if type_str.startswith("linkedlist"):
+        return build_linked_list(val)
     return val
 
 def convert_output(val, type_str):
     if isinstance(val, TreeNode) or type_str.startswith("tree"):
         return serialize_tree(val)
+    if isinstance(val, ListNode) or type_str.startswith("linkedlist"):
+        return serialize_linked_list(val)
     return val
 
 # USER_CODE_MARKER
@@ -86,7 +116,7 @@ def run_all():
     decoded = base64.b64decode(sys.argv[1]).decode("utf-8")
     tests = json.loads(decoded)
     
-    params = json.loads('''{{PARAMS_JSON}}''')
+    params = json.loads('''{{PARAMS_JSON}}''') or []
     return_type = '''{{RETURN_TYPE}}'''
 
     for i, test in enumerate(tests):
@@ -94,16 +124,20 @@ def run_all():
             raw_inputs = test.get("inputs", [])
             converted_inputs = []
             for j, val in enumerate(raw_inputs):
-                type_str = params[j]["type"] if j < len(params) else ""
+                type_str = params[j]["type"] if params and j < len(params) else ""
                 converted_inputs.append(convert_input(val, type_str))
             
             if isinstance(converted_inputs, list):
                 out = {{FUNCTION_NAME}}(*converted_inputs)
             else:
                 out = {{FUNCTION_NAME}}(converted_inputs)
-            
-            converted_out = convert_output(out, return_type)
-            emit({"test": i + 1, "output": converted_out})
+
+            if return_type == "void" and len(converted_inputs) > 0:
+                converted_out = convert_output(converted_inputs[0], params[0]["type"] if params else "")
+            else:
+                converted_out = convert_output(out, return_type)
+
+            emit({ "test": i + 1, "output": converted_out })
         except Exception as exc:
             emit({
                 "test": i + 1,
