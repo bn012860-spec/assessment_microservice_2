@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
@@ -499,6 +500,39 @@ func isCentralCompareEnabled(language string) bool {
 	}
 }
 
+func startHealthServer(ctx context.Context, containerPool *pool.ContainerPool, port string) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "healthy"})
+	})
+
+	mux.HandleFunc("/stats", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(containerPool.GetStats())
+	})
+
+	server := &http.Server{
+		Addr:    ":" + port,
+		Handler: mux,
+	}
+
+	go func() {
+		slog.Info("Health/Stats server starting", "port", port)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("Health server failed", "error", err)
+		}
+	}()
+
+	go func() {
+		<-ctx.Done()
+		slog.Info("Shutting down health server...")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		server.Shutdown(shutdownCtx)
+	}()
+}
+
 func main() {
 	// Initialize Structured Logging
 	logLevel := slog.LevelInfo
@@ -578,6 +612,13 @@ func main() {
 	slog.Info("Container pool warmed up.")
 
 	containerPool.StartMonitor(ctx, time.Minute)
+
+	// Start Health/Stats Server
+	healthPort := os.Getenv("HEALTH_PORT")
+	if healthPort == "" {
+		healthPort = "8081"
+	}
+	startHealthServer(ctx, containerPool, healthPort)
 
 	// Connect to MongoDB
 	mongoClient, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))

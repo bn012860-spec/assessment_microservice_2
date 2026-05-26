@@ -1,14 +1,20 @@
 import express from "express";
 import problemsRoutes from "./problems.routes.js";
+import assessmentsRoutes from "./assessments.routes.js";
 import submissionsRoutes from "./submissions.routes.js";
 import previewRoutes from "./preview.routes.js";
 import authRoutes from "./auth.routes.js";
+import healthRoutes from "./health.routes.js";
+import adminRoutes from "./admin.routes.js";
 
 const router = express.Router();
 
 router.use("/problems", problemsRoutes);
+router.use("/assessments", assessmentsRoutes);
 router.use("/submissions", submissionsRoutes);
 router.use("/preview", previewRoutes);
 router.use("/auth", authRoutes);
+router.use("/health", healthRoutes);
+router.use("/admin", adminRoutes);
 
 export default router;

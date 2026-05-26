@@ -44,8 +44,31 @@ const SubmissionOutput = ({ output }) => {
         return <pre>{output}</pre>;
     }
 
+    // Handle results without details (e.g. Compilation Error, or some system errors)
     if (!(parsed && typeof parsed === 'object' && parsed.status && Array.isArray(parsed.details))) {
-        return <pre>{JSON.stringify(parsed, null, 2)}</pre>;
+        const verdictClass = verdictClassMap[parsed.status] || 'neutral';
+        return (
+            <div className="submission-output">
+                <div className={`result-box ${verdictClass}`}>
+                    <div className="result-box__label">Verdict</div>
+                    <h3>{parsed.status}</h3>
+                </div>
+                {parsed.stderr && (
+                    <div className="mt-20">
+                        <h4>Standard Error</h4>
+                        <pre className="stderr-output">{parsed.stderr}</pre>
+                    </div>
+                )}
+                {parsed.internalError && (
+                    <div className="mt-20">
+                        <p style={{ color: '#dc3545' }}><strong>Internal Error:</strong> {parsed.internalError}</p>
+                    </div>
+                )}
+                {!parsed.stderr && !parsed.internalError && (
+                    <pre>{JSON.stringify(parsed, null, 2)}</pre>
+                )}
+            </div>
+        );
     }
 
     const passedCount = parsed.passedCount ?? parsed.passed ?? 0;

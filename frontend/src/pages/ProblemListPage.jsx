@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api';
 
-function ProblemListPage() {
+function ProblemListPage({ user }) {
   const [problems, setProblems] = useState([]);
   const [filters, setFilters] = useState({
     search: '',
@@ -11,13 +11,15 @@ function ProblemListPage() {
     tag: ''
   });
 
+  const canManage = user && (user.role === 'admin' || user.role === 'faculty');
+
   useEffect(() => {
     const params = new URLSearchParams();
     if (filters.search) params.append('search', filters.search);
     if (filters.difficulty) params.append('difficulty', filters.difficulty);
     if (filters.tag) params.append('tag', filters.tag);
 
-    api.get(`/api/problems?\${params.toString()}`)
+    api.get(`/api/problems?${params.toString()}`)
       .then(response => setProblems(response.data))
       .catch(error => console.error('Error fetching problems:', error));
   }, [filters]);
@@ -28,6 +30,7 @@ function ProblemListPage() {
   };
 
   const handleDelete = (_id) => {
+    if (!window.confirm('Are you sure you want to delete this problem?')) return;
     api.delete(`/api/problems/${_id}`)
       .then(() => {
         setProblems(problems.filter(problem => problem._id !== _id));
@@ -39,7 +42,7 @@ function ProblemListPage() {
     <div className="container">
       <h2 className="mb-20">Problems</h2>
       <div className="flex-gap mb-20">
-        <Link to="/add-problem" className="button">Add New Problem</Link>
+        {canManage && <Link to="/add-problem" className="button">Add New Problem</Link>}
         <div style={{ flex: 1 }}></div>
         <input 
           type="text" 
@@ -73,7 +76,7 @@ function ProblemListPage() {
               <th>Difficulty</th>
               <th>Submissions</th>
               <th>Acceptance</th>
-              <th>Actions</th>
+              {canManage && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
@@ -89,10 +92,12 @@ function ProblemListPage() {
                   <td>{problem.difficulty}</td>
                   <td>{problem.submissionCount || 0}</td>
                   <td>{rate}</td>
-                  <td>
-                    <Link to={`/problems/${problem._id}/edit`} className="button">Edit</Link>
-                    <button onClick={() => handleDelete(problem._id)} className="button button-danger">Delete</button>
-                  </td>
+                  {canManage && (
+                    <td>
+                      <Link to={`/problems/${problem._id}/edit`} className="button">Edit</Link>
+                      <button onClick={() => handleDelete(problem._id)} className="button button-danger">Delete</button>
+                    </td>
+                  )}
                 </tr>
               );
             })}

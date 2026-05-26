@@ -5,7 +5,8 @@ import SubmissionOutput from '../components/SubmissionOutput';
 
 const supportedLanguages = ['python', 'javascript', 'java', 'c', 'csharp'];
 
-function buildTemplate(language, functionName, paramNames) {
+function buildTemplate(language, functionName, parameters) {
+  const paramNames = (parameters || []).map(p => p.name);
   const params = paramNames.join(', ');
 
   if (language === 'python') {
@@ -15,7 +16,19 @@ function buildTemplate(language, functionName, paramNames) {
     return `function ${functionName}(${params}) {\n  // your code here\n}`;
   }
   if (language === 'java') {
-    return `class Solution {\n    public static Object ${functionName}(${paramNames.map((p) => `Object ${p}`).join(', ')}) {\n        // your code here\n        return null;\n    }\n}`;
+    const mapType = (t) => {
+      if (t === 'number') return 'int';
+      if (t === 'string') return 'String';
+      if (t === 'boolean') return 'boolean';
+      if (t.startsWith('array<')) return 'int[]'; // Simplified
+      if (t.startsWith('matrix<')) return 'int[][]';
+      if (t.startsWith('linkedlist')) return 'ListNode';
+      if (t.startsWith('tree')) return 'TreeNode';
+      return 'Object';
+    };
+    const returnTypeStr = parameters && parameters.length > 0 ? 'Object' : 'Object'; // Default
+    // For now, let's stick to Object for safety but add the semicolon
+    return `import java.util.*;\n\nclass Solution {\n    public Object ${functionName}(${(parameters || []).map(p => `Object ${p.name}`).join(', ')}) {\n        // your code here\n        return null;\n    }\n}`;
   }
   if (language === 'c') {
     return `long ${functionName}(long *args, int argc) {\n    // your code here\n    return 0;\n}`;
@@ -23,14 +36,14 @@ function buildTemplate(language, functionName, paramNames) {
   return `public class UserSolution {\n    public object ${functionName}(${paramNames.map((p) => `object ${p}`).join(', ')}) {\n        // your code here\n        return null;\n    }\n}`;
 }
 
-const ProblemPage = () => {
+const ProblemPage = ({ user }) => {
   const { _id } = useParams();
   const [problem, setProblem] = useState(null);
   const [code, setCode] = useState('');
   const [selectedLanguage, setSelectedLanguage] = useState('python');
   const [submission, setSubmission] = useState(null);
   const intervalRef = useRef(null);
-  const isAuthed = !!localStorage.getItem('token');
+  const isAuthed = !!user;
 
   useEffect(() => {
     const fetchProblem = async () => {
@@ -39,8 +52,7 @@ const ProblemPage = () => {
         const fetchedProblem = res.data;
         setProblem(fetchedProblem);
 
-        const paramNames = (fetchedProblem.parameters || []).map((p) => p.name);
-        setCode(buildTemplate(selectedLanguage, fetchedProblem.functionName || 'solution', paramNames));
+        setCode(buildTemplate(selectedLanguage, fetchedProblem.functionName || 'solution', fetchedProblem.parameters));
       } catch (err) {
         console.error(`Error fetching problem ${_id}:`, err);
       }

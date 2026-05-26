@@ -82,14 +82,19 @@ function sanitizeSubmissionForStudent(submission, problem) {
   return normalized;
 }
 
-export async function submitSolution({ problemId, code, language, userId }) {
-  const submission = await submissionsRepo.create({
+export async function submitSolution({ problemId, code, language, userId, assessmentId = null, attemptId = null }) {
+  const submissionData = {
     problemId,
     code,
     language,
     userId,
     status: "Pending"
-  });
+  };
+
+  if (assessmentId) submissionData.assessmentId = assessmentId;
+  if (attemptId) submissionData.attemptId = attemptId;
+
+  const submission = await submissionsRepo.create(submissionData);
 
   const problem = await problemsRepo.findById(problemId);
   if (!problem) {

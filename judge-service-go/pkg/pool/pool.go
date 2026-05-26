@@ -138,6 +138,33 @@ func (p *ContainerPool) Shutdown(ctx context.Context) {
 	p.inUse = make(map[string]*PooledContainer)
 }
 
+// PoolStats represents the current state of the container pool.
+type PoolStats struct {
+	Available map[string]int `json:"available"`
+	InUse     map[string]int `json:"in_use"`
+}
+
+// GetStats returns the current statistics of the container pool.
+func (p *ContainerPool) GetStats() PoolStats {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	stats := PoolStats{
+		Available: make(map[string]int),
+		InUse:     make(map[string]int),
+	}
+
+	for lang, containers := range p.available {
+		stats.Available[lang] = len(containers)
+	}
+
+	for _, c := range p.inUse {
+		stats.InUse[c.Language]++
+	}
+
+	return stats
+}
+
 // StartMonitor starts a background goroutine to monitor container health.
 func (p *ContainerPool) StartMonitor(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)

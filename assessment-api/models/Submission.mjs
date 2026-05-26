@@ -13,6 +13,18 @@ const SubmissionSchema = new Schema({
         ref: 'User',
         required: true
     },
+    assessmentId: {
+        type: Schema.Types.ObjectId,
+        ref: 'Assessment'
+    },
+    attemptId: {
+        type: Schema.Types.ObjectId,
+        ref: 'AssessmentAttempt'
+    },
+    score: {
+        type: Number,
+        default: 0
+    },
     code: {
         type: String,
         required: true
