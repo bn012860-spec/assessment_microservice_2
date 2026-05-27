@@ -120,6 +120,28 @@ export async function listAssessmentAttempts(assessmentId, user) {
   return attemptsRepo.findAll({ assessmentId });
 }
 
+export async function submitAssessment(attemptId, user) {
+  const attempt = await attemptsRepo.findById(attemptId);
+  if (!attempt) throw new HttpError(404, "Attempt not found");
+
+  // Permission check
+  const studentId = attempt.studentId._id || attempt.studentId;
+  if (user.role === 'student' && String(studentId) !== String(user._id)) {
+    throw new HttpError(403, "Forbidden");
+  }
+
+  if (attempt.status !== 'Active') {
+    return attempt; // Already submitted
+  }
+
+  await recalculateAttemptScore(attemptId);
+  
+  return attemptsRepo.updateById(attemptId, {
+    status: 'Submitted',
+    submittedAt: new Date()
+  });
+}
+
 export async function getAttemptSubmissions(attemptId, user) {
   const attempt = await attemptsRepo.findById(attemptId);
   if (!attempt) throw new HttpError(404, "Attempt not found");
@@ -139,6 +161,9 @@ function validateAssessmentPayload(payload) {
   if (!payload.startTime) errors.push("Start time is required");
   if (!payload.endTime) errors.push("End time is required");
   if (!payload.durationMinutes) errors.push("Duration is required");
+  if (payload.startTime && payload.endTime && new Date(payload.startTime) >= new Date(payload.endTime)) {
+    errors.push("End time must be after start time");
+  }
   if (!Array.isArray(payload.problems) || payload.problems.length === 0) {
     errors.push("At least one problem is required");
   }

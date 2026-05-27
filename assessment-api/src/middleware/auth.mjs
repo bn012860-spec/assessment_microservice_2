@@ -9,6 +9,9 @@ export function verifyToken(req, res, next) {
   try {
     const decoded = jwt.verify(token, env.JWT_SECRET);
     req.user = decoded;
+    if (req.user.id && !req.user._id) {
+      req.user._id = req.user.id;
+    }
     next();
   } catch (err) {
     return res.status(401).json({ message: "Invalid token" });
@@ -23,6 +26,9 @@ export function optionalVerifyToken(req, res, next) {
   try {
     const decoded = jwt.verify(token, env.JWT_SECRET);
     req.user = decoded;
+    if (req.user.id && !req.user._id) {
+      req.user._id = req.user.id;
+    }
   } catch (err) {
     // Ignore invalid optional token and proceed as anonymous.
   }

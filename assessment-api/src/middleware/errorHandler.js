@@ -1,11 +1,18 @@
 export function errorHandler(err, req, res, next) {
   console.error(err);
 
+  const status = err.status || 500;
+  const message = err.message || "Internal Server Error";
+
   if (err.status && err.body) {
-    return res.status(err.status).json(err.body);
+    const responseBody = typeof err.body === 'object' ? { ...err.body } : { body: err.body };
+    if (!responseBody.msg) responseBody.msg = message;
+    if (!responseBody.message) responseBody.message = message;
+    return res.status(status).json(responseBody);
   }
 
-  res.status(err.status || 500).json({
-    message: err.message || "Internal Server Error"
+  res.status(status).json({
+    message: message,
+    msg: message
   });
 }

@@ -21,6 +21,15 @@ export async function getProblemById(req, res, next) {
   }
 }
 
+export async function getProblemStats(req, res, next) {
+  try {
+    const stats = await problemsService.getProblemStats(req.params._id);
+    res.json(stats);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function createProblem(req, res, next) {
   try {
     const problem = await problemsService.createProblem({ ...req.body });

@@ -23,7 +23,7 @@ const AssessmentResultPage = () => {
         // We'll use a filtered list from the general submissions endpoint for now
         // A dedicated endpoint for attempt submissions would be better in the future
         const submissionsRes = await api.get('/api/submissions/my');
-        const attemptSubmissions = submissionsRes.data.filter(s => s.attemptId === attemptId);
+        const attemptSubmissions = submissionsRes.data.filter(s => String(s.attemptId) === String(attemptId));
         setSubmissions(attemptSubmissions);
 
       } catch (err) {
@@ -39,7 +39,10 @@ const AssessmentResultPage = () => {
   if (error) return <div className="container error">{error}</div>;
 
   const getProblemResult = (problemId) => {
-    const problemSubmissions = submissions.filter(s => s.problemId === problemId || s.problemId?._id === problemId);
+    const problemSubmissions = submissions.filter(s => {
+      const sProblemId = s.problemId?._id || s.problemId;
+      return String(sProblemId) === String(problemId);
+    });
     const wasAccepted = problemSubmissions.some(s => s.status === 'Success');
     return wasAccepted ? 'Accepted' : (problemSubmissions.length > 0 ? 'Failed' : 'Not Attempted');
   };

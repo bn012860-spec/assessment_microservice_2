@@ -56,6 +56,15 @@ export async function startAssessment(req, res, next) {
   }
 }
 
+export async function submitAssessment(req, res, next) {
+  try {
+    const attempt = await assessmentsService.submitAssessment(req.params.attemptId, req.user);
+    res.json(attempt);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function getAssessmentAttemptById(req, res, next) {
   try {
     const attempt = await assessmentsService.getAssessmentAttemptById(req.params.attemptId, req.user);

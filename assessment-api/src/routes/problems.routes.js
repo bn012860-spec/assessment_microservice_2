@@ -4,6 +4,7 @@ import { verifyToken, optionalVerifyToken, authorizeRoles } from "../middleware/
 import {
   listProblems,
   getProblemById,
+  getProblemStats,
   createProblem,
   deleteProblem,
   updateProblem
@@ -13,6 +14,7 @@ const router = express.Router();
 
 router.get("/", listProblems);
 router.get("/:_id", optionalVerifyToken, getProblemById);
+router.get("/:_id/stats", optionalVerifyToken, getProblemStats);
 router.post("/", verifyToken, authorizeRoles("admin", "faculty"), validate("problem"), createProblem);
 router.put("/:_id", verifyToken, authorizeRoles("admin", "faculty"), validate("problem"), updateProblem);
 router.delete("/:_id", verifyToken, authorizeRoles("admin"), deleteProblem);

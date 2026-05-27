@@ -10,7 +10,7 @@ import {
 const router = express.Router();
 
 router.post("/", verifyToken, validate("submission"), submitSolution);
-router.get("/me", verifyToken, getMySubmissions);
+router.get("/my", verifyToken, getMySubmissions);
 router.get("/:_id", verifyToken, getSubmissionById);
 
 export default router;

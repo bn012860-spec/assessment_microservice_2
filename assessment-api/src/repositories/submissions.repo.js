@@ -11,7 +11,7 @@ export async function findById(id) {
 
 export async function findByUserId(userId) {
   return Submission.find({ userId })
-    .select("_id problemId language status createdAt updatedAt")
+    .select("_id problemId language status score attemptId assessmentId createdAt updatedAt")
     .populate("problemId", "title")
     .sort({ createdAt: -1 });
 }

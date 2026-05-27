@@ -1,4 +1,5 @@
 import * as problemsRepo from "../repositories/problems.repo.js";
+import Submission from "../../models/Submission.mjs";
 import { HttpError } from "../utils/httpError.js";
 
 function isPrivilegedRole(role) {
@@ -213,6 +214,41 @@ export async function getProblemById(id, user = null) {
   }
 
   return sanitizeProblemForStudent(problem);
+}
+
+export async function getProblemStats(problemId) {
+  const totalSubmissions = await Submission.countDocuments({ problemId });
+  const acceptedSubmissions = await Submission.countDocuments({ problemId, status: "Success" });
+  
+  const successSubmissions = await Submission.find({ problemId, status: "Success" });
+  
+  let totalTime = 0;
+  let countWithTime = 0;
+  
+  successSubmissions.forEach(s => {
+    let elapsed = null;
+    if (s.testResult && typeof s.testResult === 'object') {
+      elapsed = s.testResult.elapsedMs ?? s.testResult.totalTimeMs;
+    } else if (s.output) {
+      try {
+        const parsed = JSON.parse(s.output);
+        elapsed = parsed.elapsedMs ?? parsed.totalTimeMs;
+      } catch (e) { /* ignore */ }
+    }
+    
+    if (elapsed !== null && typeof elapsed === 'number') {
+      totalTime += elapsed;
+      countWithTime++;
+    }
+  });
+
+  return {
+    problemId,
+    totalSubmissions,
+    acceptedSubmissions,
+    acceptanceRate: totalSubmissions > 0 ? (acceptedSubmissions / totalSubmissions) * 100 : 0,
+    averageRuntimeMs: countWithTime > 0 ? totalTime / countWithTime : null
+  };
 }
 
 export async function createProblem(payload) {

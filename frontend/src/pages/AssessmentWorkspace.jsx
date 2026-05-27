@@ -159,6 +159,17 @@ const AssessmentWorkspace = ({ user }) => {
     return `${h > 0 ? h.toString().padStart(2, '0') + ':' : ''}${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
+  const finishAssessment = async () => {
+    if (window.confirm('Are you sure you want to finish the assessment?')) {
+      try {
+        await assessments.submitAttempt(attemptId);
+        navigate(`/assessment-attempt/${attemptId}/result`);
+      } catch (err) {
+        alert('Failed to finish assessment. Please try again.');
+      }
+    }
+  };
+
   if (loading) return <div className="container">Loading workspace...</div>;
   if (error) return <div className="container error">{error}</div>;
   if (!currentProblem) return <div className="container">No problems found.</div>;
@@ -195,7 +206,7 @@ const AssessmentWorkspace = ({ user }) => {
           <button 
             className="button" 
             style={{ width: '100%', background: '#2ecc71' }}
-            onClick={() => navigate(`/assessment-attempt/${attemptId}/result`)}
+            onClick={finishAssessment}
           >
             Finish Assessment
           </button>

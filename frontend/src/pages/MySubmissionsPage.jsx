@@ -11,7 +11,7 @@ const MySubmissionsPage = () => {
   useEffect(() => {
     const fetchMySubmissions = async () => {
       try {
-        const res = await api.get("/api/submissions/me");
+        const res = await api.get("/api/submissions/my");
         setSubmissions(res.data || []);
       } catch (err) {
         const msg =
@@ -98,6 +98,19 @@ const MySubmissionsPage = () => {
           <p><strong>Status:</strong> {selectedSubmission.status}</p>
           <p><strong>Language:</strong> {selectedSubmission.language}</p>
           <p><strong>Submitted:</strong> {new Date(selectedSubmission.createdAt).toLocaleString()}</p>
+          
+          <h4>Code</h4>
+          <pre style={{ 
+            background: '#f8f9fa', 
+            padding: '15px', 
+            borderRadius: '4px', 
+            border: '1px solid #ddd',
+            overflowX: 'auto',
+            fontFamily: 'monospace'
+          }}>
+            {selectedSubmission.code}
+          </pre>
+
           {selectedSubmission.output && (
             <>
               <h4>Output</h4>

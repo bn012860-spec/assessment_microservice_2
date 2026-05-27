@@ -75,6 +75,7 @@ export const assessments = {
   update: (id, data) => api.put(`/api/assessments/${id}`, data),
   delete: (id) => api.delete(`/api/assessments/${id}`),
   start: (id) => api.post(`/api/assessments/${id}/start`),
+  submitAttempt: (attemptId) => api.post(`/api/assessments/attempts/${attemptId}/submit`),
   getAttempt: (attemptId) => api.get(`/api/assessments/attempts/${attemptId}`),
   getAttemptSubmissions: (attemptId) => api.get(`/api/assessments/attempts/${attemptId}/submissions`),
   listAttempts: (assessmentId) => api.get(`/api/assessments/${assessmentId}/attempts`)

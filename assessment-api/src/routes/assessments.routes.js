@@ -7,6 +7,7 @@ import {
   updateAssessment,
   deleteAssessment,
   startAssessment,
+  submitAssessment,
   getAssessmentAttemptById,
   listAssessmentAttempts,
   getAttemptSubmissions
@@ -21,6 +22,7 @@ router.put("/:_id", verifyToken, authorizeRoles("admin", "faculty"), updateAsses
 router.delete("/:_id", verifyToken, authorizeRoles("admin", "faculty"), deleteAssessment);
 
 router.post("/:_id/start", verifyToken, authorizeRoles("student"), startAssessment);
+router.post("/attempts/:attemptId/submit", verifyToken, authorizeRoles("student"), submitAssessment);
 router.get("/:_id/attempts", verifyToken, authorizeRoles("admin", "faculty"), listAssessmentAttempts);
 router.get("/attempts/:attemptId", verifyToken, getAssessmentAttemptById);
 router.get("/attempts/:attemptId/submissions", verifyToken, getAttemptSubmissions);

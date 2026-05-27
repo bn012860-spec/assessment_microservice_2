@@ -39,6 +39,7 @@ function buildTemplate(language, functionName, parameters) {
 const ProblemPage = ({ user }) => {
   const { _id } = useParams();
   const [problem, setProblem] = useState(null);
+  const [stats, setStats] = useState(null);
   const [code, setCode] = useState('');
   const [selectedLanguage, setSelectedLanguage] = useState('python');
   const [submission, setSubmission] = useState(null);
@@ -48,9 +49,14 @@ const ProblemPage = ({ user }) => {
   useEffect(() => {
     const fetchProblem = async () => {
       try {
-        const res = await api.get(`/api/problems/${_id}`);
-        const fetchedProblem = res.data;
+        const [problemRes, statsRes] = await Promise.all([
+          api.get(`/api/problems/${_id}`),
+          api.get(`/api/problems/${_id}/stats`)
+        ]);
+        
+        const fetchedProblem = problemRes.data;
         setProblem(fetchedProblem);
+        setStats(statsRes.data);
 
         setCode(buildTemplate(selectedLanguage, fetchedProblem.functionName || 'solution', fetchedProblem.parameters));
       } catch (err) {
@@ -75,6 +81,9 @@ const ProblemPage = ({ user }) => {
       if (currentSubmission.status === 'Success' || currentSubmission.status === 'Fail' || currentSubmission.status === 'Error') {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
+        // Refresh stats after a submission finishes
+        const statsRes = await api.get(`/api/problems/${_id}/stats`);
+        setStats(statsRes.data);
       }
     } catch (err) {
       clearInterval(intervalRef.current);
@@ -124,13 +133,21 @@ const ProblemPage = ({ user }) => {
           ))}
         </div>
         <p>{problem.description}</p>
-        <div className="flex-gap mt-10">
-          <p><strong>Submissions:</strong> {problem.submissionCount || 0}</p>
-          <p><strong>Acceptance:</strong> {problem.submissionCount > 0 ? ((problem.acceptedCount / problem.submissionCount) * 100).toFixed(1) + '%' : '0%'}</p>
+        {stats && (
+          <div className="flex-gap mt-10" style={{ fontSize: '0.9em', color: '#666' }}>
+            <span><strong>Submissions:</strong> {stats.totalSubmissions}</span>
+            <span><strong>Accepted:</strong> {stats.acceptedSubmissions}</span>
+            <span><strong>Acceptance Rate:</strong> {stats.acceptanceRate.toFixed(1)}%</span>
+            {stats.averageRuntimeMs !== null && (
+              <span><strong>Avg Runtime:</strong> {stats.averageRuntimeMs.toFixed(0)}ms</span>
+            )}
+          </div>
+        )}
+        <div style={{ marginTop: '15px' }}>
+          <p><strong>Function:</strong> {problem.functionName}</p>
+          <p><strong>Return Type:</strong> {problem.returnType}</p>
+          <p><strong>Parameters:</strong> {(problem.parameters || []).map((p) => `${p.name}: ${p.type}`).join(', ') || 'None'}</p>
         </div>
-        <p><strong>Function:</strong> {problem.functionName}</p>
-        <p><strong>Return Type:</strong> {problem.returnType}</p>
-        <p><strong>Parameters:</strong> {(problem.parameters || []).map((p) => `${p.name}: ${p.type}`).join(', ') || 'None'}</p>
       </div>
 
       <div className="form-group mt-20">
