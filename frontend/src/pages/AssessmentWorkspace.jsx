@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import Editor from '@monaco-editor/react';
+import { Clock, CheckCircle2, ChevronRight, Terminal, Play, Send, Info, Code2, AlertCircle, ChevronDown, ChevronUp, Loader2, Trash2 } from 'lucide-react';
 import api, { assessments } from '../api';
 import SubmissionOutput from '../components/SubmissionOutput';
 
@@ -33,6 +35,11 @@ const AssessmentWorkspace = ({ user }) => {
   const intervalRefs = useRef({}); // problemId -> intervalId
 
   const [timeLeft, setTimeLeft] = useState(null);
+  const [showConsole, setShowConsole] = useState(false);
+  const [consoleTab, setConsoleTab] = useState('testcases');
+
+  const [testCasesMap, setTestCasesMap] = useState({});
+  const [activeTestCaseIdxMap, setActiveTestCaseIdxMap] = useState({});
 
   useEffect(() => {
     const fetchData = async () => {
@@ -45,24 +52,33 @@ const AssessmentWorkspace = ({ user }) => {
         const assessmentData = assessmentRes.data;
         setAssessment(assessmentData);
 
-        // Fetch full problem details for all problems in assessment
         const problemPromises = assessmentData.problems.map(p => api.get(`/api/problems/${p.problemId._id || p.problemId}`));
         const problemResponses = await Promise.all(problemPromises);
         const fullProblems = problemResponses.map(r => r.data);
         setProblems(fullProblems);
 
-        // Initialize code templates
         const initialCodeMap = {};
         const initialLangMap = {};
+        const initialTestCasesMap = {};
+        const initialActiveIdxMap = {};
+
         fullProblems.forEach(p => {
           const lang = assessmentData.allowedLanguages?.[0] || 'python';
           initialLangMap[p._id] = lang;
           initialCodeMap[p._id] = buildTemplate(lang, p.functionName, p.parameters);
+
+          const samples = (p.testCases || []).filter(tc => tc.isSample);
+          initialTestCasesMap[p._id] = samples.length > 0 
+            ? samples.map(tc => typeof tc.inputs === 'string' ? tc.inputs : JSON.stringify(tc.inputs)) 
+            : ['[]'];
+          initialActiveIdxMap[p._id] = 0;
         });
+        
         setCodeMap(initialCodeMap);
         setLangMap(initialLangMap);
+        setTestCasesMap(initialTestCasesMap);
+        setActiveTestCaseIdxMap(initialActiveIdxMap);
 
-        // Calculate initial time left
         const startTime = new Date(attemptData.startedAt).getTime();
         const durationMs = assessmentData.durationMinutes * 60 * 1000;
         const endTime = startTime + durationMs;
@@ -85,7 +101,6 @@ const AssessmentWorkspace = ({ user }) => {
       setTimeLeft(prev => {
         if (prev <= 1) {
           clearInterval(timer);
-          // Auto submit logic or redirect to results
           navigate(`/assessment-attempt/${attemptId}/result`);
           return 0;
         }
@@ -110,6 +125,32 @@ const AssessmentWorkspace = ({ user }) => {
     setCodeMap(prev => ({ ...prev, [problemId]: code }));
   };
 
+  const handleTestCaseChange = (problemId, idx, value) => {
+    setTestCasesMap(prev => {
+      const next = [...(prev[problemId] || [])];
+      next[idx] = value;
+      return { ...prev, [problemId]: next };
+    });
+  };
+
+  const handleAddTestCase = (problemId) => {
+    setTestCasesMap(prev => ({ ...prev, [problemId]: [...(prev[problemId] || []), '[]'] }));
+    setActiveTestCaseIdxMap(prev => ({ ...prev, [problemId]: (testCasesMap[problemId] || []).length }));
+  };
+
+  const handleRemoveTestCase = (problemId, idx) => {
+    setTestCasesMap(prev => {
+      const next = [...(prev[problemId] || [])];
+      if (next.length <= 1) return prev;
+      next.splice(idx, 1);
+      return { ...prev, [problemId]: next };
+    });
+    setActiveTestCaseIdxMap(prev => {
+      const currentIdx = prev[problemId] || 0;
+      return { ...prev, [problemId]: currentIdx >= idx ? Math.max(0, currentIdx - 1) : currentIdx };
+    });
+  };
+
   const checkStatus = async (submissionId, problemId) => {
     try {
       const res = await api.get(`/api/submissions/${submissionId}`);
@@ -126,29 +167,72 @@ const AssessmentWorkspace = ({ user }) => {
     }
   };
 
+  const [isRunning, setIsRunning] = useState(false);
+  const [runResultMap, setRunResultMap] = useState({});
+
+  const handleRun = async () => {
+    const currentProblem = problems[currentProblemIndex];
+    if (!currentProblem) return;
+
+    setIsRunning(true);
+    setShowConsole(true);
+    setConsoleTab('result');
+    setRunResultMap(prev => ({ ...prev, [currentProblem._id]: null }));
+    setSubmissionMap(prev => ({ ...prev, [currentProblem._id]: null }));
+
+    let tests = [];
+    const tcs = testCasesMap[currentProblem._id] || ['[]'];
+    try {
+      tests = tcs.map(tcStr => {
+        const parsed = JSON.parse(tcStr || '[]');
+        const inputArr = Array.isArray(parsed) ? parsed : [parsed];
+        return { inputs: inputArr, expected: null, isSample: true };
+      });
+    } catch (err) {
+      setRunResultMap(prev => ({ 
+        ...prev, 
+        [currentProblem._id]: { status: 'Error', error: 'Invalid JSON in one of the test cases.' }
+      }));
+      setIsRunning(false);
+      return;
+    }
+
+    try {
+      const res = await api.post(`/api/problems/${currentProblem._id}/run`, {
+        code: codeMap[currentProblem._id],
+        language: langMap[currentProblem._id],
+        customTests: tests
+      });
+      setRunResultMap(prev => ({ ...prev, [currentProblem._id]: res.data }));
+    } catch (err) {
+      setRunResultMap(prev => ({ ...prev, [currentProblem._id]: { status: 'Error', error: 'Failed to run code' } }));
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
   const handleSubmit = async () => {
     const problemId = currentProblem._id;
     if (intervalRefs.current[problemId]) return;
 
-    const payload = {
-      problemId,
-      code: codeMap[problemId],
-      language: langMap[problemId],
-      assessmentId: assessment._id,
-      attemptId: attempt._id
-    };
-
+    setShowConsole(true);
+    setConsoleTab('result');
+    setRunResultMap(prev => ({ ...prev, [problemId]: null }));
+    
     try {
       setSubmissionMap(prev => ({ ...prev, [problemId]: { status: 'Submitting...' } }));
-      const res = await api.post('/api/submissions', payload);
+      const res = await api.post('/api/submissions', {
+        problemId,
+        code: codeMap[problemId],
+        language: langMap[problemId],
+        assessmentId: assessment._id,
+        attemptId: attempt._id
+      });
       const newSubmission = res.data;
       setSubmissionMap(prev => ({ ...prev, [problemId]: newSubmission }));
-
-      intervalRefs.current[problemId] = setInterval(() => {
-        checkStatus(newSubmission._id, problemId);
-      }, 2000);
+      intervalRefs.current[problemId] = setInterval(() => checkStatus(newSubmission._id, problemId), 2000);
     } catch (err) {
-      setSubmissionMap(prev => ({ ...prev, [problemId]: { status: 'Error', output: 'Submission failed' } }));
+      setSubmissionMap(prev => ({ ...prev, [problemId]: { status: 'Error', error: 'Submission failed' } }));
     }
   };
 
@@ -170,115 +254,268 @@ const AssessmentWorkspace = ({ user }) => {
     }
   };
 
-  if (loading) return <div className="container">Loading workspace...</div>;
-  if (error) return <div className="container error">{error}</div>;
+  const handleEditorWillMount = (monaco) => {
+    monaco.editor.defineTheme('modern-dark', {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [],
+      colors: {
+        'editor.background': '#0d1117',
+        'editor.lineHighlightBackground': '#161b22',
+        'editorLineNumber.foreground': '#484f58',
+        'editorIndentGuide.background': '#21262d',
+      }
+    });
+  };
+
+  if (loading) return <div className="container flex-center" style={{ height: '100vh' }}><Loader2 className="spin" size={48} color="var(--primary)" /></div>;
+  if (error) return <div className="container error-box">{error}</div>;
   if (!currentProblem) return <div className="container">No problems found.</div>;
 
   const currentSubmission = submissionMap[currentProblem._id];
   const isJudging = currentSubmission && ['Submitting...', 'Pending', 'Running'].includes(currentSubmission.status);
+  const currentRunResult = runResultMap[currentProblem._id];
+  
+  const currentTestCases = testCasesMap[currentProblem._id] || ['[]'];
+  const currentActiveIdx = activeTestCaseIdxMap[currentProblem._id] || 0;
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 100px)', gap: '20px', padding: '20px' }}>
-      {/* Sidebar */}
-      <div style={{ width: '250px', borderRight: '1px solid #ddd', paddingRight: '20px' }}>
-        <div style={{ marginBottom: '20px', textAlign: 'center' }}>
-          <h3 style={{ margin: 0 }}>Time Remaining</h3>
-          <div style={{ fontSize: '2em', fontWeight: 'bold', color: timeLeft < 300 ? '#e74c3c' : '#2c3e50' }}>
+    <div className="ide-layout fade-in">
+      {/* Sidebar: Navigation & Timer */}
+      <div className="workspace-sidebar" style={{ width: '320px', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
+        <div style={{ padding: '24px', borderBottom: '1px solid var(--border)', textAlign: 'center', background: 'var(--surface)' }}>
+          <div className="flex-center gap-2 mb-2" style={{ color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.1em' }}>
+            <Clock size={14} /> Time Remaining
+          </div>
+          <div style={{ fontSize: '2.5rem', fontWeight: '800', color: timeLeft < 300 ? 'var(--error)' : 'var(--primary)', fontFamily: 'monospace' }}>
             {formatTime(timeLeft)}
           </div>
         </div>
         
-        <h4>Problems</h4>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {problems.map((p, idx) => (
-            <button
-              key={p._id}
-              onClick={() => setCurrentProblemIndex(idx)}
-              className={`button ${currentProblemIndex === idx ? '' : 'button-outline'}`}
-              style={{ textAlign: 'left', background: currentProblemIndex === idx ? '#3498db' : 'transparent', color: currentProblemIndex === idx ? 'white' : '#3498db' }}
-            >
-              {idx + 1}. {p.title}
-            </button>
-          ))}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+          <h4 style={{ margin: '0 0 16px', fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Problems</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {problems.map((p, idx) => (
+              <button
+                key={p._id}
+                onClick={() => setCurrentProblemIndex(idx)}
+                className={`button ${currentProblemIndex === idx ? '' : 'button-outline'}`}
+                style={{ 
+                  textAlign: 'left', 
+                  justifyContent: 'flex-start',
+                  padding: '12px 16px',
+                  fontWeight: '600',
+                  fontSize: '0.9rem',
+                  border: currentProblemIndex === idx ? 'none' : '1px solid var(--border)'
+                }}
+              >
+                <span style={{ marginRight: '10px', opacity: 0.6 }}>{idx + 1}.</span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</span>
+                {submissionMap[p._id]?.status === 'Success' && <CheckCircle2 size={16} color="var(--success)" style={{ marginLeft: 'auto' }} />}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div style={{ marginTop: 'auto', paddingTop: '20px' }}>
+        <div style={{ padding: '20px', borderTop: '1px solid var(--border)', background: 'var(--surface)' }}>
           <button 
             className="button" 
-            style={{ width: '100%', background: '#2ecc71' }}
+            style={{ width: '100%', background: 'var(--success)', padding: '14px', fontSize: '1rem', border: 'none', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)' }}
             onClick={finishAssessment}
           >
+            <CheckCircle2 size={20} />
             Finish Assessment
           </button>
         </div>
       </div>
 
-      {/* Main Workspace */}
+      {/* Main IDE Area */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div style={{ display: 'flex', gap: '20px', flex: 1, overflow: 'hidden' }}>
+        <div className="workspace-main" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
           {/* Problem Description */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '10px', border: '1px solid #eee', borderRadius: '4px' }}>
-            <h2>{currentProblem.title}</h2>
-            <div className="flex-gap mb-20">
+          <div className="workspace-description" style={{ width: '420px', minWidth: '320px', overflowY: 'auto', padding: '32px', borderRight: '1px solid var(--border)', background: 'var(--bg)' }}>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1rem' }}>{currentProblem.title}</h2>
+            <div className="flex-gap mb-6">
               <span className={`tag difficulty-${currentProblem.difficulty.toLowerCase()}`}>{currentProblem.difficulty}</span>
+              <span className="tag">Score: {assessment.problems[currentProblemIndex]?.maxScore || 100}</span>
             </div>
-            <p style={{ whiteSpace: 'pre-wrap' }}>{currentProblem.description}</p>
             
-            <hr />
-            <p><strong>Function:</strong> <code>{currentProblem.functionName}</code></p>
-            <p><strong>Parameters:</strong> {(currentProblem.parameters || []).map(p => `${p.name} (${p.type})`).join(', ')}</p>
-            <p><strong>Return Type:</strong> <code>{currentProblem.returnType}</code></p>
-          </div>
-
-          {/* Editor Area */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <div style={{ marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <label>Language:</label>
-              <select
-                value={langMap[currentProblem._id]}
-                onChange={(e) => handleLanguageChange(currentProblem._id, e.target.value)}
-                disabled={isJudging}
-                style={{ padding: '5px' }}
-              >
-                {(assessment.allowedLanguages?.length > 0 ? assessment.allowedLanguages : supportedLanguages).map(lang => (
-                  <option key={lang} value={lang}>{lang}</option>
-                ))}
-              </select>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.7', whiteSpace: 'pre-wrap', marginBottom: '2rem' }}>
+              {currentProblem.description}
             </div>
-
-            <textarea
-              style={{ 
-                flex: 1, 
-                fontFamily: 'monospace', 
-                padding: '10px', 
-                fontSize: '14px',
-                border: '1px solid #ccc',
-                borderRadius: '4px',
-                resize: 'none'
-              }}
-              value={codeMap[currentProblem._id]}
-              onChange={(e) => handleCodeChange(currentProblem._id, e.target.value)}
-              disabled={isJudging}
-            />
-
-            <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'flex-end' }}>
-              <button 
-                className="button" 
-                onClick={handleSubmit}
-                disabled={isJudging}
-              >
-                {isJudging ? 'Judging...' : 'Submit Answer'}
-              </button>
+            
+            <div style={{ background: 'var(--surface)', padding: '20px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)' }}>
+              <h4 style={{ fontSize: '0.85rem', color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Specs</h4>
+              <div style={{ display: 'grid', gap: '10px', fontSize: '0.9rem' }}>
+                <p><strong>Function:</strong> <code style={{ color: 'var(--primary)', background: 'transparent' }}>{currentProblem.functionName}</code></p>
+                <p><strong>Return:</strong> <code style={{ color: 'var(--success)', background: 'transparent' }}>{currentProblem.returnType}</code></p>
+                <p><strong>Params:</strong> {(currentProblem.parameters || []).map(p => `${p.name} (${p.type})`).join(', ')}</p>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Output Area */}
-        <div style={{ height: '200px', marginTop: '20px', borderTop: '2px solid #ddd', paddingTop: '10px', overflowY: 'auto' }}>
-          <h4>Submission Result: {currentSubmission ? currentSubmission.status : 'Not submitted'}</h4>
-          {currentSubmission && currentSubmission.output && (
-            <SubmissionOutput output={currentSubmission.output} />
-          )}
+          {/* Editor Panel */}
+          <div className="workspace-editor" style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--editor-bg)', boxShadow: 'inset 1px 1px 4px rgba(0,0,0,0.2)' }}>
+            <div className="ide-toolbar">
+              <div className="flex-center gap-4">
+                <div className="flex-center gap-2">
+                  <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Language</span>
+                  <select
+                    value={langMap[currentProblem._id]}
+                    onChange={(e) => handleLanguageChange(currentProblem._id, e.target.value)}
+                    disabled={isJudging}
+                    style={{ width: 'auto', padding: '4px 8px', fontSize: '0.85rem', background: 'var(--bg)' }}
+                  >
+                    {(assessment.allowedLanguages?.length > 0 ? assessment.allowedLanguages : supportedLanguages).map(lang => (
+                      <option key={lang} value={lang}>{lang}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="flex-center gap-2">
+                <button onClick={handleRun} disabled={isRunning || isJudging} className="button button-outline" style={{ height: '36px', padding: '0 16px', fontSize: '0.85rem', borderColor: 'rgba(255,255,255,0.1)' }}>
+                  <Play size={14} /> Run
+                </button>
+                <button onClick={handleSubmit} disabled={isRunning || isJudging} className="button button-primary" style={{ height: '36px', padding: '0 20px', fontSize: '0.85rem' }}>
+                  <Send size={14} /> Submit
+                </button>
+              </div>
+            </div>
+
+            <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
+              <Editor
+                height="100%"
+                language={langMap[currentProblem._id] === 'python' ? 'python' : langMap[currentProblem._id] === 'javascript' ? 'javascript' : langMap[currentProblem._id]}
+                theme="modern-dark"
+                value={codeMap[currentProblem._id]}
+                onChange={(val) => handleCodeChange(currentProblem._id, val)}
+                beforeMount={handleEditorWillMount}
+                options={{
+                  fontSize: 15,
+                  fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                  minimap: { enabled: false },
+                  scrollBeyondLastLine: false,
+                  automaticLayout: true,
+                  padding: { top: 20, bottom: 20 },
+                  renderLineHighlight: 'all'
+                }}
+              />
+            </div>
+
+            {/* Developer Console Drawer */}
+            <div className="console-drawer" style={{ height: showConsole ? '35%' : '44px' }}>
+              <div className="console-header">
+                <div className="console-tabs">
+                  <button 
+                    className={`console-tab ${consoleTab === 'testcases' ? 'active' : ''}`} 
+                    onClick={() => { setConsoleTab('testcases'); setShowConsole(true); }}
+                  >
+                    Testcases
+                  </button>
+                  <button 
+                    className={`console-tab ${consoleTab === 'console' ? 'active' : ''}`} 
+                    onClick={() => { setConsoleTab('console'); setShowConsole(true); }}
+                  >
+                    Console
+                  </button>
+                  <button 
+                    className={`console-tab ${consoleTab === 'result' ? 'active' : ''}`} 
+                    onClick={() => { setConsoleTab('result'); setShowConsole(true); }}
+                  >
+                    Result
+                  </button>
+                </div>
+                <div className="flex-center gap-2">
+                  <button className="text-muted flex-center" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }} onClick={() => setShowConsole(!showConsole)}>
+                    {showConsole ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+                  </button>
+                </div>
+              </div>
+
+              {showConsole && (
+                <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+                  {(isRunning || isJudging) ? (
+                    <div className="flex-center fade-in" style={{ height: '100%', flexDirection: 'column', gap: '16px' }}>
+                      <Loader2 className="spin" size={32} color="var(--primary)" />
+                      <p className="text-muted" style={{ fontWeight: '600', letterSpacing: '0.05em', textTransform: 'uppercase', fontSize: '0.85rem' }}>
+                        {isRunning ? 'Executing Code...' : 'Judging Submission...'}
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      {consoleTab === 'testcases' && (
+                        <div className="fade-in">
+                          <div className="flex-between mb-4">
+                            <div className="flex-center gap-2" style={{ overflowX: 'auto', paddingBottom: '4px' }}>
+                              {currentTestCases.map((tc, idx) => (
+                                <button 
+                                  key={idx} 
+                                  onClick={() => setActiveTestCaseIdxMap(prev => ({ ...prev, [currentProblem._id]: idx }))} 
+                                  className="button"
+                                  style={{ 
+                                    padding: '4px 12px', 
+                                    fontSize: '0.8rem',
+                                    borderRadius: '100px',
+                                    background: currentActiveIdx === idx ? 'var(--primary-glow)' : 'var(--bg)',
+                                    color: currentActiveIdx === idx ? 'var(--primary)' : 'var(--text-secondary)',
+                                    border: `1px solid ${currentActiveIdx === idx ? 'var(--primary)' : 'var(--border)'}` 
+                                  }}
+                                >
+                                  Case {idx + 1}
+                                </button>
+                              ))}
+                              <button 
+                                onClick={() => handleAddTestCase(currentProblem._id)} 
+                                className="button"
+                                style={{ padding: '4px 12px', fontSize: '0.8rem', borderRadius: '100px', background: 'var(--bg)', border: '1px dashed var(--border)', color: 'var(--text-secondary)' }}
+                              >
+                                + Add Case
+                              </button>
+                            </div>
+                            {currentTestCases.length > 1 && (
+                              <button onClick={() => handleRemoveTestCase(currentProblem._id, currentActiveIdx)} className="text-muted" style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                                <Trash2 size={16} />
+                              </button>
+                            )}
+                          </div>
+
+                          <div>
+                            <label style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', display: 'block' }}>JSON Input Array</label>
+                            <textarea
+                              value={currentTestCases[currentActiveIdx] || ''}
+                              onChange={(e) => handleTestCaseChange(currentProblem._id, currentActiveIdx, e.target.value)}
+                              placeholder='e.g., [[2,7,11,15], 9]'
+                              style={{ height: '120px', fontSize: '0.9rem', fontFamily: "'JetBrains Mono', monospace", background: 'var(--bg)', width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', color: 'var(--text)' }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {consoleTab === 'result' && (
+                        <div className="fade-in">
+                          {currentRunResult && <SubmissionOutput output={currentRunResult} />}
+                          {currentSubmission && !currentRunResult && <SubmissionOutput output={currentSubmission.output || { status: currentSubmission.status }} />}
+                          {!currentRunResult && !currentSubmission && (
+                            <div className="flex-center" style={{ height: '100px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                              Run your code to see results here.
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {consoleTab === 'console' && (
+                        <div className="fade-in">
+                          <div className="flex-center" style={{ height: '100px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                            Raw stdout logs will appear here during execution.
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

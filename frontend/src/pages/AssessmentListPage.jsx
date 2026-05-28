@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Clock, Users, BookOpen, ChevronRight, Calendar, AlertCircle } from 'lucide-react';
 import { assessments } from '../api';
 
 const AssessmentListPage = ({ user }) => {
@@ -21,69 +22,136 @@ const AssessmentListPage = ({ user }) => {
     fetchAssessments();
   }, []);
 
-  if (loading) return <div>Loading assessments...</div>;
-  if (error) return <div className="error">{error}</div>;
+  if (loading) return <div className="container">Loading assessments...</div>;
+  if (error) return <div className="container error-box">{error}</div>;
 
   const now = new Date();
-
   const active = assessmentList.filter(a => new Date(a.startTime) <= now && new Date(a.endTime) >= now && a.status === 'Published');
   const upcoming = assessmentList.filter(a => new Date(a.startTime) > now && a.status === 'Published');
-  const completed = assessmentList.filter(a => new Date(a.endTime) < now || a.status === 'Completed');
+  const past = assessmentList.filter(a => new Date(a.endTime) < now || a.status !== 'Published');
 
-  const AssessmentCard = ({ assessment }) => (
-    <div className="problem-card" style={{ marginBottom: '20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h3>{assessment.title}</h3>
-          <p>{assessment.description}</p>
-          <div style={{ fontSize: '0.9em', color: '#666' }}>
-            <span>Starts: {new Date(assessment.startTime).toLocaleString()}</span>
-            <span style={{ margin: '0 10px' }}>|</span>
-            <span>Duration: {assessment.durationMinutes} mins</span>
-            <span style={{ margin: '0 10px' }}>|</span>
-            <span>Problems: {assessment.problems?.length || 0}</span>
+  const AssessmentCard = ({ assessment, type }) => {
+    const isPast = type === 'past';
+    const isUpcoming = type === 'upcoming';
+    const isActive = type === 'active';
+
+    return (
+      <div className={`problem-card fade-in ${isActive ? 'active-assessment' : ''}`} style={{ 
+        position: 'relative', 
+        borderLeft: isActive ? '4px solid var(--success)' : (isUpcoming ? '4px solid var(--primary)' : '1px solid var(--border)')
+      }}>
+        <div className="flex-between mb-4">
+          <div className="flex-center gap-2">
+            {isActive && <span className="status-dot active"></span>}
+            <span className={`tag ${isActive ? 'difficulty-easy' : (isUpcoming ? 'difficulty-medium' : '')}`} style={{ fontSize: '0.7rem' }}>
+              {isActive ? 'LIVE NOW' : (isUpcoming ? 'UPCOMING' : 'ENDED')}
+            </span>
+          </div>
+          <span className="text-muted" style={{ fontSize: '0.8rem' }}>
+            {assessment.durationMinutes} mins
+          </span>
+        </div>
+
+        <h3 className="mb-2">{assessment.title}</h3>
+        <p className="text-secondary mb-6" style={{ fontSize: '0.9rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+          {assessment.description}
+        </p>
+
+        <div className="grid grid-cols-2 gap-4 mb-6" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div className="flex-center gap-2 text-muted" style={{ fontSize: '0.8rem', justifyContent: 'flex-start' }}>
+            <Calendar size={14} />
+            <span>{new Date(assessment.startTime).toLocaleDateString()}</span>
+          </div>
+          <div className="flex-center gap-2 text-muted" style={{ fontSize: '0.8rem', justifyContent: 'flex-start' }}>
+            <BookOpen size={14} />
+            <span>{assessment.problems?.length || 0} Problems</span>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <Link to={`/assessments/${assessment._id}`} className="button button-outline">
-            View Details
+
+        <div className="flex-between mt-auto pt-4" style={{ borderTop: '1px solid var(--border)' }}>
+          <div className="flex-center gap-2 text-muted" style={{ fontSize: '0.85rem' }}>
+            <Users size={16} />
+            <span>{assessment.participantCount || 0} enrolled</span>
+          </div>
+          
+          <Link 
+            to={`/assessments/${assessment._id}`} 
+            className={`button ${isPast ? 'button-outline' : ''}`}
+            style={{ padding: '6px 16px', fontSize: '0.85rem' }}
+          >
+            {isPast ? 'View Results' : (isUpcoming ? 'Register' : 'Join Now')}
+            <ChevronRight size={16} />
           </Link>
-          {(user?.role === 'admin' || user?.role === 'faculty') && (
-            <Link to={`/admin/assessments/${assessment._id}/results`} className="button" style={{ background: '#9b59b6' }}>
-              Results
-            </Link>
-          )}
         </div>
+
+        {isActive && (
+          <style>{`
+            .active-assessment {
+              box-shadow: 0 0 20px rgba(16, 185, 129, 0.1);
+              border-color: rgba(16, 185, 129, 0.3);
+            }
+            .status-dot {
+              width: 8px;
+              height: 8px;
+              border-radius: 50%;
+              display: inline-block;
+            }
+            .status-dot.active {
+              background-color: var(--success);
+              box-shadow: 0 0 8px var(--success);
+              animation: pulse 2s infinite;
+            }
+            @keyframes pulse {
+              0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+              70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+              100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+            }
+          `}</style>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
-    <div>
-      <h2>Assessments</h2>
-      
+    <div className="container fade-in">
+      <div className="mb-12">
+        <h1 className="mb-2">Assessments</h1>
+        <p className="text-muted">Take part in timed challenges to test your skills and compete with others.</p>
+      </div>
+
       {active.length > 0 && (
-        <section>
-          <h3 style={{ color: '#2ecc71' }}>Active Assessments</h3>
-          {active.map(a => <AssessmentCard key={a._id} assessment={a} />)}
+        <section className="mb-12">
+          <h2 className="mb-6 flex-center gap-2" style={{ justifyContent: 'flex-start', color: 'var(--success)', fontSize: '1.25rem' }}>
+            <div className="status-dot active"></div>
+            Active Assessments
+          </h2>
+          <div className="problem-card-grid">
+            {active.map(a => <AssessmentCard key={a._id} assessment={a} type="active" />)}
+          </div>
         </section>
       )}
 
       {upcoming.length > 0 && (
-        <section>
-          <h3 style={{ color: '#3498db' }}>Upcoming Assessments</h3>
-          {upcoming.map(a => <AssessmentCard key={a._id} assessment={a} />)}
+        <section className="mb-12">
+          <h2 className="mb-6" style={{ fontSize: '1.25rem' }}>Upcoming Challenges</h2>
+          <div className="problem-card-grid">
+            {upcoming.map(a => <AssessmentCard key={a._id} assessment={a} type="upcoming" />)}
+          </div>
         </section>
       )}
 
-      {completed.length > 0 && (
-        <section>
-          <h3 style={{ color: '#95a5a6' }}>Completed Assessments</h3>
-          {completed.map(a => <AssessmentCard key={a._id} assessment={a} />)}
-        </section>
-      )}
-
-      {assessmentList.length === 0 && <p>No assessments available.</p>}
+      <section>
+        <h2 className="mb-6" style={{ fontSize: '1.25rem', color: 'var(--text-muted)' }}>Past Assessments</h2>
+        {past.length > 0 ? (
+          <div className="problem-card-grid">
+            {past.map(a => <AssessmentCard key={a._id} assessment={a} type="past" />)}
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', padding: '60px', background: 'var(--surface)', borderRadius: 'var(--radius-lg)', border: '1px dashed var(--border)' }}>
+            <p className="text-muted">No past assessments found.</p>
+          </div>
+        )}
+      </section>
     </div>
   );
 };

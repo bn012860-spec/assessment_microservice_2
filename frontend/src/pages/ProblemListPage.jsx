@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { Search, Filter, Plus, ChevronRight, Users, CheckCircle2 } from 'lucide-react';
 import api from '../api';
 
 function ProblemListPage({ user }) {
@@ -29,80 +30,93 @@ function ProblemListPage({ user }) {
     setFilters(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleDelete = (_id) => {
-    if (!window.confirm('Are you sure you want to delete this problem?')) return;
-    api.delete(`/api/problems/${_id}`)
-      .then(() => {
-        setProblems(problems.filter(problem => problem._id !== _id));
-      })
-      .catch(error => console.error('Error deleting problem:', error));
-  };
-
   return (
-    <div className="container">
-      <h2 className="mb-20">Problems</h2>
-      <div className="flex-gap mb-20">
-        {canManage && <Link to="/add-problem" className="button">Add New Problem</Link>}
-        <div style={{ flex: 1 }}></div>
-        <input 
-          type="text" 
-          name="search" 
-          placeholder="Search problems..." 
-          value={filters.search} 
-          onChange={handleFilterChange}
-          style={{ width: '250px' }}
-        />
-        <select name="difficulty" value={filters.difficulty} onChange={handleFilterChange} style={{ width: '150px' }}>
-          <option value="">All Difficulties</option>
-          <option value="Easy">Easy</option>
-          <option value="Medium">Medium</option>
-          <option value="Hard">Hard</option>
-        </select>
-        <input 
-          type="text" 
-          name="tag" 
-          placeholder="Filter by tag..." 
-          value={filters.tag} 
-          onChange={handleFilterChange}
-          style={{ width: '150px' }}
-        />
+    <div className="container fade-in">
+      <div className="flex-between mb-8">
+        <div>
+          <h1 className="mb-2">Problem Set</h1>
+          <p className="text-muted">Master your skills with our curated set of coding challenges.</p>
+        </div>
+        {canManage && (
+          <Link to="/add-problem" className="button">
+            <Plus size={18} />
+            <span>New Problem</span>
+          </Link>
+        )}
       </div>
 
-      <div className="table-container">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Title</th>
-              <th>Difficulty</th>
-              <th>Submissions</th>
-              <th>Acceptance</th>
-              {canManage && <th>Actions</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {problems.map(problem => {
-              const rate = problem.submissionCount > 0 
-                ? ((problem.acceptedCount / problem.submissionCount) * 100).toFixed(1) + '%'
-                : '0%';
-              return (
-                <tr key={problem._id}>
-                  <td>
-                    <Link to={`/problems/${problem._id}`}>{problem.title}</Link>
-                  </td>
-                  <td>{problem.difficulty}</td>
-                  <td>{problem.submissionCount || 0}</td>
-                  <td>{rate}</td>
-                  {canManage && (
-                    <td>
-                      <Link to={`/problems/${problem._id}/edit`} className="button">Edit</Link>
-                      <button onClick={() => handleDelete(problem._id)} className="button button-danger">Delete</button>
-                    </td>
-                  )}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div className="flex-between gap-4 mb-8" style={{ background: 'var(--surface)', padding: 'var(--sp-4)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)' }}>
+        <div style={{ flex: 1, position: 'relative' }}>
+          <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+          <input 
+            type="text" 
+            name="search" 
+            placeholder="Search problems..." 
+            value={filters.search} 
+            onChange={handleFilterChange}
+            style={{ paddingLeft: '40px' }}
+          />
+        </div>
+        <div style={{ width: '180px' }}>
+          <select name="difficulty" value={filters.difficulty} onChange={handleFilterChange}>
+            <option value="">All Difficulties</option>
+            <option value="Easy">Easy</option>
+            <option value="Medium">Medium</option>
+            <option value="Hard">Hard</option>
+          </select>
+        </div>
+        <div style={{ width: '180px' }}>
+          <input 
+            type="text" 
+            name="tag" 
+            placeholder="Filter by tag..." 
+            value={filters.tag} 
+            onChange={handleFilterChange}
+          />
+        </div>
+      </div>
+
+      <div className="problem-card-grid">
+        {problems.length > 0 ? problems.map(problem => {
+          const rate = problem.submissionCount > 0 
+            ? ((problem.acceptedCount / problem.submissionCount) * 100).toFixed(1) + '%'
+            : '0%';
+          return (
+            <Link key={problem._id} to={`/problems/${problem._id}`} className="problem-card">
+              <div className="flex-between mb-2">
+                <span className={`tag difficulty-${problem.difficulty.toLowerCase()}`}>
+                  {problem.difficulty}
+                </span>
+                <span className="text-muted" style={{ fontSize: '0.8rem' }}>
+                  ID: {problem._id.slice(-6)}
+                </span>
+              </div>
+              <h3>{problem.title}</h3>
+              <div className="meta">
+                {(problem.tags || []).slice(0, 3).map(tag => (
+                  <span key={tag} className="tag">{tag}</span>
+                ))}
+              </div>
+              
+              <div className="stats">
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <CheckCircle2 size={14} /> {rate}
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Users size={14} /> {problem.submissionCount || 0}
+                  </span>
+                </div>
+                <ChevronRight size={18} />
+              </div>
+            </Link>
+          );
+        }) : (
+          <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '80px', background: 'var(--surface)', borderRadius: 'var(--radius-xl)', border: '1px dashed var(--border)' }}>
+            <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>No problems found matching your filters.</p>
+            <button className="button button-outline mt-4" onClick={() => setFilters({ search: '', difficulty: '', tag: '' })}>Clear all filters</button>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -27,6 +27,7 @@ type TestResult struct {
 	Test      int         `json:"test"`                // test index (0-based)
 	Passed    bool        `json:"passed"`              // whether test passed
 	Ok        bool        `json:"ok,omitempty"`        // legacy alias for whether test passed
+	Input     interface{} `json:"input,omitempty"`     // input used for this test
 	Output    interface{} `json:"output,omitempty"`    // actual output returned by user code
 	Expected  interface{} `json:"expected,omitempty"`  // expected output (useful for UI diffs)
 	Error     string      `json:"error,omitempty"`     // short error message, if any

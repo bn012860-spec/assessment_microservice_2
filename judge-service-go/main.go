@@ -500,7 +500,7 @@ func isCentralCompareEnabled(language string) bool {
 	}
 }
 
-func startHealthServer(ctx context.Context, containerPool *pool.ContainerPool, port string) {
+func startHealthServer(ctx context.Context, containerPool *pool.ContainerPool, port string, problemsCollection *mongo.Collection, executor *executor.Executor) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -512,13 +512,98 @@ func startHealthServer(ctx context.Context, containerPool *pool.ContainerPool, p
 		json.NewEncoder(w).Encode(containerPool.GetStats())
 	})
 
+	mux.HandleFunc("/run", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var msg models.SubmissionMessage
+		if err := json.NewDecoder(r.Body).Decode(&msg); err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		if err := msg.Validate(); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		problem, err := fetchProblemData(r.Context(), problemsCollection, msg.ProblemID)
+		if err != nil {
+			http.Error(w, "Problem not found", http.StatusNotFound)
+			return
+		}
+
+		// If the message contains custom tests, override the problem's tests
+		if len(msg.Tests) > 0 {
+			problem.TestCases = msg.Tests
+		} else {
+			// For "Run", usually we only run sample test cases
+			var samples []models.TestCase
+			for _, tc := range problem.TestCases {
+				if tc.IsSample {
+					samples = append(samples, tc)
+				}
+			}
+			if len(samples) > 0 {
+				problem.TestCases = samples
+			}
+		}
+
+		if err := problem.ValidateBasic(); err != nil {
+			http.Error(w, "Invalid problem data: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		if len(problem.TestCases) == 0 {
+			http.Error(w, "No test cases to run", http.StatusBadRequest)
+			return
+		}
+
+		lang := languages.GetLanguage(msg.Language)
+		if lang == nil {
+			http.Error(w, "Unsupported language", http.StatusBadRequest)
+			return
+		}
+
+		pooledContainer := containerPool.Acquire(lang.ID)
+		if pooledContainer == nil {
+			http.Error(w, "No available containers", http.StatusServiceUnavailable)
+			return
+		}
+		defer containerPool.Release(pooledContainer)
+
+		var result *models.SubmissionResult
+		var runErr error
+
+		if adapter, ok := adapters.GetAdapter(lang.ID); ok && isCentralCompareEnabled(lang.ID) {
+			execCtx, cancel := context.WithTimeout(r.Context(), time.Duration(len(problem.TestCases)+1)*defaultSandboxTimeout)
+			defer cancel()
+			result, runErr = runSubmissionCentral(execCtx, executor, pooledContainer, msg, problem, adapter)
+		} else {
+			// Legacy execution path not fully supported for synchronous /run yet, but we can try
+			// For now, let's assume central compare is the way forward
+			http.Error(w, "Synchronous run only supported for languages with central compare", http.StatusBadRequest)
+			return
+		}
+
+		if runErr != nil {
+			http.Error(w, "Execution failed: "+runErr.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(result)
+	})
+
 	server := &http.Server{
 		Addr:    ":" + port,
 		Handler: mux,
 	}
 
 	go func() {
-		slog.Info("Health/Stats server starting", "port", port)
+		slog.Info("Health/Stats/Run server starting", "port", port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("Health server failed", "error", err)
 		}
@@ -613,13 +698,6 @@ func main() {
 
 	containerPool.StartMonitor(ctx, time.Minute)
 
-	// Start Health/Stats Server
-	healthPort := os.Getenv("HEALTH_PORT")
-	if healthPort == "" {
-		healthPort = "8081"
-	}
-	startHealthServer(ctx, containerPool, healthPort)
-
 	// Connect to MongoDB
 	mongoClient, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
 	failOnError(err, "Failed to connect to MongoDB")
@@ -631,6 +709,13 @@ func main() {
 
 	problemsCollection := mongoClient.Database("assessment_db").Collection("problems")
 	submissionsCollection := mongoClient.Database("assessment_db").Collection("submissions")
+
+	// Start Health/Stats/Run Server
+	healthPort := os.Getenv("HEALTH_PORT")
+	if healthPort == "" {
+		healthPort = "8081"
+	}
+	startHealthServer(ctx, containerPool, healthPort, problemsCollection, executor)
 
 	// Normalize Redis address
 	redisAddr := redisURI

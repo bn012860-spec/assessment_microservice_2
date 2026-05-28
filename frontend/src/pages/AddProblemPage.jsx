@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Plus, Save, Trash2, AlertTriangle, CheckCircle2, ChevronLeft, Info, Settings } from 'lucide-react';
 import api from '../api';
 import { buildProblemPayload, collectErrorMessages } from '../utils/problemForm';
 import { PROBLEM_TEMPLATES } from '../utils/problemTemplates';
@@ -43,11 +44,21 @@ const AddProblemPage = () => {
     setFormData({ ...formData, testCases: next });
   };
 
+  const removeTestCase = (index) => {
+    if (formData.testCases.length <= 1) return;
+    setFormData({ ...formData, testCases: formData.testCases.filter((_, i) => i !== index) });
+  };
+
   const handleParamChange = (index, e) => {
     const { name, value } = e.target;
     const next = [...formData.parameters];
     next[index][name] = value;
     setFormData({ ...formData, parameters: next });
+  };
+
+  const removeParameter = (index) => {
+    if (formData.parameters.length <= 1) return;
+    setFormData({ ...formData, parameters: formData.parameters.filter((_, i) => i !== index) });
   };
 
   const addTestCase = () => {
@@ -81,6 +92,7 @@ const AddProblemPage = () => {
     const { errors, payload } = buildProblemPayload(formData);
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
+      window.scrollTo(0, 0);
       return;
     }
     setFormErrors({});
@@ -92,6 +104,7 @@ const AddProblemPage = () => {
       const data = err.response?.data;
       setApiError(data?.error || 'Failed to create problem');
       setApiErrors(Array.isArray(data?.errors) ? data.errors : []);
+      window.scrollTo(0, 0);
     }
   };
 
@@ -134,173 +147,219 @@ const AddProblemPage = () => {
         ...template.data
       });
     }
-    // reset selector
     e.target.value = "";
   };
 
   return (
-    <div className="container">
-      <h2>Add New Problem</h2>
+    <div className="container fade-in">
+      <div className="flex-between mb-8">
+        <button onClick={() => navigate(-1)} className="button button-outline" style={{ padding: '8px 12px' }}>
+          <ChevronLeft size={18} /> Back
+        </button>
+        <h1 style={{ fontSize: '1.75rem' }}>Create New Problem</h1>
+        <div style={{ width: '80px' }}></div>
+      </div>
+
       {collectErrorMessages(formErrors).length > 0 && (
-        <div className="error-box">
-          <strong>Fix the following before submitting:</strong>
-          <ul>{collectErrorMessages(formErrors).map((error, index) => <li key={index}>{error}</li>)}</ul>
+        <div className="error-box mb-8">
+          <div className="flex-center gap-2 mb-2" style={{ justifyContent: 'flex-start' }}>
+            <AlertTriangle size={18} />
+            <strong>Fix the following before submitting:</strong>
+          </div>
+          <ul style={{ paddingLeft: '24px' }}>
+            {collectErrorMessages(formErrors).map((error, index) => <li key={index}>{error}</li>)}
+          </ul>
         </div>
       )}
+
       {apiError && (
-        <div className="error-box">
-          <strong>Error:</strong>
+        <div className="error-box mb-8">
+          <div className="flex-center gap-2 mb-2" style={{ justifyContent: 'flex-start' }}>
+            <AlertTriangle size={18} />
+            <strong>Error:</strong>
+          </div>
           <div>{apiError}</div>
           {apiErrors.length > 0 && (
-            <ul>{apiErrors.map((error, index) => <li key={index}>{error}</li>)}</ul>
+            <ul style={{ paddingLeft: '24px', marginTop: '8px' }}>
+              {apiErrors.map((error, index) => <li key={index}>{error}</li>)}
+            </ul>
           )}
         </div>
       )}
 
       {validationReport && (
         <div className={`report-box ${validationReport.schemaValid && validationReport.typeValidation && validationReport.wrapperGeneration ? 'success' : 'failure'}`}>
-          <h3>Validation Report</h3>
+          <div className="flex-center gap-2 mb-4" style={{ justifyContent: 'flex-start' }}>
+            <Info size={20} />
+            <h3 style={{ margin: 0, fontSize: '1.1rem' }}>Validation Report</h3>
+          </div>
           <ul className="report-list">
-            <li>{validationReport.schemaValid ? '✅' : '✗'} Schema Validation</li>
-            <li>{validationReport.typeValidation ? '✅' : '✗'} Type Conversion Validation</li>
-            <li>{validationReport.wrapperGeneration ? '✅' : '✗'} Wrapper Generation (JS, Python, Java)</li>
+            <li>{validationReport.schemaValid ? <CheckCircle2 size={16} color="var(--success)" /> : <AlertTriangle size={16} color="var(--error)" />} Schema Validation</li>
+            <li>{validationReport.typeValidation ? <CheckCircle2 size={16} color="var(--success)" /> : <AlertTriangle size={16} color="var(--error)" />} Type Conversion Validation</li>
+            <li>{validationReport.wrapperGeneration ? <CheckCircle2 size={16} color="var(--success)" /> : <AlertTriangle size={16} color="var(--error)" />} Wrapper Generation (JS, Python, Java)</li>
           </ul>
           {validationReport.errors.length > 0 && (
-            <div className="mt-10">
+            <div className="mt-4 p-4" style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
               <strong>Details:</strong>
-              <ul>{validationReport.errors.map((err, i) => <li key={i}>{err}</li>)}</ul>
+              <ul style={{ paddingLeft: '20px', marginTop: '8px', fontSize: '0.85rem' }}>
+                {validationReport.errors.map((err, i) => <li key={i}>{err}</li>)}
+              </ul>
             </div>
           )}
           {validationReport.schemaValid && validationReport.typeValidation && validationReport.wrapperGeneration && (
-            <div className="mt-10 success-text">✓ This problem is valid and ready to be published.</div>
+            <div className="mt-4 success-text flex-center gap-2" style={{ justifyContent: 'flex-start' }}>
+              <CheckCircle2 size={18} />
+              <span>This problem is valid and ready to be published.</span>
+            </div>
           )}
         </div>
       )}
 
-      <div className="form-group problem-card">
-        <label>Start from a template:</label>
-        <select onChange={handleTemplateSelect} defaultValue="">
-          <option value="" disabled>Select a template...</option>
-          {PROBLEM_TEMPLATES.map(t => (
-            <option key={t.id} value={t.id}>{t.label}</option>
-          ))}
-        </select>
-        <p className="form-hint">Selecting a template auto-fills the function name, parameters, and return type.</p>
+      <div className="problem-card mb-8">
+        <div className="flex-center gap-2 mb-4" style={{ justifyContent: 'flex-start' }}>
+          <Settings size={20} color="var(--primary)" />
+          <h3 style={{ margin: 0, fontSize: '1.1rem' }}>Templates</h3>
+        </div>
+        <div className="form-group">
+          <label>Start from a template:</label>
+          <select onChange={handleTemplateSelect} defaultValue="" style={{ marginTop: '8px' }}>
+            <option value="" disabled>Select a template...</option>
+            {PROBLEM_TEMPLATES.map(t => (
+              <option key={t.id} value={t.id}>{t.label}</option>
+            ))}
+          </select>
+          <p className="form-hint">Selecting a template auto-fills the function name, parameters, and return type.</p>
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label>Title:</label>
-          <input type="text" name="title" value={formData.title} onChange={handleChange} className={fieldClassName('title')} required />
-          {fieldError('title') && <div className="error-text">{fieldError('title')}</div>}
-        </div>
-        <div className="form-group">
-          <label>Description:</label>
-          <textarea name="description" value={formData.description} onChange={handleChange} className={fieldClassName('description')} required />
-          {fieldError('description') && <div className="error-text">{fieldError('description')}</div>}
-        </div>
-        <div className="form-group">
-          <label>Difficulty:</label>
-          <select name="difficulty" value={formData.difficulty} onChange={handleChange}>
-            <option value="Easy">Easy</option>
-            <option value="Medium">Medium</option>
-            <option value="Hard">Hard</option>
-          </select>
-        </div>
-        <div className="form-group">
-          <label>Function Name:</label>
-          <input type="text" name="functionName" value={formData.functionName} onChange={handleChange} className={fieldClassName('functionName')} required />
-          {fieldError('functionName') && <div className="error-text">{fieldError('functionName')}</div>}
-        </div>
-        <div className="form-group">
-          <label>Return Type:</label>
-          <input type="text" name="returnType" value={formData.returnType} onChange={handleChange} className={fieldClassName('returnType')} required />
-          {fieldError('returnType') && <div className="error-text">{fieldError('returnType')}</div>}
-        </div>
-
-        <h3>Parameters</h3>
-        {fieldError('parameters') && <div className="error-text mb-20">{fieldError('parameters')}</div>}
-        {formData.parameters.map((p, i) => (
-          <div key={i} className="form-group problem-card">
-            <label>Parameter {i + 1}</label>
-            <input
-              type="text"
-              name="name"
-              placeholder="Name"
-              value={p.name}
-              onChange={(e) => handleParamChange(i, e)}
-              className={fieldClassName(`parameters.${i}.name`)}
-            />
-            {fieldError(`parameters.${i}.name`) && <div className="error-text">{fieldError(`parameters.${i}.name`)}</div>}
-            <input
-              type="text"
-              name="type"
-              placeholder="Type (e.g. array<number>)"
-              value={p.type}
-              onChange={(e) => handleParamChange(i, e)}
-              className={fieldClassName(`parameters.${i}.type`)}
-            />
-            {fieldError(`parameters.${i}.type`) && <div className="error-text">{fieldError(`parameters.${i}.type`)}</div>}
+      <form onSubmit={handleSubmit} className="mb-12">
+        <div className="problem-card mb-8">
+          <h3 className="mb-6">Basic Information</h3>
+          <div className="form-group mb-4">
+            <label>Title</label>
+            <input type="text" name="title" value={formData.title} onChange={handleChange} className={fieldClassName('title')} placeholder="e.g. Two Sum" required />
+            {fieldError('title') && <div className="error-text">{fieldError('title')}</div>}
           </div>
-        ))}
-        <button type="button" onClick={addParameter} className="button">Add Parameter</button>
-
-        <h3>Compare Config</h3>
-        <div className="form-group problem-card">
-          <label>Mode:</label>
-          <select name="mode" value={formData.compareConfig.mode} onChange={handleCompareConfigChange}>
-            <option value="EXACT">EXACT</option>
-            <option value="STRUCTURAL">STRUCTURAL</option>
-          </select>
-          <label>Float Tolerance:</label>
-          <input type="number" step="0.000001" name="floatTolerance" value={formData.compareConfig.floatTolerance} onChange={handleCompareConfigChange} />
-          <label>
-            <input type="checkbox" name="orderInsensitive" checked={!!formData.compareConfig.orderInsensitive} onChange={handleCompareConfigChange} />
-            Order Insensitive Arrays
-          </label>
-        </div>
-
-        <h3>Test Cases</h3>
-        <p className="form-hint">Mark the first 1-2 test cases as sample so students can see example inputs and outputs.</p>
-        {fieldError('testCases') && <div className="error-text mb-20">{fieldError('testCases')}</div>}
-        {formData.testCases.map((tc, i) => (
-          <div key={i} className="form-group problem-card">
-            <label>Test Case {i + 1}</label>
-            <textarea
-              name="inputs"
-              placeholder='Inputs as JSON array, e.g. [[2,7,11,15],9]'
-              value={tc.inputs}
-              onChange={(e) => handleTestCaseChange(i, e)}
-              className={fieldClassName(`testCases.${i}.inputs`) || fieldClassName(`testCases.${i}`)}
-              required
-            />
-            {fieldError(`testCases.${i}.inputs`) && <div className="error-text">{fieldError(`testCases.${i}.inputs`)}</div>}
-            {fieldError(`testCases.${i}`) && <div className="error-text">{fieldError(`testCases.${i}`)}</div>}
-            <textarea name="expected" placeholder='Expected output as JSON value' value={tc.expected} onChange={(e) => handleTestCaseChange(i, e)} required />
-            <label>
-              <input type="checkbox" name="isSample" checked={!!tc.isSample} onChange={(e) => handleTestCaseChange(i, e)} />
-              Visible to students (sample)
-            </label>
+          <div className="form-group mb-4">
+            <label>Description</label>
+            <textarea name="description" value={formData.description} onChange={handleChange} className={fieldClassName('description')} placeholder="Markdown supported..." style={{ height: '150px' }} required />
+            {fieldError('description') && <div className="error-text">{fieldError('description')}</div>}
           </div>
-        ))}
-        <button type="button" onClick={addTestCase} className="button">Add Test Case</button>
-
-        <div className="form-group">
-          <label>Tags (comma-separated):</label>
-          <input type="text" name="tags" value={formData.tags} onChange={handleChange} />
+          <div className="grid grid-cols-2 gap-6" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+            <div className="form-group">
+              <label>Difficulty</label>
+              <select name="difficulty" value={formData.difficulty} onChange={handleChange}>
+                <option value="Easy">Easy</option>
+                <option value="Medium">Medium</option>
+                <option value="Hard">Hard</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Tags (comma-separated)</label>
+              <input type="text" name="tags" value={formData.tags} onChange={handleChange} placeholder="array, string, dp" />
+            </div>
+          </div>
         </div>
-        <div className="form-group">
-          <label>
-            <input type="checkbox" name="isPremium" checked={formData.isPremium} onChange={handleChange} />
-            Is Premium?
-          </label>
+
+        <div className="problem-card mb-8">
+          <h3 className="mb-6">Signature & Types</h3>
+          <div className="grid grid-cols-2 gap-6 mb-6" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+            <div className="form-group">
+              <label>Function Name</label>
+              <input type="text" name="functionName" value={formData.functionName} onChange={handleChange} className={fieldClassName('functionName')} placeholder="e.g. solve" required />
+              {fieldError('functionName') && <div className="error-text">{fieldError('functionName')}</div>}
+            </div>
+            <div className="form-group">
+              <label>Return Type</label>
+              <input type="text" name="returnType" value={formData.returnType} onChange={handleChange} className={fieldClassName('returnType')} placeholder="e.g. number or array<number>" required />
+              {fieldError('returnType') && <div className="error-text">{fieldError('returnType')}</div>}
+            </div>
+          </div>
+
+          <h4 className="mb-4" style={{ fontSize: '1rem' }}>Parameters</h4>
+          {formData.parameters.map((p, i) => (
+            <div key={i} className="flex-center gap-4 mb-4">
+              <div style={{ flex: 1 }}>
+                <input
+                  type="text"
+                  name="name"
+                  placeholder="Name"
+                  value={p.name}
+                  onChange={(e) => handleParamChange(i, e)}
+                  className={fieldClassName(`parameters.${i}.name`)}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <input
+                  type="text"
+                  name="type"
+                  placeholder="Type (e.g. array<number>)"
+                  value={p.type}
+                  onChange={(e) => handleParamChange(i, e)}
+                  className={fieldClassName(`parameters.${i}.type`)}
+                />
+              </div>
+              <button type="button" onClick={() => removeParameter(i)} className="button button-outline" style={{ color: 'var(--error)', padding: '10px' }}>
+                <Trash2 size={18} />
+              </button>
+            </div>
+          ))}
+          <button type="button" onClick={addParameter} className="button button-outline" style={{ width: '100%' }}>
+            <Plus size={16} /> Add Parameter
+          </button>
         </div>
 
-        <div className="mt-20 flex-gap">
-          <button type="button" onClick={handleValidate} className="button secondary" disabled={isValidating}>
+        <div className="problem-card mb-8">
+          <h3 className="mb-6">Test Cases</h3>
+          {formData.testCases.map((tc, i) => (
+            <div key={i} className="mb-6 p-6" style={{ background: 'rgba(0,0,0,0.1)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+              <div className="flex-between mb-4">
+                <h4 style={{ fontSize: '0.9rem', margin: 0 }}>Test Case {i + 1}</h4>
+                <button type="button" onClick={() => removeTestCase(i)} className="text-muted" style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                  <Trash2 size={16} />
+                </button>
+              </div>
+              <div className="form-group mb-4">
+                <label style={{ fontSize: '0.85rem' }}>Inputs (JSON array)</label>
+                <textarea
+                  name="inputs"
+                  placeholder='e.g. [[2,7,11,15], 9]'
+                  value={tc.inputs}
+                  onChange={(e) => handleTestCaseChange(i, e)}
+                  style={{ height: '80px', fontSize: '0.85rem', fontFamily: 'monospace' }}
+                  required
+                />
+              </div>
+              <div className="form-group mb-4">
+                <label style={{ fontSize: '0.85rem' }}>Expected Output (JSON)</label>
+                <input
+                  type="text"
+                  name="expected"
+                  placeholder='e.g. [0, 1]'
+                  value={tc.expected}
+                  onChange={(e) => handleTestCaseChange(i, e)}
+                  style={{ fontSize: '0.85rem', fontFamily: 'monospace' }}
+                  required
+                />
+              </div>
+              <label className="flex-center gap-2" style={{ justifyContent: 'flex-start', cursor: 'pointer' }}>
+                <input type="checkbox" name="isSample" checked={!!tc.isSample} onChange={(e) => handleTestCaseChange(i, e)} style={{ width: 'auto' }} />
+                <span style={{ fontSize: '0.85rem' }}>Show as sample to students</span>
+              </label>
+            </div>
+          ))}
+          <button type="button" onClick={addTestCase} className="button button-outline" style={{ width: '100%' }}>
+            <Plus size={16} /> Add Test Case
+          </button>
+        </div>
+
+        <div className="flex-between gap-4 mt-8">
+          <button type="button" onClick={handleValidate} className="button button-outline" style={{ flex: 1, padding: '14px' }} disabled={isValidating}>
             {isValidating ? 'Validating...' : 'Validate Problem'}
           </button>
-          <button type="submit" className="button">Create Problem</button>
+          <button type="submit" className="button" style={{ flex: 1, padding: '14px' }}>
+            <Save size={20} /> Create Problem
+          </button>
         </div>
       </form>
     </div>

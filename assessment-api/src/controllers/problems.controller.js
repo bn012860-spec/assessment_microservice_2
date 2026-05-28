@@ -42,6 +42,15 @@ export async function createProblem(req, res, next) {
   }
 }
 
+export async function runProblem(req, res, next) {
+  try {
+    const result = await problemsService.runProblem(req.params._id, req.body);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function deleteProblem(req, res, next) {
   try {
     const problem = await problemsService.deleteProblem(req.params._id);

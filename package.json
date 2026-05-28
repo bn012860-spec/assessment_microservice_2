@@ -5,7 +5,10 @@
     "seed:problems": "docker compose exec -T assessment-api node scripts/seed_problems_api.mjs"
   },
   "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
     "amqplib": "^0.10.9",
+    "framer-motion": "^12.40.0",
+    "lucide-react": "^1.17.0",
     "mongoose": "^8.19.1"
   }
 }

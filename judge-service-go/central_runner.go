@@ -116,6 +116,7 @@ func runSubmissionCentralPerTest(ctx context.Context, exec *executor.Executor, p
 		testStart := time.Now()
 		tr := models.TestResult{
 			Test:     i + 1,
+			Input:    tc.Input,
 			Expected: tc.Expected,
 		}
 
@@ -370,6 +371,7 @@ func appendBatchedResults(result *models.SubmissionResult, stdout io.Reader, pro
 		testStart := time.Now()
 		tr := models.TestResult{
 			Test:     out.Test,
+			Input:    tc.Input,
 			Expected: tc.Expected,
 			Output:   out.Output,
 		}

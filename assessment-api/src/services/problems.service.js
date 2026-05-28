@@ -278,3 +278,39 @@ export async function updateProblem(id, payload) {
 export async function deleteProblem(id) {
   return problemsRepo.deleteById(id);
 }
+
+export async function runProblem(id, payload) {
+  const problem = await problemsRepo.findById(id);
+  if (!problem) throw new HttpError(404, "Problem not found");
+
+  const { code, language, customTests } = payload;
+  
+  const judgeMsg = {
+    schemaVersion: "1",
+    submissionId: "run-" + Date.now(), // Ephemeral ID
+    problemId: id,
+    language: language,
+    code: code,
+    functionName: problem.functionName,
+    compareMode: problem.compareConfig?.mode || "STRUCTURAL",
+    tests: customTests || [] // Pass custom tests if provided
+  };
+
+  try {
+    const response = await fetch("http://judge-service-go:8081/run", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(judgeMsg)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new HttpError(response.status, "Judge service error: " + errorText);
+    }
+
+    return await response.json();
+  } catch (err) {
+    if (err instanceof HttpError) throw err;
+    throw new HttpError(500, "Failed to connect to judge service: " + err.message);
+  }
+}

@@ -55,49 +55,51 @@ const AssessmentResultPage = () => {
   return (
     <div className="container">
       <h2>Assessment Result</h2>
-      <div className="problem-card" style={{ textAlign: 'center', padding: '40px' }}>
-        <h1 style={{ fontSize: '4em', margin: '0', color: '#2c3e50' }}>{attempt.score}</h1>
-        <p style={{ fontSize: '1.5em', color: '#7f8c8d' }}>out of {totalMaxScore} points</p>
+      <div className="problem-card" style={{ textAlign: 'center', padding: '60px 24px' }}>
+        <h1 style={{ fontSize: '5rem', margin: '0', color: 'var(--primary)', fontWeight: '800' }}>{attempt.score}</h1>
+        <p style={{ fontSize: '1.5rem', color: 'var(--text-secondary)', fontWeight: '500' }}>out of {totalMaxScore} points</p>
         
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '50px', marginTop: '30px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '40px', marginTop: '40px', flexWrap: 'wrap' }}>
           <div>
-            <h3>Time Used</h3>
-            <p style={{ fontSize: '1.2em' }}>{timeTaken} minutes</p>
+            <h3 style={{ fontSize: '0.9rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Time Used</h3>
+            <p style={{ fontSize: '1.25rem', fontWeight: '700' }}>{timeTaken} minutes</p>
           </div>
           <div>
-            <h3>Status</h3>
-            <p style={{ fontSize: '1.2em' }}>{attempt.status}</p>
+            <h3 style={{ fontSize: '0.9rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Status</h3>
+            <p style={{ fontSize: '1.25rem', fontWeight: '700', color: attempt.status === 'Completed' ? 'var(--success)' : 'var(--warning)' }}>{attempt.status}</p>
           </div>
         </div>
       </div>
 
       <h3 className="mt-20">Problem Breakdown</h3>
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '10px' }}>
-        <thead>
-          <tr style={{ textAlign: 'left', borderBottom: '2px solid #eee' }}>
-            <th style={{ padding: '10px' }}>Problem</th>
-            <th style={{ padding: '10px' }}>Verdict</th>
-            <th style={{ padding: '10px' }}>Score</th>
-          </tr>
-        </thead>
-        <tbody>
-          {assessment.problems.map((p, idx) => {
-            const verdict = getProblemResult(p.problemId._id || p.problemId);
-            const score = verdict === 'Accepted' ? (p.maxScore || 100) : 0;
-            return (
-              <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
-                <td style={{ padding: '10px' }}>{p.problemId.title || `Problem ${idx + 1}`}</td>
-                <td style={{ padding: '10px' }}>
-                  <span className={`tag ${verdict === 'Accepted' ? 'difficulty-easy' : (verdict === 'Failed' ? 'difficulty-hard' : '')}`}>
-                    {verdict}
-                  </span>
-                </td>
-                <td style={{ padding: '10px' }}>{score} / {p.maxScore || 100}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <div className="table-container">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Problem</th>
+              <th>Verdict</th>
+              <th style={{ textAlign: 'right' }}>Score</th>
+            </tr>
+          </thead>
+          <tbody>
+            {assessment.problems.map((p, idx) => {
+              const verdict = getProblemResult(p.problemId._id || p.problemId);
+              const score = verdict === 'Accepted' ? (p.maxScore || 100) : 0;
+              return (
+                <tr key={idx}>
+                  <td style={{ fontWeight: '600' }}>{p.problemId.title || `Problem ${idx + 1}`}</td>
+                  <td>
+                    <span className={`tag ${verdict === 'Accepted' ? 'difficulty-easy' : (verdict === 'Failed' ? 'difficulty-hard' : '')}`}>
+                      {verdict}
+                    </span>
+                  </td>
+                  <td style={{ textAlign: 'right', fontWeight: '700' }}>{score} / {p.maxScore || 100}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
 
       <div style={{ marginTop: '40px', textAlign: 'center' }}>
         <Link to="/assessments" className="button">Back to Assessments</Link>

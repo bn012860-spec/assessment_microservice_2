@@ -81,4 +81,12 @@ export const assessments = {
   listAttempts: (assessmentId) => api.get(`/api/assessments/${assessmentId}/attempts`)
 };
 
+export const problems = {
+  list: (params) => api.get("/api/problems", { params }),
+  get: (id) => api.get(`/api/problems/${id}`),
+  run: (id, data) => api.post(`/api/problems/${id}/run`, data),
+  getStats: (id) => api.get(`/api/problems/${id}/stats`),
+  delete: (id) => api.delete(`/api/problems/${id}`)
+};
+
 export default api;
