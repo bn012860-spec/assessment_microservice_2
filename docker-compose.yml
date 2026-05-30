@@ -154,6 +154,16 @@ services:
     networks:
       - assessment-net
 
+  judge-go:
+    build:
+      context: ./judge-service-go/environments/go
+      dockerfile: Dockerfile
+    image: judge-go-env
+    pull_policy: build
+    container_name: judge_go_env
+    networks:
+      - assessment-net
+
   frontend:
     build:
       context: ./frontend

@@ -331,3 +331,50 @@ class Solution {
 		t.Fatalf("expected accepted result, got %+v", result)
 	}
 }
+
+func TestCpp_Tree(t *testing.T) {
+	exec, p, pc, lang := setupCppIntegration(t)
+	defer p.Release(pc)
+	problem := treeProblem("maxDepth")
+	code := `
+#include <algorithm>
+class Solution {
+public:
+    int maxDepth(TreeNode* root) {
+        if (!root) return 0;
+        return 1 + std::max(maxDepth(root->left), maxDepth(root->right));
+    }
+};
+`
+	result := runCentralCppOnce(t, exec, pc, lang, problem, code)
+	if result.Status != models.SubmissionStatusAccepted || result.Passed != result.Total {
+		t.Fatalf("expected accepted result, got %+v", result)
+	}
+}
+
+func TestCpp_LinkedList(t *testing.T) {
+	exec, p, pc, lang := setupCppIntegration(t)
+	defer p.Release(pc)
+	problem := linkedListProblem("reverseList")
+	code := `
+class Solution {
+public:
+    ListNode* reverseList(ListNode* head) {
+        ListNode* prev = nullptr;
+        ListNode* curr = head;
+        while (curr) {
+            ListNode* nxt = curr->next;
+            curr->next = prev;
+            prev = curr;
+            curr = nxt;
+        }
+        return prev;
+    }
+};
+`
+	result := runCentralCppOnce(t, exec, pc, lang, problem, code)
+	if result.Status != models.SubmissionStatusAccepted || result.Passed != result.Total {
+		t.Fatalf("expected accepted result, got %+v", result)
+	}
+}
+

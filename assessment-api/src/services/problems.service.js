@@ -1,6 +1,7 @@
 import * as problemsRepo from "../repositories/problems.repo.js";
 import Submission from "../../models/Submission.mjs";
 import { HttpError } from "../utils/httpError.js";
+import { validateProblemDefinition } from "./preview.service.js";
 
 function isPrivilegedRole(role) {
   return role === "admin" || role === "faculty" || role === "superadmin";
@@ -260,6 +261,16 @@ export async function createProblem(payload) {
       errors: validationErrors
     });
   }
+
+  // Mandatory deep validation (schema + types + wrappers)
+  const report = await validateProblemDefinition(normalizedPayload);
+  if (!report.schemaValid || !report.typeValidation || !report.wrapperGeneration) {
+    throw new HttpError(400, "Deep validation failed", {
+      error: "Problem failed deep validation checks (schema, types, or wrappers).",
+      errors: report.errors
+    });
+  }
+
   return problemsRepo.create(normalizedPayload);
 }
 
@@ -272,6 +283,16 @@ export async function updateProblem(id, payload) {
       errors: validationErrors
     });
   }
+
+  // Mandatory deep validation (schema + types + wrappers)
+  const report = await validateProblemDefinition(normalizedPayload);
+  if (!report.schemaValid || !report.typeValidation || !report.wrapperGeneration) {
+    throw new HttpError(400, "Deep validation failed", {
+      error: "Problem failed deep validation checks (schema, types, or wrappers).",
+      errors: report.errors
+    });
+  }
+
   return problemsRepo.updateById(id, normalizedPayload);
 }
 

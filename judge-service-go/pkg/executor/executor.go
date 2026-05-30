@@ -454,7 +454,7 @@ func (e *Executor) RunInContainerStream(ctx context.Context, containerID string,
 
 		// Reset limit AFTER execution completes
 		if memoryLimitMb > 0 {
-			if err := e.UpdateContainerResources(context.Background(), containerID, 256); err != nil {
+			if err := e.UpdateContainerResources(context.Background(), containerID, 1024); err != nil {
 				slog.Error("failed to reset memory limit", "containerId", containerID, "error", err)
 			}
 		}

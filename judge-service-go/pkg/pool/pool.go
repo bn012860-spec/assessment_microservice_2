@@ -246,7 +246,7 @@ func (p *ContainerPool) createContainer(ctx context.Context, image string, lang 
 	}
 
 	pidsLimit := int64(128)
-	memoryBytes := int64(256 * 1024 * 1024)
+	memoryBytes := int64(1024 * 1024 * 1024) // Increase to 1GB
 	memorySwap := memoryBytes
 	noNewPrivileges := "no-new-privileges:true"
 
@@ -272,11 +272,11 @@ func (p *ContainerPool) createContainer(ctx context.Context, image string, lang 
 		CapDrop:        []string{"ALL"},
 		Memory:         memoryBytes,
 		MemorySwap:     memorySwap,
-		CPUQuota:       50000,
+		CPUQuota:       100000, // Increase to 1.0 CPU
 		PidsLimit:      &pidsLimit,
 		Binds:          []string{workspaceBind},
 		Tmpfs: map[string]string{
-			"/tmp": "rw,noexec,nosuid,nodev,size=64m",
+			"/tmp": "rw,noexec,nosuid,nodev,size=512m",
 		},
 	}
 

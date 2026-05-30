@@ -81,6 +81,20 @@ func GenerateWrapper(p models.Problem, lang *languages.Language, submissionFuncN
 		return result, nil
 	}
 
+	if lang.ID == "cpp" {
+		tpl = strings.ReplaceAll(tpl, "{{FUNCTION_NAME}}", sanitizedFuncName)
+		cppCall := buildCppCall(p, sanitizedFuncName)
+		tpl = strings.ReplaceAll(tpl, "// GENERATED_CALL_MARKER", cppCall)
+		return tpl, nil
+	}
+
+	if lang.ID == "go" {
+		tpl = strings.ReplaceAll(tpl, "{{FUNCTION_NAME}}", sanitizedFuncName)
+		goCall := buildGoCall(p, sanitizedFuncName)
+		tpl = strings.ReplaceAll(tpl, "// GENERATED_CALL_MARKER", goCall)
+		return tpl, nil
+	}
+
 	// For other languages (JS, Python, etc.), use simple string replacement.
 	tpl = strings.ReplaceAll(tpl, "{{FUNCTION_NAME}}", sanitizedFuncName)
 
@@ -222,4 +236,145 @@ func numericToInt(v interface{}) int64 {
 	default:
 		return 0
 	}
+}
+
+func cppType(t string) string {
+	switch t {
+	case "number":
+		return "int"
+	case "string":
+		return "std::string"
+	case "boolean":
+		return "bool"
+	case "void":
+		return "void"
+	case "array<number>":
+		return "std::vector<int>"
+	case "matrix<number>":
+		return "std::vector<std::vector<int>>"
+	case "linkedlist<number>":
+		return "ListNode*"
+	case "tree<number>":
+		return "TreeNode*"
+	default:
+		return "auto"
+	}
+}
+
+func buildCppCall(p models.Problem, funcName string) string {
+	var sb strings.Builder
+	for i, param := range p.Parameters {
+		sb.WriteString(fmt.Sprintf("        %s arg%d = ", cppType(param.Type), i))
+		switch param.Type {
+		case "linkedlist<number>":
+			sb.WriteString(fmt.Sprintf("list_from_json(inputs[%d]);\n", i))
+		case "tree<number>":
+			sb.WriteString(fmt.Sprintf("tree_from_json(inputs[%d]);\n", i))
+		default:
+			sb.WriteString(fmt.Sprintf("inputs[%d].get<%s>();\n", i, cppType(param.Type)))
+		}
+	}
+
+	if p.ReturnType == "void" {
+		sb.WriteString(fmt.Sprintf("        sol.%s(", funcName))
+		for i := range p.Parameters {
+			if i > 0 {
+				sb.WriteString(", ")
+			}
+			sb.WriteString(fmt.Sprintf("arg%d", i))
+		}
+		sb.WriteString(");\n")
+
+		if len(p.Parameters) > 0 {
+			sb.WriteString(fmt.Sprintf("        result[\"output\"] = arg0;\n"))
+		} else {
+			sb.WriteString("        result[\"output\"] = nullptr;\n")
+		}
+	} else {
+		sb.WriteString(fmt.Sprintf("        %s output = sol.%s(", cppType(p.ReturnType), funcName))
+		for i := range p.Parameters {
+			if i > 0 {
+				sb.WriteString(", ")
+			}
+			sb.WriteString(fmt.Sprintf("arg%d", i))
+		}
+		sb.WriteString(");\n")
+		sb.WriteString("        result[\"output\"] = output;\n")
+	}
+	sb.WriteString("        std::cout << result.dump() << std::endl;")
+	return sb.String()
+}
+
+func goType(t string) string {
+	switch t {
+	case "number":
+		return "int"
+	case "string":
+		return "string"
+	case "boolean":
+		return "bool"
+	case "void":
+		return ""
+	case "array<number>":
+		return "[]int"
+	case "matrix<number>":
+		return "[][]int"
+	case "linkedlist<number>":
+		return "*ListNode"
+	case "tree<number>":
+		return "*TreeNode"
+	default:
+		return "interface{}"
+	}
+}
+
+func buildGoCall(p models.Problem, funcName string) string {
+	var sb strings.Builder
+	for i, param := range p.Parameters {
+		t := goType(param.Type)
+		sb.WriteString(fmt.Sprintf("\tvar arg%d %s\n", i, t))
+		switch param.Type {
+		case "linkedlist<number>":
+			sb.WriteString(fmt.Sprintf("\targ%d = listFromJSON(payload.Inputs[%d])\n", i, i))
+		case "tree<number>":
+			sb.WriteString(fmt.Sprintf("\targ%d = treeFromJSON(payload.Inputs[%d])\n", i, i))
+		default:
+			sb.WriteString(fmt.Sprintf("\tif err := json.Unmarshal(payload.Inputs[%d], &arg%d); err != nil {\n", i, i))
+			sb.WriteString("\t\tresult.Error = \"Runtime Error\"\n")
+			sb.WriteString(fmt.Sprintf("\t\tfmt.Printf(\"{\\\"error\\\": \\\"Runtime Error\\\", \\\"message\\\": \\\"failed to unmarshal arg%d: %%v\\\"}\\n\", err)\n", i))
+			sb.WriteString("\t\treturn\n")
+			sb.WriteString("\t}\n")
+		}
+	}
+
+	sb.WriteString("\tsol := &Solution{}\n")
+	if p.ReturnType == "void" {
+		sb.WriteString(fmt.Sprintf("\tsol.%s(", funcName))
+		for i := range p.Parameters {
+			if i > 0 {
+				sb.WriteString(", ")
+			}
+			sb.WriteString(fmt.Sprintf("arg%d", i))
+		}
+		sb.WriteString(")\n")
+		if len(p.Parameters) > 0 {
+			sb.WriteString("\tresult.Output = arg0\n")
+		} else {
+			sb.WriteString("\tresult.Output = nil\n")
+		}
+	} else {
+		sb.WriteString(fmt.Sprintf("\toutput := sol.%s(", funcName))
+		for i := range p.Parameters {
+			if i > 0 {
+				sb.WriteString(", ")
+			}
+			sb.WriteString(fmt.Sprintf("arg%d", i))
+		}
+		sb.WriteString(")\n")
+		sb.WriteString("\tresult.Output = output\n")
+	}
+
+	sb.WriteString("\tjsonRes, _ := json.Marshal(result)\n")
+	sb.WriteString("\tfmt.Println(string(jsonRes))\n")
+	return sb.String()
 }

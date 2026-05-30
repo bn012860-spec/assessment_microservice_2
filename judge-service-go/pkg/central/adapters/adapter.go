@@ -24,6 +24,8 @@ var AdapterRegistry = map[string]LanguageAdapter{
 	"python":     PythonAdapter{},
 	"javascript": JavaScriptAdapter{},
 	"java":       JavaAdapter{},
+	"cpp":        CppAdapter{},
+	"go":         GoAdapter{},
 }
 
 func GetAdapter(language string) (LanguageAdapter, bool) {

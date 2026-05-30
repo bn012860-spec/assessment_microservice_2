@@ -1,9 +1,10 @@
 import express from "express";
 import { previewWrapper, validateProblem } from "../controllers/preview.controller.js";
+import { verifyToken, authorizeRoles } from "../middleware/auth.mjs";
 
 const router = express.Router();
 
-router.post("/", previewWrapper);
-router.post("/validate", validateProblem);
+router.post("/", verifyToken, authorizeRoles("admin", "faculty"), previewWrapper);
+router.post("/validate", verifyToken, authorizeRoles("admin", "faculty"), validateProblem);
 
 export default router;

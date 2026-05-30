@@ -27,6 +27,7 @@ const (
 	defaultPythonBatchThreshold     = 20
 	defaultJavaScriptBatchThreshold = 20
 	defaultJavaBatchThreshold       = 20
+	defaultCppBatchThreshold        = 20
 )
 
 type batchedTestExecOutput struct {
@@ -90,7 +91,7 @@ func compileCentralSubmission(ctx context.Context, exec *executor.Executor, pool
 		submissionWorkspace.HostPath,
 		submissionWorkspace.ContainerPath,
 		compilingAdapter.CompileCommand(),
-		30*time.Second,
+		60*time.Second,
 	)
 	if err != nil {
 		if strings.TrimSpace(stderr) != "" {
@@ -465,6 +466,13 @@ func shouldUseBatchedExecution(language string, testCount int) bool {
 	case "java":
 		threshold = defaultJavaBatchThreshold
 		if raw := strings.TrimSpace(os.Getenv("JUDGE_BATCH_THRESHOLD_JAVA")); raw != "" {
+			if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+				threshold = parsed
+			}
+		}
+	case "cpp":
+		threshold = defaultCppBatchThreshold
+		if raw := strings.TrimSpace(os.Getenv("JUDGE_BATCH_THRESHOLD_CPP")); raw != "" {
 			if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
 				threshold = parsed
 			}

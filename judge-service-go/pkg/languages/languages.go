@@ -33,14 +33,13 @@ var Languages = map[string]*Language{
 	"java": {
 		ID:   "java",
 		Name: "Java",
-		// User submissions are written to Solution.java and wrapper to GeneratedTester.java
+		// User submissions are written to Solution.java and wrapper to Main.java
 		FileExt: ".java",
 		Image:   "judge-java-env",
-		// Compile both the user file (Solution.java) and the harness (GeneratedTester.java)
-		// NOTE: avoid globbing like /app/*.java if your exec doesn't expand globs.
-		CompileCmd:      []string{"javac", "/app/Solution.java", "/app/GeneratedTester.java"},
-		RunCmd:          []string{"java", "-Xmx256m", "-cp", "/app", "GeneratedTester"},
-		WrapperTemplate: "java_wrapper.tpl",
+		// Compile both the user file (Solution.java) and the harness (Main.java)
+		CompileCmd:      []string{"javac", "-cp", "/usr/share/java/gson.jar:.", "/app/Solution.java", "/app/Main.java"},
+		RunCmd:          []string{"java", "-Xmx256m", "-cp", "/usr/share/java/gson.jar:.", "Main"},
+		WrapperTemplate: "java_single_wrapper.tpl",
 	},
 	"c": {
 		ID:              "c",
@@ -59,6 +58,24 @@ var Languages = map[string]*Language{
 		CompileCmd:      []string{"mcs", "-out:/app/main.exe", "/app/main.cs"},
 		RunCmd:          []string{"mono", "/app/main.exe"},
 		WrapperTemplate: "csharp_wrapper.tpl",
+	},
+	"cpp": {
+		ID:              "cpp",
+		Name:            "C++",
+		FileExt:         ".cpp",
+		Image:           "judge-cpp-env",
+		CompileCmd:      []string{"g++", "-o", "/app/main", "/app/main.cpp"},
+		RunCmd:          []string{"/app/main"},
+		WrapperTemplate: "cpp_single_wrapper.tpl",
+	},
+	"go": {
+		ID:              "go",
+		Name:            "Go",
+		FileExt:         ".go",
+		Image:           "judge-go-env",
+		CompileCmd:      []string{"go", "build", "-o", "/app/main", "/app/main.go"},
+		RunCmd:          []string{"/app/main"},
+		WrapperTemplate: "go_wrapper.tpl",
 	},
 }
 

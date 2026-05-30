@@ -4,16 +4,53 @@ import Editor from '@monaco-editor/react';
 import { Clock, CheckCircle2, ChevronRight, Terminal, Play, Send, Info, Code2, AlertCircle, ChevronDown, ChevronUp, Loader2, Trash2 } from 'lucide-react';
 import api, { assessments } from '../api';
 import SubmissionOutput from '../components/SubmissionOutput';
+import { mapType } from '../utils/typeValidator';
 
-const supportedLanguages = ['python', 'javascript', 'java', 'c', 'csharp'];
+const supportedLanguages = ['python', 'javascript', 'java', 'cpp', 'c', 'csharp'];
 
-function buildTemplate(language, functionName, parameters) {
+function buildTemplate(language, functionName, parameters, returnType) {
   const paramNames = (parameters || []).map(p => p.name);
   const params = paramNames.join(', ');
 
   if (language === 'python') return `def ${functionName}(${params}):\n    # your code here\n    pass`;
   if (language === 'javascript') return `function ${functionName}(${params}) {\n  // your code here\n}`;
-  if (language === 'java') return `import java.util.*;\n\nclass Solution {\n    public Object ${functionName}(${(parameters || []).map(p => `Object ${p.name}`).join(', ')}) {\n        // your code here\n        return null;\n    }\n}`;
+  
+  if (language === 'java') {
+    const javaReturnType = mapType('java', returnType);
+    const javaParams = (parameters || []).map(p => `${mapType('java', p.type)} ${p.name}`).join(', ');
+    return `import java.util.*;\n\nclass Solution {\n    public ${javaReturnType} ${functionName}(${javaParams}) {\n        // your code here\n    }\n}`;
+  }
+
+  if (language === 'cpp') {
+    const cppReturnType = mapType('cpp', returnType);
+    const cppParams = (parameters || []).map(p => {
+      const type = mapType('cpp', p.type);
+      const isComplex = type.startsWith('vector') || type === 'string';
+      return `${type}${isComplex ? '&' : ''} ${p.name}`;
+    }).join(', ');
+    
+    let template = `#include <iostream>\n#include <vector>\n#include <string>\n#include <algorithm>\n\nusing namespace std;\n\n`;
+    
+    const usesTree = (parameters || []).some(p => p.type.includes('tree')) || returnType.includes('tree');
+    const usesList = (parameters || []).some(p => p.type.includes('linkedlist')) || returnType.includes('linkedlist');
+    
+    if (usesList) {
+      template += `/**\n * struct ListNode {\n *     int val;\n *     ListNode *next;\n *     ListNode(int x) : val(x), next(nullptr) {}\n * };\n */\n\n`;
+    }
+    if (usesTree) {
+      template += `/**\n * struct TreeNode {\n *     int val;\n *     TreeNode *left;\n *     TreeNode *right;\n *     TreeNode(int x) : val(x), left(nullptr), right(nullptr) {}\n * };\n */\n\n`;
+    }
+    
+    template += `class Solution {\npublic:\n    ${cppReturnType} ${functionName}(${cppParams}) {\n        // your code here\n    }\n};`;
+    return template;
+  }
+
+  if (language === 'csharp') {
+    const csReturnType = mapType('csharp', returnType);
+    const csParams = (parameters || []).map(p => `${mapType('csharp', p.type)} ${p.name}`).join(', ');
+    return `using System;\nusing System.Collections.Generic;\n\npublic class Solution {\n    public ${csReturnType} ${functionName}(${csParams}) {\n        // your code here\n    }\n}`;
+  }
+
   if (language === 'c') return `long ${functionName}(long *args, int argc) {\n    // your code here\n    return 0;\n}`;
   return `public class UserSolution {\n    public object ${functionName}(${paramNames.map((p) => `object ${p}`).join(', ')}) {\n        // your code here\n        return null;\n    }\n}`;
 }
@@ -65,7 +102,7 @@ const AssessmentWorkspace = ({ user }) => {
         fullProblems.forEach(p => {
           const lang = assessmentData.allowedLanguages?.[0] || 'python';
           initialLangMap[p._id] = lang;
-          initialCodeMap[p._id] = buildTemplate(lang, p.functionName, p.parameters);
+          initialCodeMap[p._id] = buildTemplate(lang, p.functionName, p.parameters, p.returnType);
 
           const samples = (p.testCases || []).filter(tc => tc.isSample);
           initialTestCasesMap[p._id] = samples.length > 0 
@@ -117,7 +154,7 @@ const AssessmentWorkspace = ({ user }) => {
     setLangMap(prev => ({ ...prev, [problemId]: lang }));
     setCodeMap(prev => ({ 
       ...prev, 
-      [problemId]: buildTemplate(lang, currentProblem.functionName, currentProblem.parameters) 
+      [problemId]: buildTemplate(lang, currentProblem.functionName, currentProblem.parameters, currentProblem.returnType) 
     }));
   };
 

@@ -43,6 +43,7 @@ const (
 	centralComparePythonEnv = "JUDGE_CENTRAL_COMPARE_PY"
 	centralCompareJSEnv     = "JUDGE_CENTRAL_COMPARE_JS"
 	centralCompareJavaEnv   = "JUDGE_CENTRAL_COMPARE_JAVA"
+	centralCompareCppEnv    = "JUDGE_CENTRAL_COMPARE_CPP"
 	maxTestOutputBytes      = 64 * 1024
 	maxLogOutputBytes       = 4 * 1024
 	maxTestsBytes           = 1 << 20 // 1MB
@@ -494,6 +495,13 @@ func isCentralCompareEnabled(language string) bool {
 		if raw, ok := os.LookupEnv(centralCompareJavaEnv); ok {
 			return isTruthyEnv(raw)
 		}
+		return true
+	case "cpp":
+		if raw, ok := os.LookupEnv(centralCompareCppEnv); ok {
+			return isTruthyEnv(raw)
+		}
+		return true
+	case "go":
 		return true
 	default:
 		return false

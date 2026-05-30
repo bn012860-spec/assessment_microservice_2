@@ -47,3 +47,64 @@ export function isValidType(typeStr) {
 
   return true;
 }
+
+/**
+ * Maps the canonical type system to language-specific types.
+ */
+export function mapType(language, typeStr) {
+  if (!typeStr) return 'void';
+  const match = typeStr.trim().match(TYPE_REGEX);
+  if (!match) return language === 'cpp' ? 'auto' : 'Object';
+
+  const kind = match[1];
+  const inner = match[2];
+
+  const cppMap = {
+    number: 'int',
+    string: 'string',
+    boolean: 'bool',
+    void: 'void',
+    array: (t) => `vector<${mapType('cpp', t)}>`,
+    matrix: (t) => `vector<vector<${mapType('cpp', t)}>>`,
+    tree: () => 'TreeNode*',
+    linkedlist: () => 'ListNode*',
+  };
+
+  const javaMap = {
+    number: 'int',
+    string: 'String',
+    boolean: 'boolean',
+    void: 'void',
+    array: (t) => `${mapType('java', t)}[]`,
+    matrix: (t) => `${mapType('java', t)}[][]`,
+    tree: () => 'TreeNode',
+    linkedlist: () => 'ListNode',
+  };
+
+  const csharpMap = {
+    number: 'int',
+    string: 'string',
+    boolean: 'bool',
+    void: 'void',
+    array: (t) => `${mapType('csharp', t)}[]`,
+    matrix: (t) => `${mapType('csharp', t)}[][]`,
+    tree: () => 'TreeNode',
+    linkedlist: () => 'ListNode',
+  };
+
+  const maps = {
+    cpp: cppMap,
+    java: javaMap,
+    csharp: csharpMap
+  };
+
+  const currentMap = maps[language];
+  if (!currentMap) return 'auto';
+
+  const mapped = currentMap[kind];
+  if (typeof mapped === 'function') {
+    return mapped(inner);
+  }
+  return mapped || (language === 'cpp' ? 'auto' : 'Object');
+}
+

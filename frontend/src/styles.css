@@ -87,7 +87,7 @@ a {
   backdrop-filter: var(--glass);
   -webkit-backdrop-filter: var(--glass);
   border-bottom: 1px solid var(--border);
-  padding: 0 var(--sp-6);
+  padding: 0 clamp(var(--sp-3), 1.5vw, 20px);
   height: 64px;
   display: flex;
   justify-content: space-between;
@@ -134,9 +134,9 @@ a {
 
 /* Container */
 .container {
-  max-width: 1280px;
+  max-width: 1680px;
   margin: 0 auto;
-  padding: var(--sp-8) var(--sp-6);
+  padding: var(--sp-8) clamp(var(--sp-3), 1.5vw, 20px);
 }
 
 /* Problem Cards (New) */
@@ -250,6 +250,17 @@ a {
 }
 
 /* Form Elements */
+.form-group {
+  margin-bottom: var(--sp-4);
+}
+
+.form-group > label {
+  display: block;
+  margin-bottom: var(--sp-2);
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
 input, textarea, select {
   width: 100%;
   background-color: var(--surface);
@@ -260,6 +271,11 @@ input, textarea, select {
   font-size: 0.95rem;
   transition: all 0.2s ease;
   font-family: inherit;
+}
+
+textarea {
+  min-height: 60px;
+  resize: vertical;
 }
 
 input:focus, textarea:focus, select:focus {
@@ -392,6 +408,7 @@ input:focus, textarea:focus, select:focus {
 .flex-between { display: flex; justify-content: space-between; align-items: center; }
 .flex-center { display: flex; justify-content: center; align-items: center; }
 .gap-2 { gap: var(--sp-2); }
+.gap-3 { gap: var(--sp-3); }
 .gap-4 { gap: var(--sp-4); }
 .mb-2 { margin-bottom: var(--sp-2); }
 .mb-4 { margin-bottom: var(--sp-4); }

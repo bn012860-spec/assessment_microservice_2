@@ -1,18 +1,20 @@
 
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Search, Filter, Plus, ChevronRight, Users, CheckCircle2 } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { Search, Filter, Plus, ChevronRight, Users, CheckCircle2, X } from 'lucide-react';
 import api from '../api';
 
 function ProblemListPage({ user }) {
+  const location = useLocation();
   const [problems, setProblems] = useState([]);
+  const [successMsg, setSuccessMsg] = useState(location.state?.successMessage || '');
   const [filters, setFilters] = useState({
     search: '',
     difficulty: '',
     tag: ''
   });
 
-  const canManage = user && (user.role === 'admin' || user.role === 'faculty');
+  const canManage = user && (user.role === 'admin' || user.role === 'faculty' || user.role === 'superadmin');
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -32,6 +34,17 @@ function ProblemListPage({ user }) {
 
   return (
     <div className="container fade-in">
+      {successMsg && (
+        <div className="success-box mb-8 flex-between" style={{ padding: '12px 16px', background: 'rgba(var(--success-rgb), 0.1)', border: '1px solid var(--success)', borderRadius: 'var(--radius-md)', color: 'var(--success)' }}>
+          <div className="flex-center gap-2">
+            <CheckCircle2 size={18} />
+            <span>{successMsg}</span>
+          </div>
+          <button onClick={() => setSuccessMsg('')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', display: 'flex' }}>
+            <X size={18} />
+          </button>
+        </div>
+      )}
       <div className="flex-between mb-8">
         <div>
           <h1 className="mb-2">Problem Set</h1>

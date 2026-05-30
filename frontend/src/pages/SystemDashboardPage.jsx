@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, Server, Database, Users, Code2, RefreshCw, AlertCircle } from 'lucide-react';
+import { Activity, Server, Database, Users, Code2, RefreshCw, AlertCircle, BookOpen } from 'lucide-react';
 import api from '../api';
 
 const SystemDashboardPage = () => {

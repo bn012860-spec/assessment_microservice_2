@@ -1,26 +1,65 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
-import { Play, Send, ChevronLeft, Info, History, Settings2, Terminal, AlertCircle, ChevronDown, ChevronUp, Loader2, Trash2 } from 'lucide-react';
+import { Play, Send, ChevronLeft, Info, History, Settings2, Terminal, AlertCircle, ChevronDown, ChevronUp, Loader2, Trash2, CheckCircle2, X, Edit2 } from 'lucide-react';
 import api, { problems } from '../api';
 import SubmissionOutput from '../components/SubmissionOutput';
+import { mapType } from '../utils/typeValidator';
 
-const supportedLanguages = ['python', 'javascript', 'java', 'c', 'csharp'];
+const supportedLanguages = ['python', 'javascript', 'java', 'cpp', 'c', 'csharp'];
 
-function buildTemplate(language, functionName, parameters) {
+function buildTemplate(language, functionName, parameters, returnType) {
   const paramNames = (parameters || []).map(p => p.name);
   const params = paramNames.join(', ');
 
   if (language === 'python') return `def ${functionName}(${params}):\n    # your code here\n    pass`;
   if (language === 'javascript') return `function ${functionName}(${params}) {\n  // your code here\n}`;
-  if (language === 'java') return `import java.util.*;\n\nclass Solution {\n    public Object ${functionName}(${(parameters || []).map(p => `Object ${p.name}`).join(', ')}) {\n        // your code here\n        return null;\n    }\n}`;
+
+  if (language === 'java') {
+    const javaReturnType = mapType('java', returnType);
+    const javaParams = (parameters || []).map(p => `${mapType('java', p.type)} ${p.name}`).join(', ');
+    return `import java.util.*;\n\nclass Solution {\n    public ${javaReturnType} ${functionName}(${javaParams}) {\n        // your code here\n    }\n}`;
+  }
+ 
+  if (language === 'cpp') {
+    const cppReturnType = mapType('cpp', returnType);
+    const cppParams = (parameters || []).map(p => {
+      const type = mapType('cpp', p.type);
+      const isComplex = type.startsWith('vector') || type === 'string';
+      return `${type}${isComplex ? '&' : ''} ${p.name}`;
+    }).join(', ');
+
+    let template = `#include <iostream>\n#include <vector>\n#include <string>\n#include <algorithm>\n\nusing namespace std;\n\n`;
+
+    const usesTree = (parameters || []).some(p => p.type.includes('tree')) || (returnType && returnType.includes('tree'));
+    const usesList = (parameters || []).some(p => p.type.includes('linkedlist')) || (returnType && returnType.includes('linkedlist'));
+
+    if (usesList) {
+      template += `/**\n * struct ListNode {\n *     int val;\n *     ListNode *next;\n *     ListNode(int x) : val(x), next(nullptr) {}\n * };\n */\n\n`;
+    }
+    if (usesTree) {
+      template += `/**\n * struct TreeNode {\n *     int val;\n *     TreeNode *left;\n *     TreeNode *right;\n *     TreeNode(int x) : val(x), left(nullptr), right(nullptr) {}\n * };\n */\n\n`;
+    }
+
+    template += `class Solution {\npublic:\n    ${cppReturnType} ${functionName}(${cppParams}) {\n        // your code here\n    }\n};`;
+    return template;
+  }
+
+  if (language === 'csharp') {
+    const csReturnType = mapType('csharp', returnType);
+    const csParams = (parameters || []).map(p => `${mapType('csharp', p.type)} ${p.name}`).join(', ');
+    return `using System;\nusing System.Collections.Generic;\n\npublic class Solution {\n    public ${csReturnType} ${functionName}(${csParams}) {\n        // your code here\n    }\n}`;
+  }
+
   if (language === 'c') return `long ${functionName}(long *args, int argc) {\n    // your code here\n    return 0;\n}`;
   return `public class UserSolution {\n    public object ${functionName}(${paramNames.map((p) => `object ${p}`).join(', ')}) {\n        // your code here\n        return null;\n    }\n}`;
 }
 
 const ProblemPage = ({ user }) => {
   const { _id } = useParams();
+  const location = useLocation();
   const [problem, setProblem] = useState(null);
+  const [successMsg, setSuccessMsg] = useState(location.state?.successMessage || '');
   const [stats, setStats] = useState(null);
   const [code, setCode] = useState('');
   const [selectedLanguage, setSelectedLanguage] = useState('python');
@@ -40,6 +79,7 @@ const ProblemPage = ({ user }) => {
   
   const intervalRef = useRef(null);
   const isAuthed = !!user;
+  const canManage = user && (user.role === 'admin' || user.role === 'faculty' || user.role === 'superadmin');
 
   useEffect(() => {
     if (activeTab === 'submissions' && isAuthed && mySubmissions.length === 0) {
@@ -88,7 +128,7 @@ const ProblemPage = ({ user }) => {
 
   useEffect(() => {
     if (problem) {
-      setCode(buildTemplate(selectedLanguage, problem.functionName || 'solution', problem.parameters));
+      setCode(buildTemplate(selectedLanguage, problem.functionName || 'solution', problem.parameters, problem.returnType));
     }
   }, [selectedLanguage, problem]);
 
@@ -105,6 +145,7 @@ const ProblemPage = ({ user }) => {
         setStats(statsRes.data);
       }
     } catch (err) {
+      console.error('Error checking submission status:', err);
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
@@ -126,6 +167,7 @@ const ProblemPage = ({ user }) => {
         return { inputs: inputArr, expected: null, isSample: true };
       });
     } catch (err) {
+      console.error('Invalid JSON in test cases:', err);
       setRunResult({ status: 'Error', error: 'Invalid JSON in one of the test cases.' });
       setIsRunning(false);
       return;
@@ -135,6 +177,7 @@ const ProblemPage = ({ user }) => {
       const res = await problems.run(_id, { code, language: selectedLanguage, customTests: tests });
       setRunResult(res.data);
     } catch (err) {
+      console.error('Error running code:', err);
       setRunResult({ status: 'Error', error: 'Failed to run code' });
     } finally {
       setIsRunning(false);
@@ -154,6 +197,7 @@ const ProblemPage = ({ user }) => {
       setSubmission(newSubmission);
       intervalRef.current = setInterval(() => checkStatus(newSubmission._id), 2000);
     } catch (err) {
+      console.error('Error submitting code:', err);
       setSubmission({ status: 'Error', error: 'An error occurred during submission.' });
     }
   };
@@ -198,7 +242,21 @@ const ProblemPage = ({ user }) => {
   if (!problem) return <div className="container flex-center" style={{ height: '100vh' }}><Loader2 className="spin" size={48} color="var(--primary)" /></div>;
 
   return (
-    <div className="ide-layout fade-in">
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)' }}>
+      {successMsg && (
+        <div style={{ padding: '16px 24px', background: 'var(--bg)' }}>
+          <div className="success-box flex-between" style={{ maxWidth: '1400px', margin: '0 auto', padding: '12px 16px', background: 'rgba(var(--success-rgb), 0.1)', border: '1px solid var(--success)', borderRadius: 'var(--radius-md)', color: 'var(--success)' }}>
+            <div className="flex-center gap-2">
+              <CheckCircle2 size={18} />
+              <span>{successMsg}</span>
+            </div>
+            <button onClick={() => setSuccessMsg('')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', display: 'flex' }}>
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+      )}
+      <div className="ide-layout fade-in" style={{ flex: 1 }}>
       {/* Left Panel: Problem Info */}
       <div className="ide-panel-left">
         <div className="ide-tabs">
@@ -213,10 +271,15 @@ const ProblemPage = ({ user }) => {
         <div className="ide-content">
           {activeTab === 'description' ? (
             <div>
-              <div className="mb-4">
+              <div className="flex-between mb-4">
                 <Link to="/" className="text-muted flex-center gap-2" style={{ width: 'fit-content', fontSize: '0.85rem' }}>
                   <ChevronLeft size={16} /> Back to Problems
                 </Link>
+                {canManage && (
+                  <Link to={`/problems/${_id}/edit`} className="text-muted flex-center gap-2" style={{ fontSize: '0.85rem' }}>
+                    <Edit2 size={16} /> Edit Problem
+                  </Link>
+                )}
               </div>
               <h1 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>{problem.title}</h1>
               <div className="flex-gap mb-4">
@@ -482,6 +545,7 @@ const ProblemPage = ({ user }) => {
           )}
         </div>
       </div>
+    </div>
     </div>
   );
 };
