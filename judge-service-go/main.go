@@ -224,6 +224,18 @@ func prepareSubmissionFiles(submissionMsg models.SubmissionMessage, problem mode
 				return nil, nil, nil, fmt.Errorf("failed to write combined submission file: %w", err)
 			}
 			filesToCopy = []string{submissionFileName, solutionFileName}
+		case "go":
+			solutionFileName := "solution.go"
+			if err := workspace.WriteFile(tempDir, solutionFileName, []byte(submissionMsg.Code), 0644); err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to write solution file: %w", err)
+			}
+			wrapperFileName := "main.go"
+			// Clear USER_CODE_MARKER in the wrapper since the user code is in a separate file
+			finalWrapperCode := strings.Replace(wrapperCode, "// USER_CODE_MARKER", "", 1)
+			if err := workspace.WriteFile(tempDir, wrapperFileName, []byte(finalWrapperCode), 0644); err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to write wrapper file: %w", err)
+			}
+			filesToCopy = []string{solutionFileName, wrapperFileName}
 		default: // C, CSharp, etc.
 			submissionFileName := "main" + lang.FileExt
 			if err := workspace.WriteFile(tempDir, submissionFileName, []byte(finalCode), 0644); err != nil {
@@ -416,7 +428,7 @@ func processSubmission(d amqp.Delivery, problemsCollection *mongo.Collection, su
 	defer containerPool.Release(pooledContainer)
 
 	if adapter, ok := adapters.GetAdapter(lang.ID); ok && isCentralCompareEnabled(lang.ID) {
-		execCtx, cancel := context.WithTimeout(ctx, time.Duration(len(problem.TestCases)+1)*defaultSandboxTimeout)
+		execCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
 		defer cancel()
 
 		result, err := runSubmissionCentral(execCtx, executor, pooledContainer, submissionMsg, problem, adapter)
@@ -586,7 +598,7 @@ func startHealthServer(ctx context.Context, containerPool *pool.ContainerPool, p
 		var runErr error
 
 		if adapter, ok := adapters.GetAdapter(lang.ID); ok && isCentralCompareEnabled(lang.ID) {
-			execCtx, cancel := context.WithTimeout(r.Context(), time.Duration(len(problem.TestCases)+1)*defaultSandboxTimeout)
+			execCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
 			defer cancel()
 			result, runErr = runSubmissionCentral(execCtx, executor, pooledContainer, msg, problem, adapter)
 		} else {

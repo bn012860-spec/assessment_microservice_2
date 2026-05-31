@@ -17,8 +17,8 @@ router.get("/", listProblems);
 router.get("/:_id", optionalVerifyToken, getProblemById);
 router.get("/:_id/stats", optionalVerifyToken, getProblemStats);
 router.post("/:_id/run", verifyToken, runProblem);
-router.post("/", verifyToken, authorizeRoles("admin", "faculty"), validate("problem"), createProblem);
-router.put("/:_id", verifyToken, authorizeRoles("admin", "faculty"), validate("problem"), updateProblem);
-router.delete("/:_id", verifyToken, authorizeRoles("admin"), deleteProblem);
+router.post("/", verifyToken, authorizeRoles("admin", "faculty", "superadmin"), validate("problem"), createProblem);
+router.put("/:_id", verifyToken, authorizeRoles("admin", "faculty", "superadmin"), validate("problem"), updateProblem);
+router.delete("/:_id", verifyToken, authorizeRoles("admin", "superadmin"), deleteProblem);
 
 export default router;

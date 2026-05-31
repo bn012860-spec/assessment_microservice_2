@@ -11,7 +11,7 @@ const AddAssessmentPage = () => {
     durationMinutes: 60,
     startTime: '',
     endTime: '',
-    allowedLanguages: ['python', 'javascript', 'java', 'cpp', 'c', 'csharp'],
+    allowedLanguages: ['python', 'javascript', 'java', 'cpp', 'c', 'csharp', 'go'],
     problems: [],
     status: 'Draft'
   });
@@ -129,7 +129,7 @@ const AddAssessmentPage = () => {
         <div className="problem-card" style={{ marginBottom: '20px' }}>
           <h3>Allowed Languages</h3>
           <div className="flex-gap">
-            {['python', 'javascript', 'java', 'cpp', 'c', 'csharp'].map(lang => (
+            {['python', 'javascript', 'java', 'cpp', 'c', 'csharp', 'go'].map(lang => (
               <label key={lang} style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
                 <input 
                   type="checkbox" 

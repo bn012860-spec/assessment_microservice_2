@@ -347,9 +347,8 @@ func buildGoCall(p models.Problem, funcName string) string {
 		}
 	}
 
-	sb.WriteString("\tsol := &Solution{}\n")
 	if p.ReturnType == "void" {
-		sb.WriteString(fmt.Sprintf("\tsol.%s(", funcName))
+		sb.WriteString(fmt.Sprintf("\t%s(", funcName))
 		for i := range p.Parameters {
 			if i > 0 {
 				sb.WriteString(", ")
@@ -363,7 +362,7 @@ func buildGoCall(p models.Problem, funcName string) string {
 			sb.WriteString("\tresult.Output = nil\n")
 		}
 	} else {
-		sb.WriteString(fmt.Sprintf("\toutput := sol.%s(", funcName))
+		sb.WriteString(fmt.Sprintf("\toutput := %s(", funcName))
 		for i := range p.Parameters {
 			if i > 0 {
 				sb.WriteString(", ")

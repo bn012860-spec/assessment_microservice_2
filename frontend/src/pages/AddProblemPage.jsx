@@ -214,7 +214,7 @@ const AddProblemPage = () => {
           <ul className="report-list">
             <li>{validationReport.schemaValid ? <CheckCircle2 size={16} color="var(--success)" /> : <AlertTriangle size={16} color="var(--error)" />} Schema Validation</li>
             <li>{validationReport.typeValidation ? <CheckCircle2 size={16} color="var(--success)" /> : <AlertTriangle size={16} color="var(--error)" />} Type Conversion Validation</li>
-            <li>{validationReport.wrapperGeneration ? <CheckCircle2 size={16} color="var(--success)" /> : <AlertTriangle size={16} color="var(--error)" />} Wrapper Generation (JS, Python, Java)</li>
+            <li>{validationReport.wrapperGeneration ? <CheckCircle2 size={16} color="var(--success)" /> : <AlertTriangle size={16} color="var(--error)" />} Wrapper Generation (JS, Python, Java, Go)</li>
           </ul>
           {validationReport.errors.length > 0 && (
             <div className="mt-4 p-4" style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>

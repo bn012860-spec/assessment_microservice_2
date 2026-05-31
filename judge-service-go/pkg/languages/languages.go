@@ -73,8 +73,8 @@ var Languages = map[string]*Language{
 		Name:            "Go",
 		FileExt:         ".go",
 		Image:           "judge-go-env",
-		CompileCmd:      []string{"go", "build", "-o", "/app/main", "/app/main.go"},
-		RunCmd:          []string{"/app/main"},
+		CompileCmd:      []string{"sh", "-c", "go mod init solution 2>/dev/null || true; go build -o main ."},
+		RunCmd:          []string{"./main"},
 		WrapperTemplate: "go_wrapper.tpl",
 	},
 }

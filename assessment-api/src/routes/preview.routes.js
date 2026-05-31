@@ -4,7 +4,7 @@ import { verifyToken, authorizeRoles } from "../middleware/auth.mjs";
 
 const router = express.Router();
 
-router.post("/", verifyToken, authorizeRoles("admin", "faculty"), previewWrapper);
-router.post("/validate", verifyToken, authorizeRoles("admin", "faculty"), validateProblem);
+router.post("/", verifyToken, authorizeRoles("admin", "faculty", "superadmin"), previewWrapper);
+router.post("/validate", verifyToken, authorizeRoles("admin", "faculty", "superadmin"), validateProblem);
 
 export default router;

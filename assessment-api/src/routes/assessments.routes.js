@@ -17,13 +17,13 @@ const router = express.Router();
 
 router.get("/", verifyToken, listAssessments);
 router.get("/:_id", verifyToken, getAssessmentById);
-router.post("/", verifyToken, authorizeRoles("admin", "faculty"), createAssessment);
-router.put("/:_id", verifyToken, authorizeRoles("admin", "faculty"), updateAssessment);
-router.delete("/:_id", verifyToken, authorizeRoles("admin", "faculty"), deleteAssessment);
+router.post("/", verifyToken, authorizeRoles("admin", "faculty", "superadmin"), createAssessment);
+router.put("/:_id", verifyToken, authorizeRoles("admin", "faculty", "superadmin"), updateAssessment);
+router.delete("/:_id", verifyToken, authorizeRoles("admin", "faculty", "superadmin"), deleteAssessment);
 
 router.post("/:_id/start", verifyToken, authorizeRoles("student"), startAssessment);
 router.post("/attempts/:attemptId/submit", verifyToken, authorizeRoles("student"), submitAssessment);
-router.get("/:_id/attempts", verifyToken, authorizeRoles("admin", "faculty"), listAssessmentAttempts);
+router.get("/:_id/attempts", verifyToken, authorizeRoles("admin", "faculty", "superadmin"), listAssessmentAttempts);
 router.get("/attempts/:attemptId", verifyToken, getAssessmentAttemptById);
 router.get("/attempts/:attemptId/submissions", verifyToken, getAttemptSubmissions);
 

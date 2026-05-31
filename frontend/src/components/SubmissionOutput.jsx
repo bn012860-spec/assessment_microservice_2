@@ -129,11 +129,12 @@ const SubmissionOutput = ({ output }) => {
                                         </div>
                                     )}
 
-                                    {(detail.stdout || detail.stderr) && (
+                                    {(detail.stdout || detail.stderr || detail.traceback) && (
                                         <div className="testcase-field mt-4">
                                             <span className="label">Console Logs</span>
                                             <pre style={{ color: 'var(--text-secondary)' }}>
                                                 {detail.stdout && `${detail.stdout}\n`}
+                                                {detail.traceback && <span style={{ color: 'var(--error)' }}>{detail.traceback}\n</span>}
                                                 {detail.stderr && <span style={{ color: 'var(--error)' }}>{detail.stderr}</span>}
                                             </pre>
                                         </div>

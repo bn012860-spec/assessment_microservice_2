@@ -78,7 +78,7 @@ export async function validateProblemDefinition(problem) {
   // Stage 3: Wrapper Generation
   if (report.typeValidation) {
     try {
-      const languages = ['javascript', 'python', 'java'];
+      const languages = ['javascript', 'python', 'java', 'go'];
       for (const lang of languages) {
         await buildPreview({ problem, language: lang });
       }
@@ -104,7 +104,8 @@ export async function buildPreview({ problem, language }) {
     python: "python_wrapper.tpl",
     java: "java_wrapper.tpl",
     c: "c_wrapper.tpl",
-    csharp: "csharp_wrapper.tpl"
+    csharp: "csharp_wrapper.tpl",
+    go: "go_wrapper.tpl"
   }[language] || "js_wrapper.tpl";
 
   const fs = await import("fs");

@@ -92,10 +92,22 @@ export function mapType(language, typeStr) {
     linkedlist: () => 'ListNode',
   };
 
+  const goMap = {
+    number: 'int',
+    string: 'string',
+    boolean: 'bool',
+    void: '',
+    array: (t) => `[]${mapType('go', t)}`,
+    matrix: (t) => `[][]${mapType('go', t)}`,
+    tree: () => '*TreeNode',
+    linkedlist: () => '*ListNode',
+  };
+
   const maps = {
     cpp: cppMap,
     java: javaMap,
-    csharp: csharpMap
+    csharp: csharpMap,
+    go: goMap
   };
 
   const currentMap = maps[language];

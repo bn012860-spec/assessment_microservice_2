@@ -155,6 +155,7 @@ func runSubmissionCentralPerTest(ctx context.Context, exec *executor.Executor, p
 		stdoutForResult, stdoutTruncated := truncateString(stdoutTrimmed, maxTestOutputBytes)
 		stderrForLog, stderrTruncated := truncateString(stderrTrimmed, maxLogOutputBytes)
 		tr.Stdout = stdoutForResult
+		tr.Stderr = stderrForLog
 
 		if runErr != nil {
 			errStr := strings.ToLower(runErr.Error())
@@ -167,6 +168,10 @@ func runSubmissionCentralPerTest(ctx context.Context, exec *executor.Executor, p
 				markTestFailed(&tr, models.SubmissionStatusRuntimeError)
 				if !errors.Is(runErr, context.DeadlineExceeded) && !strings.Contains(strings.ToLower(runErr.Error()), "deadline exceeded") {
 					result.InternalError = models.InternalErrorWrapper
+				}
+				if stderrForLog != "" {
+					tr.Error = "Runtime Error"
+					tr.Traceback = stderrForLog
 				}
 			}
 			slog.Error("runtime error", "submissionId", submissionMsg.SubmissionID, "test", i+1, "error", runErr)
@@ -191,6 +196,10 @@ func runSubmissionCentralPerTest(ctx context.Context, exec *executor.Executor, p
 			markTestFailed(&tr, models.SubmissionStatusRuntimeError)
 			result.InternalError = models.InternalErrorJudge
 			tr.TimeMs = time.Since(testStart).Milliseconds()
+			tr.Traceback = stdoutForResult
+			if tr.Traceback == "" && stderrForLog != "" {
+				tr.Traceback = stderrForLog
+			}
 			slog.Error("invalid wrapper output", "submissionId", submissionMsg.SubmissionID, "test", i+1, "error", parseErr, "stdout", stdoutForResult)
 			result.AddTestResult(tr)
 			continue

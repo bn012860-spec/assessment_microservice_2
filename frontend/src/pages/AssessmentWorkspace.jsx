@@ -6,7 +6,7 @@ import api, { assessments } from '../api';
 import SubmissionOutput from '../components/SubmissionOutput';
 import { mapType } from '../utils/typeValidator';
 
-const supportedLanguages = ['python', 'javascript', 'java', 'cpp', 'c', 'csharp'];
+const supportedLanguages = ['python', 'javascript', 'java', 'cpp', 'c', 'csharp', 'go'];
 
 function buildTemplate(language, functionName, parameters, returnType) {
   const paramNames = (parameters || []).map(p => p.name);

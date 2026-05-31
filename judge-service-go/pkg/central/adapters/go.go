@@ -33,6 +33,10 @@ func (GoAdapter) PrepareFiles(workDir string, submissionMsg models.SubmissionMes
 	if err := workspace.WriteFile(workDir, "solution.go", []byte(solutionCode), 0644); err != nil {
 		return nil, fmt.Errorf("failed to write solution.go: %w", err)
 	}
+	
+	// Clear USER_CODE_MARKER in the wrapper since the user code is in a separate file
+	wrapperCode = strings.Replace(wrapperCode, "// USER_CODE_MARKER", "", 1)
+	
 	if err := workspace.WriteFile(workDir, "main.go", []byte(wrapperCode), 0644); err != nil {
 		return nil, fmt.Errorf("failed to write main.go: %w", err)
 	}
@@ -41,10 +45,11 @@ func (GoAdapter) PrepareFiles(workDir string, submissionMsg models.SubmissionMes
 }
 
 func (GoAdapter) CompileCommand() []string {
-	// Compile all .go files in the directory
-	return []string{"go", "build", "-o", "/app/main", "main.go", "solution.go"}
+	// Build the binary as 'main' in the current directory (which is the workspace)
+	return []string{"sh", "-c", "go mod init solution 2>/dev/null || true; go build -o main ."}
 }
 
 func (GoAdapter) RunCommand(inputB64 string) []string {
-	return []string{"/app/main", inputB64}
+	// Run the 'main' binary from the current directory
+	return []string{"./main", inputB64}
 }

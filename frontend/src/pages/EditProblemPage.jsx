@@ -236,7 +236,7 @@ const EditProblemPage = () => {
           <ul className="report-list">
             <li>{validationReport.schemaValid ? '✅' : '✗'} Schema Validation</li>
             <li>{validationReport.typeValidation ? '✅' : '✗'} Type Conversion Validation</li>
-            <li>{validationReport.wrapperGeneration ? '✅' : '✗'} Wrapper Generation (JS, Python, Java)</li>
+            <li>{validationReport.wrapperGeneration ? '✅' : '✗'} Wrapper Generation (JS, Python, Java, Go)</li>
           </ul>
           {validationReport.errors.length > 0 && (
             <div className="mt-10">

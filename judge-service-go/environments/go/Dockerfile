@@ -6,9 +6,9 @@ RUN apk add --no-cache build-base
 # Create a non-root user 'judge'
 RUN addgroup -S judge && adduser -S -G judge judge
 
-# Set Go environment variables for writable directories in /app (bind-mounted to host)
-ENV GOCACHE=/app/.cache/go-build
-ENV GOPATH=/app/go
+# Set Go environment variables for writable directories
+ENV GOCACHE=/tmp/.cache/go-build
+ENV GOPATH=/tmp/go
 
 # Set the working directory
 WORKDIR /app

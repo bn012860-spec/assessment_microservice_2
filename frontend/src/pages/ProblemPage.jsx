@@ -6,7 +6,7 @@ import api, { problems } from '../api';
 import SubmissionOutput from '../components/SubmissionOutput';
 import { mapType } from '../utils/typeValidator';
 
-const supportedLanguages = ['python', 'javascript', 'java', 'cpp', 'c', 'csharp'];
+const supportedLanguages = ['python', 'javascript', 'java', 'cpp', 'c', 'csharp', 'go'];
 
 function buildTemplate(language, functionName, parameters, returnType) {
   const paramNames = (parameters || []).map(p => p.name);
@@ -49,6 +49,12 @@ function buildTemplate(language, functionName, parameters, returnType) {
     const csReturnType = mapType('csharp', returnType);
     const csParams = (parameters || []).map(p => `${mapType('csharp', p.type)} ${p.name}`).join(', ');
     return `using System;\nusing System.Collections.Generic;\n\npublic class Solution {\n    public ${csReturnType} ${functionName}(${csParams}) {\n        // your code here\n    }\n}`;
+  }
+
+  if (language === 'go') {
+    const goReturnType = mapType('go', returnType);
+    const goParams = (parameters || []).map(p => `${p.name} ${mapType('go', p.type)}`).join(', ');
+    return `package main\n\nfunc ${functionName}(${goParams}) ${goReturnType} {\n    // your code here\n    return ${goReturnType === 'string' ? '""' : goReturnType === 'bool' ? 'false' : goReturnType.includes('[]') ? 'nil' : '0'}\n}`;
   }
 
   if (language === 'c') return `long ${functionName}(long *args, int argc) {\n    // your code here\n    return 0;\n}`;
