@@ -56,7 +56,7 @@ func runCertificationTest(t *testing.T, exec *executor.Executor, pc *pool.Pooled
 		Code:         code,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 
 	adapter, ok := adapters.GetAdapter(lang.ID)

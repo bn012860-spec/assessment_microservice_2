@@ -29,14 +29,18 @@ func escapeForJavaString(s string) string {
 }
 
 // GenerateWrapper generates the wrapper source for a problem + language.
-func GenerateWrapper(p models.Problem, lang *languages.Language, submissionFuncName string) (string, error) {
+func GenerateWrapper(p models.Problem, lang *languages.Language, submissionFuncName string, templateName string) (string, error) {
 	if len(p.TestCases) == 0 && len(p.TestsJSON) > 0 {
 		if err := p.ParseTestsJSON(); err != nil {
 			return "", fmt.Errorf("failed to parse TestsJSON: %w", err)
 		}
 	}
 
-	tplPath := filepath.Join("pkg", "wrappers", lang.WrapperTemplate)
+	if templateName == "" {
+		templateName = lang.WrapperTemplate
+	}
+
+	tplPath := filepath.Join("pkg", "wrappers", templateName)
 	b, err := os.ReadFile(tplPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read template %s: %w", tplPath, err)
@@ -250,7 +254,7 @@ func cppType(t string) string {
 		return "void"
 	case "array<number>":
 		return "std::vector<int>"
-	case "matrix<number>":
+	case "matrix<number>", "array<array<number>>":
 		return "std::vector<std::vector<int>>"
 	case "linkedlist<number>":
 		return "ListNode*"
@@ -317,7 +321,7 @@ func goType(t string) string {
 		return ""
 	case "array<number>":
 		return "[]int"
-	case "matrix<number>":
+	case "matrix<number>", "array<array<number>>":
 		return "[][]int"
 	case "linkedlist<number>":
 		return "*ListNode"

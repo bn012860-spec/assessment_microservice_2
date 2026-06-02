@@ -94,6 +94,13 @@
     "isPremium": {
       "type": "boolean"
     },
+    "referenceSolution": {
+      "type": "string"
+    },
+    "solutionLanguage": {
+      "type": "string",
+      "enum": ["javascript", "python", "java", "go", "cpp", "c", "csharp"]
+    },
     "createdAt": {
       "type": "string",
       "format": "date-time"

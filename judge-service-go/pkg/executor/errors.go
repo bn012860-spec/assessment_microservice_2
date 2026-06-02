@@ -10,6 +10,7 @@ var (
 	ErrTimeLimitExceeded   = errors.New("time limit exceeded")
 	ErrMemoryLimitExceeded = errors.New("memory limit exceeded")
 	ErrRuntimeError        = errors.New("runtime error")
+	ErrContainerUnhealthy  = errors.New("container unhealthy")
 )
 
 // ExecutionError wraps an error with additional context like exit code.

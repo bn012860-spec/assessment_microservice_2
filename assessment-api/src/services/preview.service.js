@@ -25,6 +25,7 @@ export async function validateProblemDefinition(problem) {
     schemaValid: false,
     typeValidation: false,
     wrapperGeneration: false,
+    referenceSolutionPassed: false,
     errors: []
   };
 
@@ -85,6 +86,56 @@ export async function validateProblemDefinition(problem) {
       report.wrapperGeneration = true;
     } catch (err) {
       report.errors.push(`Wrapper generation failed: ${err.message}`);
+    }
+  }
+
+  // Stage 4: Reference Solution Verification
+  if (report.wrapperGeneration && problem.referenceSolution && problem.solutionLanguage) {
+    try {
+      const judgeMsg = {
+        schemaVersion: "1",
+        submissionId: "cert-" + Date.now(),
+        problemId: problem._id || "temp",
+        language: problem.solutionLanguage,
+        code: problem.referenceSolution,
+        functionName: problem.functionName,
+        compareMode: problem.compareConfig?.mode || "STRUCTURAL",
+        floatTolerance: problem.compareConfig?.floatTolerance || 0,
+        orderInsensitive: !!problem.compareConfig?.orderInsensitive,
+        tests: problem.testCases.map(tc => ({
+          inputs: tc.inputs,
+          expected: tc.expected,
+          isHidden: !!tc.isHidden
+        }))
+      };
+
+      const response = await fetch("http://judge-service-go:8081/run", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(judgeMsg)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        report.errors.push(`Judge service error during certification: ${errorText}`);
+      } else {
+        const result = await response.json();
+        if (result.status === "Success") {
+          report.referenceSolutionPassed = true;
+        } else {
+          const failMsg = result.message || "Reference solution failed one or more tests";
+          report.errors.push(`Reference solution failed: ${failMsg}`);
+          if (result.testResults) {
+            result.testResults.forEach((tr, idx) => {
+              if (tr.status !== "Success") {
+                report.errors.push(`Test case ${idx + 1} (${tr.isHidden ? 'Hidden' : 'Sample'}): ${tr.message || tr.status}`);
+              }
+            });
+          }
+        }
+      }
+    } catch (err) {
+      report.errors.push(`Reference solution verification crashed: ${err.message}`);
     }
   }
 

@@ -23,7 +23,9 @@ const EditProblemPage = () => {
       floatTolerance: 0,
       orderInsensitive: false
     },
-    testCases: [{ inputs: '[]', expected: '', isSample: true }]
+    testCases: [{ inputs: '[]', expected: '', isSample: true }],
+    referenceSolution: '',
+    solutionLanguage: 'javascript'
   });
 
   const [apiError, setApiError] = useState('');
@@ -57,7 +59,9 @@ const EditProblemPage = () => {
             inputs: JSON.stringify(tc.inputs ?? []),
             expected: typeof tc.expected === 'string' ? tc.expected : JSON.stringify(tc.expected ?? null),
             isSample: typeof tc.isSample === 'boolean' ? tc.isSample : !tc.isHidden
-          }))
+          })),
+          referenceSolution: problem.referenceSolution || '',
+          solutionLanguage: problem.solutionLanguage || 'javascript'
         };
 
         setFormData(transformedData);
@@ -173,7 +177,7 @@ const EditProblemPage = () => {
     try {
       const resp = await api.post('/api/preview/validate', payload);
       setValidationReport(resp.data);
-      if (resp.data.schemaValid && resp.data.typeValidation && resp.data.wrapperGeneration) {
+      if (resp.data.schemaValid && resp.data.typeValidation && resp.data.wrapperGeneration && resp.data.referenceSolutionPassed) {
         setIsValidated(true);
       }
     } catch (err) {
@@ -231,12 +235,13 @@ const EditProblemPage = () => {
       )}
 
       {validationReport && (
-        <div className={`report-box ${validationReport.schemaValid && validationReport.typeValidation && validationReport.wrapperGeneration ? 'success' : 'failure'}`}>
+        <div className={`report-box ${validationReport.schemaValid && validationReport.typeValidation && validationReport.wrapperGeneration && validationReport.referenceSolutionPassed ? 'success' : 'failure'}`}>
           <h3>Validation Report</h3>
           <ul className="report-list">
             <li>{validationReport.schemaValid ? '✅' : '✗'} Schema Validation</li>
             <li>{validationReport.typeValidation ? '✅' : '✗'} Type Conversion Validation</li>
             <li>{validationReport.wrapperGeneration ? '✅' : '✗'} Wrapper Generation (JS, Python, Java, Go)</li>
+            <li>{validationReport.referenceSolutionPassed ? '✅' : '✗'} Reference Solution Verification</li>
           </ul>
           {validationReport.errors.length > 0 && (
             <div className="mt-10">
@@ -244,7 +249,7 @@ const EditProblemPage = () => {
               <ul>{validationReport.errors.map((err, i) => <li key={i}>{err}</li>)}</ul>
             </div>
           )}
-          {validationReport.schemaValid && validationReport.typeValidation && validationReport.wrapperGeneration && (
+          {validationReport.schemaValid && validationReport.typeValidation && validationReport.wrapperGeneration && validationReport.referenceSolutionPassed && (
             <div className="mt-10 success-text">✓ This problem is valid and ready to be updated.</div>
           )}
         </div>
@@ -359,6 +364,34 @@ const EditProblemPage = () => {
             <input type="checkbox" name="orderInsensitive" checked={!!formData.compareConfig.orderInsensitive} onChange={handleCompareConfigChange} style={{ width: 'auto' }} />
             <span style={{ fontSize: '0.9rem' }}>Order Insensitive Arrays (Useful for "any order" results)</span>
           </label>
+        </div>
+
+        <h3 className="mb-4">Reference Solution (Certification)</h3>
+        <p className="form-hint mb-4">Provide a working solution to verify that your test cases are correct and solvable.</p>
+        <div className="form-group mb-4">
+          <label>Solution Language</label>
+          <select name="solutionLanguage" value={formData.solutionLanguage} onChange={handleChange}>
+            <option value="javascript">JavaScript</option>
+            <option value="python">Python</option>
+            <option value="java">Java</option>
+            <option value="go">Go</option>
+            <option value="cpp">C++</option>
+            <option value="c">C</option>
+            <option value="csharp">C#</option>
+          </select>
+        </div>
+        <div className="form-group mb-8">
+          <label>Reference Code</label>
+          <textarea
+            name="referenceSolution"
+            value={formData.referenceSolution}
+            onChange={handleChange}
+            placeholder="Write a correct solution here..."
+            style={{ height: '200px', fontFamily: "'JetBrains Mono', monospace" }}
+            className={fieldClassName('referenceSolution')}
+            required
+          />
+          {fieldError('referenceSolution') && <div className="error-text">{fieldError('referenceSolution')}</div>}
         </div>
 
         <h3 className="mb-2">Test Cases</h3>

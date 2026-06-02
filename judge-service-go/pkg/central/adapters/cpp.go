@@ -17,11 +17,7 @@ func (CppAdapter) Name() string {
 
 func (CppAdapter) PrepareFiles(workDir string, submissionMsg models.SubmissionMessage, problem models.Problem) ([]string, error) {
 	lang := languages.GetLanguage("cpp")
-	origTpl := lang.WrapperTemplate
-	lang.WrapperTemplate = "cpp_single_wrapper.tpl"
-	defer func() { lang.WrapperTemplate = origTpl }()
-
-	wrapperCode, err := wrapper.GenerateWrapper(problem, lang, submissionMsg.FunctionName)
+	wrapperCode, err := wrapper.GenerateWrapper(problem, lang, submissionMsg.FunctionName, "cpp_single_wrapper.tpl")
 	if err != nil {
 		return nil, err
 	}
@@ -38,11 +34,7 @@ func (CppAdapter) PrepareFiles(workDir string, submissionMsg models.SubmissionMe
 
 func (CppAdapter) PrepareBatchFiles(workDir string, submissionMsg models.SubmissionMessage, problem models.Problem) ([]string, error) {
 	lang := languages.GetLanguage("cpp")
-	origTpl := lang.WrapperTemplate
-	lang.WrapperTemplate = "cpp_batch_wrapper.tpl"
-	defer func() { lang.WrapperTemplate = origTpl }()
-
-	wrapperCode, err := wrapper.GenerateWrapper(problem, lang, submissionMsg.FunctionName)
+	wrapperCode, err := wrapper.GenerateWrapper(problem, lang, submissionMsg.FunctionName, "cpp_batch_wrapper.tpl")
 	if err != nil {
 		return nil, err
 	}

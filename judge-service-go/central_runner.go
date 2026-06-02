@@ -41,22 +41,30 @@ type batchedTestExecOutput struct {
 var errBatchedOutputLimitExceeded = fmt.Errorf("batched wrapper output exceeded limit")
 
 func runSubmissionCentral(ctx context.Context, exec *executor.Executor, pooledContainer *pool.PooledContainer, submissionMsg models.SubmissionMessage, problem models.Problem, adapter adapters.LanguageAdapter) (*models.SubmissionResult, error) {
+	result, _, err := runSubmissionCentralDetailed(ctx, exec, pooledContainer, submissionMsg, problem, adapter)
+	return result, err
+}
+
+func runSubmissionCentralDetailed(ctx context.Context, exec *executor.Executor, pooledContainer *pool.PooledContainer, submissionMsg models.SubmissionMessage, problem models.Problem, adapter adapters.LanguageAdapter) (result *models.SubmissionResult, cleanupFailed bool, err error) {
 	submissionWorkspace, err := workspace.NewSubmissionWorkspace(pooledContainer.WorkDir, submissionMsg.SubmissionID)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	defer func() {
 		if cleanupErr := workspace.CleanupSubmissionWorkspace(submissionWorkspace.HostPath); cleanupErr != nil {
+			cleanupFailed = true
 			slog.Error("failed to cleanup workspace", "submissionId", submissionMsg.SubmissionID, "path", submissionWorkspace.HostPath, "error", cleanupErr)
 		}
 	}()
 
 	if batchAdapter, ok := adapter.(adapters.BatchLanguageAdapter); ok && shouldUseBatchedExecution(submissionMsg.Language, len(problem.TestCases)) {
-		return runSubmissionCentralBatched(ctx, exec, pooledContainer, submissionMsg, problem, batchAdapter, submissionWorkspace, startedResult(problem))
+		result, err = runSubmissionCentralBatched(ctx, exec, pooledContainer, submissionMsg, problem, batchAdapter, submissionWorkspace, startedResult(problem))
+		return result, cleanupFailed, err
 	}
 
-	result := startedResult(problem)
-	return runSubmissionCentralPerTest(ctx, exec, pooledContainer, submissionMsg, problem, adapter, submissionWorkspace, result)
+	result = startedResult(problem)
+	result, err = runSubmissionCentralPerTest(ctx, exec, pooledContainer, submissionMsg, problem, adapter, submissionWorkspace, result)
+	return result, cleanupFailed, err
 }
 
 func startedResult(problem models.Problem) *models.SubmissionResult {

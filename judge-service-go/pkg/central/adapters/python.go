@@ -18,12 +18,7 @@ func (PythonAdapter) Name() string {
 
 func (PythonAdapter) PrepareFiles(workDir string, submissionMsg models.SubmissionMessage, problem models.Problem) ([]string, error) {
 	lang := languages.GetLanguage("python")
-	// Save current template to restore later if needed, or just temporarily override
-	origTpl := lang.WrapperTemplate
-	lang.WrapperTemplate = "python_single_wrapper.tpl"
-	defer func() { lang.WrapperTemplate = origTpl }()
-
-	wrapperCode, err := wrapper.GenerateWrapper(problem, lang, submissionMsg.FunctionName)
+	wrapperCode, err := wrapper.GenerateWrapper(problem, lang, submissionMsg.FunctionName, "python_single_wrapper.tpl")
 	if err != nil {
 		return nil, err
 	}
@@ -40,11 +35,7 @@ func (PythonAdapter) PrepareFiles(workDir string, submissionMsg models.Submissio
 
 func (PythonAdapter) PrepareBatchFiles(workDir string, submissionMsg models.SubmissionMessage, problem models.Problem) ([]string, error) {
 	lang := languages.GetLanguage("python")
-	origTpl := lang.WrapperTemplate
-	lang.WrapperTemplate = "python_batch_wrapper.tpl"
-	defer func() { lang.WrapperTemplate = origTpl }()
-
-	wrapperCode, err := wrapper.GenerateWrapper(problem, lang, submissionMsg.FunctionName)
+	wrapperCode, err := wrapper.GenerateWrapper(problem, lang, submissionMsg.FunctionName, "python_batch_wrapper.tpl")
 	if err != nil {
 		return nil, err
 	}

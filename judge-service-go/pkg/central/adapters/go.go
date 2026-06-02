@@ -18,7 +18,7 @@ func (GoAdapter) Name() string {
 
 func (GoAdapter) PrepareFiles(workDir string, submissionMsg models.SubmissionMessage, problem models.Problem) ([]string, error) {
 	lang := languages.GetLanguage("go")
-	wrapperCode, err := wrapper.GenerateWrapper(problem, lang, submissionMsg.FunctionName)
+	wrapperCode, err := wrapper.GenerateWrapper(problem, lang, submissionMsg.FunctionName, "")
 	if err != nil {
 		return nil, err
 	}

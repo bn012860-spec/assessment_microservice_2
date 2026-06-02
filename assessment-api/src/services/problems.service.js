@@ -262,11 +262,11 @@ export async function createProblem(payload) {
     });
   }
 
-  // Mandatory deep validation (schema + types + wrappers)
+  // Mandatory deep validation (schema + types + wrappers + reference solution)
   const report = await validateProblemDefinition(normalizedPayload);
-  if (!report.schemaValid || !report.typeValidation || !report.wrapperGeneration) {
+  if (!report.schemaValid || !report.typeValidation || !report.wrapperGeneration || !report.referenceSolutionPassed) {
     throw new HttpError(400, "Deep validation failed", {
-      error: "Problem failed deep validation checks (schema, types, or wrappers).",
+      error: "Problem failed deep validation checks (schema, types, wrappers, or reference solution).",
       errors: report.errors
     });
   }
@@ -284,11 +284,11 @@ export async function updateProblem(id, payload) {
     });
   }
 
-  // Mandatory deep validation (schema + types + wrappers)
+  // Mandatory deep validation (schema + types + wrappers + reference solution)
   const report = await validateProblemDefinition(normalizedPayload);
-  if (!report.schemaValid || !report.typeValidation || !report.wrapperGeneration) {
+  if (!report.schemaValid || !report.typeValidation || !report.wrapperGeneration || !report.referenceSolutionPassed) {
     throw new HttpError(400, "Deep validation failed", {
-      error: "Problem failed deep validation checks (schema, types, or wrappers).",
+      error: "Problem failed deep validation checks (schema, types, wrappers, or reference solution).",
       errors: report.errors
     });
   }

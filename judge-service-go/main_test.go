@@ -114,6 +114,91 @@ func TestFallbackResultForExecutionFailureClassification(t *testing.T) {
 	}
 }
 
+func TestShouldDiscardContainer(t *testing.T) {
+	tests := []struct {
+		name          string
+		execErr       error
+		result        *models.SubmissionResult
+		cleanupFailed bool
+		wantDiscard   bool
+	}{
+		{
+			name:          "cleanup failure discards",
+			cleanupFailed: true,
+			wantDiscard:   true,
+		},
+		{
+			name:        "timeout execution error discards",
+			execErr:     executor.NewExecutionError(executor.ErrTimeLimitExceeded, "", -1),
+			wantDiscard: true,
+		},
+		{
+			name:        "memory execution error discards",
+			execErr:     executor.NewExecutionError(executor.ErrMemoryLimitExceeded, "", 137),
+			wantDiscard: true,
+		},
+		{
+			name:        "runtime exit error discards",
+			execErr:     executor.NewExecutionError(executor.ErrRuntimeError, "exit code 2", 2),
+			wantDiscard: true,
+		},
+		{
+			name:        "memory reset failure discards",
+			execErr:     executor.NewExecutionError(executor.ErrContainerUnhealthy, "failed to reset memory limit", -1),
+			wantDiscard: true,
+		},
+		{
+			name:        "normal compilation error does not discard",
+			execErr:     executor.NewExecutionError(executor.ErrCompilationFailed, "syntax error", 1),
+			wantDiscard: false,
+		},
+		{
+			name:        "compile timeout discards",
+			execErr:     executor.NewExecutionError(executor.ErrCompilationFailed, "context deadline exceeded", -1),
+			wantDiscard: true,
+		},
+		{
+			name: "captured user runtime error does not discard",
+			result: &models.SubmissionResult{
+				Status: models.SubmissionStatusRuntimeError,
+				Details: []models.TestResult{{
+					Test:      1,
+					Error:     models.SubmissionStatusRuntimeError,
+					ErrorType: models.ErrorTypeRuntime,
+				}},
+			},
+			wantDiscard: false,
+		},
+		{
+			name: "central timeout result discards",
+			result: &models.SubmissionResult{
+				Status: models.SubmissionStatusTimeLimitExceeded,
+			},
+			wantDiscard: true,
+		},
+		{
+			name: "wrapper internal error discards",
+			result: &models.SubmissionResult{
+				Status:        models.SubmissionStatusRuntimeError,
+				InternalError: models.InternalErrorWrapper,
+			},
+			wantDiscard: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, reason := shouldDiscardContainer(tt.execErr, tt.result, tt.cleanupFailed)
+			if got != tt.wantDiscard {
+				t.Fatalf("expected discard=%v, got discard=%v reason=%q", tt.wantDiscard, got, reason)
+			}
+			if got && reason == "" {
+				t.Fatalf("expected discard reason")
+			}
+		})
+	}
+}
+
 func TestIsCentralCompareEnabled_DefaultsAndOverrides(t *testing.T) {
 	t.Run("python defaults enabled", func(t *testing.T) {
 		restoreEnv(t, centralComparePythonEnv)

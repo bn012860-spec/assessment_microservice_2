@@ -28,8 +28,8 @@ type PooledContainer struct {
 type ContainerPool struct {
 	cli        *docker.Client
 	mu         sync.Mutex
-	available  map[string][]*PooledContainer // language -> idle containers
-	inUse      map[string]*PooledContainer   // containerID -> container
+	availChans map[string]chan *PooledContainer // language -> idle containers
+	inUse      map[string]*PooledContainer      // containerID -> container
 	maxPerLang int
 	images     map[string]string // language -> image name
 }
@@ -38,7 +38,7 @@ type ContainerPool struct {
 func NewPool(cli *docker.Client, maxPerLang int) *ContainerPool {
 	return &ContainerPool{
 		cli:        cli,
-		available:  make(map[string][]*PooledContainer),
+		availChans: make(map[string]chan *PooledContainer),
 		inUse:      make(map[string]*PooledContainer),
 		maxPerLang: maxPerLang,
 		images:     make(map[string]string),
@@ -46,37 +46,115 @@ func NewPool(cli *docker.Client, maxPerLang int) *ContainerPool {
 }
 
 // Acquire gets a container from the pool for the given language.
-func (p *ContainerPool) Acquire(lang string) *PooledContainer {
+// It blocks until a container is available or the context is cancelled.
+func (p *ContainerPool) Acquire(ctx context.Context, lang string) *PooledContainer {
 	p.mu.Lock()
-	defer p.mu.Unlock()
+	ch, ok := p.availChans[lang]
+	p.mu.Unlock()
 
-	if len(p.available[lang]) == 0 {
-		return nil // Or create a new one if pool is not at max capacity
+	if !ok {
+		return nil
 	}
 
-	container := p.available[lang][0]
-	p.available[lang] = p.available[lang][1:]
-	container.Busy = true
-	p.inUse[container.ID] = container
-	return container
+	select {
+	case container := <-ch:
+		p.mu.Lock()
+		container.Busy = true
+		p.inUse[container.ID] = container
+		p.mu.Unlock()
+		return container
+	case <-ctx.Done():
+		return nil
+	}
 }
 
 // Release returns a container to the pool.
 func (p *ContainerPool) Release(container *PooledContainer) {
+	if container == nil {
+		return
+	}
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	if _, ok := p.inUse[container.ID]; !ok {
+		return
+	}
 	container.Busy = false
 	delete(p.inUse, container.ID)
-	p.available[container.Language] = append(p.available[container.Language], container)
+
+	ch, ok := p.availChans[container.Language]
+	if !ok {
+		// Should not happen if pool is managed correctly
+		slog.Error("Releasing container for unknown language", "language", container.Language)
+		p.removeContainer(container)
+		return
+	}
+
+	select {
+	case ch <- container:
+		// success
+	default:
+		// Channel full? Should not happen if maxPerLang is respected
+		slog.Warn("Container pool channel full during release", "language", container.Language)
+		p.removeContainer(container)
+	}
+}
+
+// Discard removes a suspect container from the pool and creates a replacement.
+func (p *ContainerPool) Discard(ctx context.Context, container *PooledContainer, reason string) {
+	if container == nil {
+		return
+	}
+
+	p.mu.Lock()
+	_, wasInUse := p.inUse[container.ID]
+	if wasInUse {
+		delete(p.inUse, container.ID)
+	}
+	image := p.images[container.Language]
+	ch := p.availChans[container.Language]
+	p.mu.Unlock()
+
+	if !wasInUse {
+		slog.Warn("Ignoring discard for container that is not in use", "containerId", container.ID, "language", container.Language, "reason", reason)
+		return
+	}
+
+	slog.Warn("Discarding pooled container", "containerId", container.ID, "language", container.Language, "reason", reason)
+	p.removeContainer(container)
+
+	if image == "" {
+		slog.Error("Cannot replace discarded container; image is unknown", "language", container.Language)
+		return
+	}
+
+	replacement, err := p.newPooledContainer(ctx, image, container.Language)
+	if err != nil {
+		slog.Error("Failed to replace discarded container", "language", container.Language, "error", err)
+		return
+	}
+
+	if ch != nil {
+		select {
+		case ch <- replacement:
+			slog.Info("Replaced discarded container", "oldId", container.ID, "newId", replacement.ID, "language", container.Language)
+		default:
+			slog.Warn("Container pool channel full during discard/replacement", "language", container.Language)
+			p.removeContainer(replacement)
+		}
+	}
 }
 
 // WarmUp creates an initial set of containers for a given language.
 func (p *ContainerPool) WarmUp(ctx context.Context, lang string, image string, count int) error {
 	p.mu.Lock()
-	defer p.mu.Unlock()
-
 	p.images[lang] = image
+	if p.availChans[lang] == nil {
+		p.availChans[lang] = make(chan *PooledContainer, count)
+	}
+	ch := p.availChans[lang]
+	p.mu.Unlock()
 
 	if err := p.pullImage(ctx, image); err != nil {
 		return fmt.Errorf("failed to pull image %s: %w", image, err)
@@ -87,11 +165,18 @@ func (p *ContainerPool) WarmUp(ctx context.Context, lang string, image string, c
 		if err != nil {
 			return err
 		}
-		p.available[lang] = append(p.available[lang], &PooledContainer{
+		c := &PooledContainer{
 			ID:       id,
 			Language: lang,
 			WorkDir:  workDir,
-		})
+		}
+		select {
+		case ch <- c:
+			// success
+		default:
+			slog.Warn("WarmUp: channel full, discarding extra container", "language", lang)
+			p.removeContainer(c)
+		}
 	}
 	return nil
 }
@@ -99,9 +184,7 @@ func (p *ContainerPool) WarmUp(ctx context.Context, lang string, image string, c
 // Shutdown stops and removes all containers in the pool.
 func (p *ContainerPool) Shutdown(ctx context.Context) {
 	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	slog.Info("Shutting down container pool", "total_available", len(p.available), "total_in_use", len(p.inUse))
+	slog.Info("Shutting down container pool", "total_languages", len(p.availChans), "total_in_use", len(p.inUse))
 
 	var wg sync.WaitGroup
 
@@ -116,26 +199,29 @@ func (p *ContainerPool) Shutdown(ctx context.Context) {
 			slog.Error("Failed to remove container during shutdown", "containerId", c.ID, "error", err)
 		}
 		// Also cleanup the workdir
-		if err := workspace.CleanupSubmissionWorkspace(c.WorkDir); err != nil {
+		if err := workspace.CleanupContainerWorkspace(c.WorkDir); err != nil {
 			slog.Error("Failed to cleanup workdir during shutdown", "workdir", c.WorkDir, "error", err)
 		}
 	}
 
-	for _, containers := range p.available {
-		for _, c := range containers {
+	// Drain all available channels
+	for lang, ch := range p.availChans {
+		close(ch)
+		for c := range ch {
 			wg.Add(1)
 			go remove(c)
 		}
+		delete(p.availChans, lang)
 	}
 
-	for _, c := range p.inUse {
+	for id, c := range p.inUse {
 		wg.Add(1)
 		go remove(c)
+		delete(p.inUse, id)
 	}
+	p.mu.Unlock()
 
 	wg.Wait()
-	p.available = make(map[string][]*PooledContainer)
-	p.inUse = make(map[string]*PooledContainer)
 }
 
 // PoolStats represents the current state of the container pool.
@@ -154,8 +240,8 @@ func (p *ContainerPool) GetStats() PoolStats {
 		InUse:     make(map[string]int),
 	}
 
-	for lang, containers := range p.available {
-		stats.Available[lang] = len(containers)
+	for lang, ch := range p.availChans {
+		stats.Available[lang] = len(ch)
 	}
 
 	for _, c := range p.inUse {
@@ -183,35 +269,57 @@ func (p *ContainerPool) StartMonitor(ctx context.Context, interval time.Duration
 
 func (p *ContainerPool) checkHealth(ctx context.Context) {
 	p.mu.Lock()
-	defer p.mu.Unlock()
+	langs := make([]string, 0, len(p.availChans))
+	for lang := range p.availChans {
+		langs = append(langs, lang)
+	}
+	p.mu.Unlock()
 
-	for lang, containers := range p.available {
-		var healthy []*PooledContainer
-		for _, c := range containers {
+	for _, lang := range langs {
+		p.mu.Lock()
+		ch := p.availChans[lang]
+		image := p.images[lang]
+		p.mu.Unlock()
+
+		if ch == nil {
+			continue
+		}
+
+		// Non-blocking health check of available containers
+		count := len(ch)
+		for i := 0; i < count; i++ {
+			var c *PooledContainer
+			select {
+			case c = <-ch:
+			default:
+				continue
+			}
+
 			if p.isContainerHealthy(c.ID) {
-				healthy = append(healthy, c)
+				select {
+				case ch <- c:
+				default:
+					p.removeContainer(c)
+				}
 			} else {
 				slog.Warn("Container found unhealthy, removing", "containerId", c.ID, "language", lang)
 				p.removeContainer(c)
 
-				// Recreate replacement
-				image := p.images[lang]
 				if image != "" {
-					id, workDir, err := p.createContainer(ctx, image, lang)
+					replacement, err := p.newPooledContainer(ctx, image, lang)
 					if err == nil {
-						healthy = append(healthy, &PooledContainer{
-							ID:       id,
-							Language: lang,
-							WorkDir:  workDir,
-						})
-						slog.Info("Replaced unhealthy container", "oldId", c.ID, "newId", id, "language", lang)
+						select {
+						case ch <- replacement:
+							slog.Info("Replaced unhealthy container", "oldId", c.ID, "newId", replacement.ID, "language", lang)
+						default:
+							p.removeContainer(replacement)
+						}
 					} else {
 						slog.Error("Failed to recreate replacement container", "language", lang, "error", err)
 					}
 				}
 			}
 		}
-		p.available[lang] = healthy
 	}
 }
 
@@ -228,7 +336,19 @@ func (p *ContainerPool) removeContainer(c *PooledContainer) {
 		ID:    c.ID,
 		Force: true,
 	})
-	_ = workspace.CleanupSubmissionWorkspace(c.WorkDir)
+	_ = workspace.CleanupContainerWorkspace(c.WorkDir)
+}
+
+func (p *ContainerPool) newPooledContainer(ctx context.Context, image string, lang string) (*PooledContainer, error) {
+	id, workDir, err := p.createContainer(ctx, image, lang)
+	if err != nil {
+		return nil, err
+	}
+	return &PooledContainer{
+		ID:       id,
+		Language: lang,
+		WorkDir:  workDir,
+	}, nil
 }
 
 // createContainer creates a new Docker container with a tmpfs volume mount.

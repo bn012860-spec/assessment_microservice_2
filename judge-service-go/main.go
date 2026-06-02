@@ -172,7 +172,7 @@ func prepareSubmissionFiles(submissionMsg models.SubmissionMessage, problem mode
 	problem.TestsJSON = testsJSON
 
 	// The submission message provides the function name used in the user's code.
-	wrapperCode, err := wrapper.GenerateWrapper(problem, lang, submissionMsg.FunctionName)
+	wrapperCode, err := wrapper.GenerateWrapper(problem, lang, submissionMsg.FunctionName, "")
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to generate wrapper: %w", err)
 	}
@@ -278,6 +278,69 @@ func fallbackResultForExecutionFailure(executionPath string, execErr error, stdo
 
 	result.InternalError = models.InternalErrorWrapper
 	return result
+}
+
+func shouldDiscardContainer(execErr error, result *models.SubmissionResult, cleanupFailed bool) (bool, string) {
+	if cleanupFailed {
+		return true, "submission workspace cleanup failed"
+	}
+
+	if execErr != nil {
+		if isPoisonousExecutionError(execErr) {
+			return true, execErr.Error()
+		}
+		return false, ""
+	}
+
+	if result == nil {
+		return false, ""
+	}
+	if result.Status == models.SubmissionStatusTimeLimitExceeded || result.Status == models.SubmissionStatusMemoryLimitExceeded {
+		return true, result.Status
+	}
+	if result.InternalError == models.InternalErrorWrapper {
+		return true, "wrapper/internal runtime failure"
+	}
+	if result.Status == models.SubmissionStatusCompilationError && looksLikeContainerFailure(result.Stderr) {
+		return true, "compile failed due to container-level failure"
+	}
+
+	return false, ""
+}
+
+func isPoisonousExecutionError(err error) bool {
+	var execErr *executor.ExecutionError
+	if errors.As(err, &execErr) {
+		switch execErr.Type {
+		case executor.ErrTimeLimitExceeded, executor.ErrMemoryLimitExceeded, executor.ErrRuntimeError, executor.ErrContainerUnhealthy:
+			return true
+		case executor.ErrCompilationFailed:
+			return looksLikeContainerFailure(execErr.Message)
+		}
+	}
+	return looksLikeContainerFailure(err.Error())
+}
+
+func looksLikeContainerFailure(message string) bool {
+	msg := strings.ToLower(message)
+	return strings.Contains(msg, "deadline exceeded") ||
+		strings.Contains(msg, "timed out") ||
+		strings.Contains(msg, "memory limit exceeded") ||
+		strings.Contains(msg, "possibly oom") ||
+		strings.Contains(msg, "container unhealthy") ||
+		strings.Contains(msg, "stopped container") ||
+		strings.Contains(msg, "no such container")
+}
+
+
+func finishWithContainer(containerPool *pool.ContainerPool, container *pool.PooledContainer, discard bool, reason string) {
+	if discard {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		containerPool.Discard(ctx, container, reason)
+		return
+	}
+	containerPool.Release(container)
 }
 
 func processAndStoreResults(ctx context.Context, executionPath string, stdout, stderr string, execErr error, submissionMsg models.SubmissionMessage, submissionsCollection *mongo.Collection, problemsCollection *mongo.Collection, redisClient *redis.Client) {
@@ -387,7 +450,7 @@ func processAndStoreResults(ctx context.Context, executionPath string, stdout, s
 }
 
 // processSubmission is the main coordinator for handling a submission message.
-func processSubmission(d amqp.Delivery, problemsCollection *mongo.Collection, submissionsCollection *mongo.Collection, redisClient *redis.Client, executor *executor.Executor, containerPool *pool.ContainerPool) {
+func processSubmission(d amqp.Delivery, ch *amqp.Channel, retryQueueName string, problemsCollection *mongo.Collection, submissionsCollection *mongo.Collection, redisClient *redis.Client, executor *executor.Executor, containerPool *pool.ContainerPool) {
 	ctx := context.Background()
 
 	submissionMsg, err := validateAndDecodeSubmission(d)
@@ -418,24 +481,52 @@ func processSubmission(d amqp.Delivery, problemsCollection *mongo.Collection, su
 		return
 	}
 
-	// Acquire a container from the pool
-	pooledContainer := containerPool.Acquire(lang.ID)
+	// Acquire a container from the pool with a timeout
+	acquireCtx, acquireCancel := context.WithTimeout(ctx, 30*time.Second)
+	defer acquireCancel()
+
+	pooledContainer := containerPool.Acquire(acquireCtx, lang.ID)
 	if pooledContainer == nil {
-		slog.Warn("No available containers for language, retrying...", "submissionId", submissionMsg.SubmissionID, "language", lang.ID)
-		d.Nack(false, true)
+		slog.Warn("No available containers for language, routing to retry queue", "submissionId", submissionMsg.SubmissionID, "language", lang.ID)
+		
+		// To avoid hot-requeue loop, we publish to a retry queue with TTL
+		err := ch.PublishWithContext(ctx, "", retryQueueName, false, false, amqp.Publishing{
+			ContentType:  d.ContentType,
+			Body:         d.Body,
+			DeliveryMode: amqp.Persistent,
+		})
+		if err != nil {
+			slog.Error("Failed to publish to retry queue", "submissionId", submissionMsg.SubmissionID, "error", err)
+			d.Nack(false, true) // Fallback to basic requeue
+			return
+		}
+		
+		d.Ack(false)
 		return
 	}
-	defer containerPool.Release(pooledContainer)
+	discardContainer := false
+	discardReason := ""
+	defer func() {
+		finishWithContainer(containerPool, pooledContainer, discardContainer, discardReason)
+	}()
 
 	if adapter, ok := adapters.GetAdapter(lang.ID); ok && isCentralCompareEnabled(lang.ID) {
 		execCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
 		defer cancel()
 
-		result, err := runSubmissionCentral(execCtx, executor, pooledContainer, submissionMsg, problem, adapter)
+		result, cleanupFailed, err := runSubmissionCentralDetailed(execCtx, executor, pooledContainer, submissionMsg, problem, adapter)
 		if err != nil {
 			slog.Error("Central execution setup failed", "submissionId", submissionMsg.SubmissionID, "adapter", adapter.Name(), "error", err)
+			if discard, reason := shouldDiscardContainer(err, result, cleanupFailed); discard {
+				discardContainer = true
+				discardReason = reason
+			}
 			d.Nack(false, false)
 			return
+		}
+		if discard, reason := shouldDiscardContainer(nil, result, cleanupFailed); discard {
+			discardContainer = true
+			discardReason = reason
 		}
 
 		resultBytes, err := result.ToJSON()
@@ -458,6 +549,8 @@ func processSubmission(d amqp.Delivery, problemsCollection *mongo.Collection, su
 	}
 	defer func() {
 		if cleanupErr := workspace.CleanupSubmissionWorkspace(submissionWorkspace.HostPath); cleanupErr != nil {
+			discardContainer = true
+			discardReason = "submission workspace cleanup failed"
 			slog.Error("Failed to cleanup submission workspace", "submissionId", submissionMsg.SubmissionID, "path", submissionWorkspace.HostPath, "error", cleanupErr)
 		}
 	}()
@@ -485,6 +578,10 @@ func processSubmission(d amqp.Delivery, problemsCollection *mongo.Collection, su
 		problem.MemoryLimitMb,
 	)
 	slog.Info("Execution finished", "submissionId", submissionMsg.SubmissionID, "error", execErr)
+	if discard, reason := shouldDiscardContainer(execErr, nil, false); discard {
+		discardContainer = true
+		discardReason = reason
+	}
 
 	processAndStoreResults(ctx, models.ExecutionPathLegacy, stdout, stderr, execErr, submissionMsg, submissionsCollection, problemsCollection, redisClient)
 
@@ -587,12 +684,19 @@ func startHealthServer(ctx context.Context, containerPool *pool.ContainerPool, p
 			return
 		}
 
-		pooledContainer := containerPool.Acquire(lang.ID)
+		acquireCtx, acquireCancel := context.WithTimeout(r.Context(), 30*time.Second)
+		defer acquireCancel()
+
+		pooledContainer := containerPool.Acquire(acquireCtx, lang.ID)
 		if pooledContainer == nil {
-			http.Error(w, "No available containers", http.StatusServiceUnavailable)
+			http.Error(w, "No available containers (request timed out waiting for resource)", http.StatusServiceUnavailable)
 			return
 		}
-		defer containerPool.Release(pooledContainer)
+		discardContainer := false
+		discardReason := ""
+		defer func() {
+			finishWithContainer(containerPool, pooledContainer, discardContainer, discardReason)
+		}()
 
 		var result *models.SubmissionResult
 		var runErr error
@@ -600,7 +704,12 @@ func startHealthServer(ctx context.Context, containerPool *pool.ContainerPool, p
 		if adapter, ok := adapters.GetAdapter(lang.ID); ok && isCentralCompareEnabled(lang.ID) {
 			execCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
 			defer cancel()
-			result, runErr = runSubmissionCentral(execCtx, executor, pooledContainer, msg, problem, adapter)
+			var cleanupFailed bool
+			result, cleanupFailed, runErr = runSubmissionCentralDetailed(execCtx, executor, pooledContainer, msg, problem, adapter)
+			if discard, reason := shouldDiscardContainer(runErr, result, cleanupFailed); discard {
+				discardContainer = true
+				discardReason = reason
+			}
 		} else {
 			// Legacy execution path not fully supported for synchronous /run yet, but we can try
 			// For now, let's assume central compare is the way forward
@@ -777,6 +886,22 @@ func main() {
 	)
 	failOnError(err, "Failed to declare submission queue")
 
+	// Declare a retry queue with TTL and DLX
+	retryQueueName := submissionQueueName + "_retry"
+	_, err = ch.QueueDeclare(
+		retryQueueName,
+		true,
+		false,
+		false,
+		false,
+		amqp.Table{
+			"x-dead-letter-exchange":    "",
+			"x-dead-letter-routing-key": submissionQueueName,
+			"x-message-ttl":             5000, // 5 seconds wait before retry
+		},
+	)
+	failOnError(err, "Failed to declare retry queue")
+
 	msgs, err := ch.Consume(
 		submissionQueueName, // queue
 		"",                  // consumer
@@ -803,7 +928,7 @@ func main() {
 			defer workerWg.Done()
 			slog.Debug("Worker started", "workerId", workerID)
 			for d := range msgs {
-				processSubmission(d, problemsCollection, submissionsCollection, redisClient, executor, containerPool)
+				processSubmission(d, ch, retryQueueName, problemsCollection, submissionsCollection, redisClient, executor, containerPool)
 			}
 			slog.Debug("Worker stopped", "workerId", workerID)
 		}(i)

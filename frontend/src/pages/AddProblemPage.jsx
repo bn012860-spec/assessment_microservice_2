@@ -21,7 +21,9 @@ const AddProblemPage = () => {
       floatTolerance: 0,
       orderInsensitive: false
     },
-    testCases: [{ inputs: '[]', expected: '', isSample: true }]
+    testCases: [{ inputs: '[]', expected: '', isSample: true }],
+    referenceSolution: '',
+    solutionLanguage: 'javascript'
   });
   const [apiError, setApiError] = useState('');
   const [apiErrors, setApiErrors] = useState([]);
@@ -138,7 +140,7 @@ const AddProblemPage = () => {
     try {
       const resp = await api.post('/api/preview/validate', payload);
       setValidationReport(resp.data);
-      if (resp.data.schemaValid && resp.data.typeValidation && resp.data.wrapperGeneration) {
+      if (resp.data.schemaValid && resp.data.typeValidation && resp.data.wrapperGeneration && resp.data.referenceSolutionPassed) {
         setIsValidated(true);
       }
     } catch (err) {
@@ -206,7 +208,7 @@ const AddProblemPage = () => {
       )}
 
       {validationReport && (
-        <div className={`report-box ${validationReport.schemaValid && validationReport.typeValidation && validationReport.wrapperGeneration ? 'success' : 'failure'}`}>
+        <div className={`report-box ${validationReport.schemaValid && validationReport.typeValidation && validationReport.wrapperGeneration && validationReport.referenceSolutionPassed ? 'success' : 'failure'}`}>
           <div className="flex-center gap-2 mb-4" style={{ justifyContent: 'flex-start' }}>
             <Info size={20} />
             <h3 style={{ margin: 0, fontSize: '1.1rem' }}>Validation Report</h3>
@@ -215,6 +217,7 @@ const AddProblemPage = () => {
             <li>{validationReport.schemaValid ? <CheckCircle2 size={16} color="var(--success)" /> : <AlertTriangle size={16} color="var(--error)" />} Schema Validation</li>
             <li>{validationReport.typeValidation ? <CheckCircle2 size={16} color="var(--success)" /> : <AlertTriangle size={16} color="var(--error)" />} Type Conversion Validation</li>
             <li>{validationReport.wrapperGeneration ? <CheckCircle2 size={16} color="var(--success)" /> : <AlertTriangle size={16} color="var(--error)" />} Wrapper Generation (JS, Python, Java, Go)</li>
+            <li>{validationReport.referenceSolutionPassed ? <CheckCircle2 size={16} color="var(--success)" /> : <AlertTriangle size={16} color="var(--error)" />} Reference Solution Verification</li>
           </ul>
           {validationReport.errors.length > 0 && (
             <div className="mt-4 p-4" style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
@@ -224,7 +227,7 @@ const AddProblemPage = () => {
               </ul>
             </div>
           )}
-          {validationReport.schemaValid && validationReport.typeValidation && validationReport.wrapperGeneration && (
+          {validationReport.schemaValid && validationReport.typeValidation && validationReport.wrapperGeneration && validationReport.referenceSolutionPassed && (
             <div className="mt-4 success-text flex-center gap-2" style={{ justifyContent: 'flex-start' }}>
               <CheckCircle2 size={18} />
               <span>This problem is valid and ready to be published.</span>
@@ -348,6 +351,34 @@ const AddProblemPage = () => {
             <input type="checkbox" name="orderInsensitive" checked={!!formData.compareConfig.orderInsensitive} onChange={handleCompareConfigChange} style={{ width: 'auto' }} />
             <span style={{ fontSize: '0.9rem' }}>Order Insensitive Arrays (Useful for "any order" results)</span>
           </label>
+        </div>
+
+        <h3 className="mb-4">Reference Solution (Certification)</h3>
+        <p className="form-hint mb-4">Provide a working solution to verify that your test cases are correct and solvable.</p>
+        <div className="form-group mb-4">
+          <label>Solution Language</label>
+          <select name="solutionLanguage" value={formData.solutionLanguage} onChange={handleChange}>
+            <option value="javascript">JavaScript</option>
+            <option value="python">Python</option>
+            <option value="java">Java</option>
+            <option value="go">Go</option>
+            <option value="cpp">C++</option>
+            <option value="c">C</option>
+            <option value="csharp">C#</option>
+          </select>
+        </div>
+        <div className="form-group mb-8">
+          <label>Reference Code</label>
+          <textarea
+            name="referenceSolution"
+            value={formData.referenceSolution}
+            onChange={handleChange}
+            placeholder="Write a correct solution here..."
+            style={{ height: '200px', fontFamily: "'JetBrains Mono', monospace" }}
+            className={fieldClassName('referenceSolution')}
+            required
+          />
+          {fieldError('referenceSolution') && <div className="error-text">{fieldError('referenceSolution')}</div>}
         </div>
 
         <h3 className="mb-2">Test Cases</h3>

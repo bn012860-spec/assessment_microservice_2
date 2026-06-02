@@ -116,6 +116,14 @@ export function buildProblemPayload(formData) {
     addError(errors, "returnType", `Invalid return type: ${returnType}`);
   }
 
+  if (!formData.referenceSolution || !formData.referenceSolution.trim()) {
+    addError(errors, "referenceSolution", "Reference solution is required for certification");
+  }
+
+  if (!formData.solutionLanguage) {
+    addError(errors, "solutionLanguage", "Solution language is required for certification");
+  }
+
   const parameters = normalizeParameters(formData.parameters || [], errors);
   const testCases = normalizeTestCases(formData.testCases || [], parameters.length, errors);
 
@@ -138,6 +146,8 @@ export function buildProblemPayload(formData) {
         orderInsensitive: !!formData.compareConfig?.orderInsensitive
       },
       testCases,
+      referenceSolution: formData.referenceSolution,
+      solutionLanguage: formData.solutionLanguage,
       tags: String(formData.tags || "")
         .split(",")
         .map((tag) => tag.trim())

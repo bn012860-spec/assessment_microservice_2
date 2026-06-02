@@ -56,6 +56,13 @@ func CleanupSubmissionWorkspace(path string) error {
 	return os.RemoveAll(path)
 }
 
+func CleanupContainerWorkspace(path string) error {
+	if err := validateContainerWorkspacePath(path); err != nil {
+		return err
+	}
+	return os.RemoveAll(path)
+}
+
 func StartSweeper(ctx context.Context, root string, interval time.Duration, maxAge time.Duration) {
 	if interval <= 0 || maxAge <= 0 {
 		return
@@ -165,6 +172,29 @@ func validateSubmissionWorkspacePath(path string) error {
 	parent := filepath.Base(filepath.Dir(cleanPath))
 	if !strings.HasPrefix(parent, "judge-") {
 		return fmt.Errorf("refusing to delete workspace outside judge container dir: %s", cleanPath)
+	}
+
+	return nil
+}
+
+func validateContainerWorkspacePath(path string) error {
+	if path == "" {
+		return fmt.Errorf("workspace path is required")
+	}
+
+	rootAbs, err := filepath.Abs(RootDir)
+	if err != nil {
+		return fmt.Errorf("resolve workspace root: %w", err)
+	}
+	cleanPath, err := filepath.Abs(filepath.Clean(path))
+	if err != nil {
+		return fmt.Errorf("resolve container workspace: %w", err)
+	}
+	if !isWithinBase(rootAbs, cleanPath) {
+		return fmt.Errorf("refusing to delete workspace outside judge root: %s", cleanPath)
+	}
+	if !strings.HasPrefix(filepath.Base(cleanPath), "judge-") {
+		return fmt.Errorf("refusing to delete non-container workspace: %s", cleanPath)
 	}
 
 	return nil

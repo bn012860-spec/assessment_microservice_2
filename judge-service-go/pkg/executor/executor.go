@@ -65,7 +65,7 @@ func (e *Executor) UpdateContainerResources(ctx context.Context, containerID str
 	slog.Info("Updating container resource limits", "containerId", containerID, "memoryMb", memoryMb)
 
 	opts := docker.UpdateContainerOptions{
-		Context: ctx,
+		Context:    ctx,
 		Memory:     int(memoryBytes),
 		MemorySwap: int(memoryBytes),
 	}
@@ -456,6 +456,9 @@ func (e *Executor) RunInContainerStream(ctx context.Context, containerID string,
 		if memoryLimitMb > 0 {
 			if err := e.UpdateContainerResources(context.Background(), containerID, 1024); err != nil {
 				slog.Error("failed to reset memory limit", "containerId", containerID, "error", err)
+				if waitErr == nil {
+					waitErr = NewExecutionError(ErrContainerUnhealthy, fmt.Sprintf("failed to reset memory limit: %v", err), -1)
+				}
 			}
 		}
 

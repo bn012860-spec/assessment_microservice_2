@@ -18,11 +18,7 @@ func (JavaScriptAdapter) Name() string {
 
 func (JavaScriptAdapter) PrepareFiles(workDir string, submissionMsg models.SubmissionMessage, problem models.Problem) ([]string, error) {
 	lang := languages.GetLanguage("javascript")
-	origTpl := lang.WrapperTemplate
-	lang.WrapperTemplate = "js_single_wrapper.tpl"
-	defer func() { lang.WrapperTemplate = origTpl }()
-
-	wrapperCode, err := wrapper.GenerateWrapper(problem, lang, submissionMsg.FunctionName)
+	wrapperCode, err := wrapper.GenerateWrapper(problem, lang, submissionMsg.FunctionName, "js_single_wrapper.tpl")
 	if err != nil {
 		return nil, err
 	}
@@ -38,11 +34,7 @@ func (JavaScriptAdapter) PrepareFiles(workDir string, submissionMsg models.Submi
 
 func (JavaScriptAdapter) PrepareBatchFiles(workDir string, submissionMsg models.SubmissionMessage, problem models.Problem) ([]string, error) {
 	lang := languages.GetLanguage("javascript")
-	origTpl := lang.WrapperTemplate
-	lang.WrapperTemplate = "js_batch_wrapper.tpl"
-	defer func() { lang.WrapperTemplate = origTpl }()
-
-	wrapperCode, err := wrapper.GenerateWrapper(problem, lang, submissionMsg.FunctionName)
+	wrapperCode, err := wrapper.GenerateWrapper(problem, lang, submissionMsg.FunctionName, "js_batch_wrapper.tpl")
 	if err != nil {
 		return nil, err
 	}
