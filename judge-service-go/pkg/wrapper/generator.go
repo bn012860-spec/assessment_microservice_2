@@ -260,6 +260,8 @@ func cppType(t string) string {
 		return "ListNode*"
 	case "tree<number>":
 		return "TreeNode*"
+	case "graph<number>":
+		return "Node*"
 	default:
 		return "auto"
 	}
@@ -274,6 +276,8 @@ func buildCppCall(p models.Problem, funcName string) string {
 			sb.WriteString(fmt.Sprintf("list_from_json(inputs[%d]);\n", i))
 		case "tree<number>":
 			sb.WriteString(fmt.Sprintf("tree_from_json(inputs[%d]);\n", i))
+		case "graph<number>":
+			sb.WriteString(fmt.Sprintf("graph_from_json(inputs[%d]);\n", i))
 		default:
 			sb.WriteString(fmt.Sprintf("inputs[%d].get<%s>();\n", i, cppType(param.Type)))
 		}
@@ -327,6 +331,8 @@ func goType(t string) string {
 		return "*ListNode"
 	case "tree<number>":
 		return "*TreeNode"
+	case "graph<number>":
+		return "*Node"
 	default:
 		return "interface{}"
 	}
@@ -342,6 +348,8 @@ func buildGoCall(p models.Problem, funcName string) string {
 			sb.WriteString(fmt.Sprintf("\targ%d = listFromJSON(payload.Inputs[%d])\n", i, i))
 		case "tree<number>":
 			sb.WriteString(fmt.Sprintf("\targ%d = treeFromJSON(payload.Inputs[%d])\n", i, i))
+		case "graph<number>":
+			sb.WriteString(fmt.Sprintf("\targ%d = graphFromJSON(payload.Inputs[%d])\n", i, i))
 		default:
 			sb.WriteString(fmt.Sprintf("\tif err := json.Unmarshal(payload.Inputs[%d], &arg%d); err != nil {\n", i, i))
 			sb.WriteString("\t\tresult.Error = \"Runtime Error\"\n")

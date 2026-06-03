@@ -108,6 +108,17 @@ export function validateData(data, typeStr) {
         if (!res.valid) return { valid: false, error: `Linked list node at [${i}]: ${res.error}` };
       }
       return { valid: true };
+    case "graph":
+      // Graphs are represented as Adjacency Lists: array<array<number>>
+      if (!Array.isArray(data)) return { valid: false, error: `Expected graph representation as adjacency list (array), got ${typeof data}` };
+      for (let i = 0; i < data.length; i++) {
+        if (!Array.isArray(data[i])) return { valid: false, error: `Graph adjacency list at [${i}] is not an array` };
+        for (let j = 0; j < data[i].length; j++) {
+          const res = validateData(data[i][j], inner);
+          if (!res.valid) return { valid: false, error: `Graph neighbor value at [${i}][${j}]: ${res.error}` };
+        }
+      }
+      return { valid: true };
     default:
       return { valid: false, error: `Unsupported validation for kind: ${kind}` };
   }

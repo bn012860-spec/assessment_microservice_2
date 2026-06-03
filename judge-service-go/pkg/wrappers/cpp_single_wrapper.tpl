@@ -29,6 +29,15 @@ struct TreeNode {
     TreeNode(int x, TreeNode *left, TreeNode *right) : val(x), left(left), right(right) {}
 };
 
+class Node {
+public:
+    int val;
+    std::vector<Node*> neighbors;
+    Node() { val = 0; neighbors = std::vector<Node*>(); }
+    Node(int _val) { val = _val; neighbors = std::vector<Node*>(); }
+    Node(int _val, std::vector<Node*> _neighbors) { val = _val; neighbors = _neighbors; }
+};
+
 // JSON conversions for ListNode
 void to_json(json& j, const ListNode* p) {
     if (!p) {
@@ -99,6 +108,52 @@ TreeNode* tree_from_json(const json& j) {
         i++;
     }
     return root;
+}
+
+// JSON conversions for Node (Graph)
+void to_json(json& j, const Node* node) {
+    if (!node) {
+        j = nullptr;
+        return;
+    }
+    std::unordered_map<int, const Node*> map;
+    std::queue<const Node*> q;
+    q.push(node);
+    map[node->val] = node;
+    while (!q.empty()) {
+        const Node* curr = q.front();
+        q.pop();
+        for (const Node* neighbor : curr->neighbors) {
+            if (map.find(neighbor->val) == map.end()) {
+                map[neighbor->val] = neighbor;
+                q.push(neighbor);
+            }
+        }
+    }
+    std::vector<std::vector<int>> res;
+    for (int i = 1; i <= map.size(); i++) {
+        if (map.count(i)) {
+            std::vector<int> neighbors;
+            for (const Node* nb : map[i]->neighbors) neighbors.push_back(nb->val);
+            res.push_back(neighbors);
+        } else {
+            res.push_back({});
+        }
+    }
+    j = res;
+}
+
+Node* graph_from_json(const json& j) {
+    if (j.is_null() || !j.is_array() || j.empty()) return nullptr;
+    int n = j.size();
+    std::vector<Node*> nodes(n);
+    for (int i = 0; i < n; i++) nodes[i] = new Node(i + 1);
+    for (int i = 0; i < n; i++) {
+        for (const auto& neighborIdx : j[i]) {
+            nodes[i]->neighbors.push_back(nodes[neighborIdx.get<int>() - 1]);
+        }
+    }
+    return nodes[0];
 }
 
 // Simple base64 decoder

@@ -216,7 +216,7 @@ const AddProblemPage = () => {
           <ul className="report-list">
             <li>{validationReport.schemaValid ? <CheckCircle2 size={16} color="var(--success)" /> : <AlertTriangle size={16} color="var(--error)" />} Schema Validation</li>
             <li>{validationReport.typeValidation ? <CheckCircle2 size={16} color="var(--success)" /> : <AlertTriangle size={16} color="var(--error)" />} Type Conversion Validation</li>
-            <li>{validationReport.wrapperGeneration ? <CheckCircle2 size={16} color="var(--success)" /> : <AlertTriangle size={16} color="var(--error)" />} Wrapper Generation (JS, Python, Java, Go)</li>
+            <li>{validationReport.wrapperGeneration ? <CheckCircle2 size={16} color="var(--success)" /> : <AlertTriangle size={16} color="var(--error)" />} Wrapper Generation (JS, TS, PY, Java, Go, C#, C++, C)</li>
             <li>{validationReport.referenceSolutionPassed ? <CheckCircle2 size={16} color="var(--success)" /> : <AlertTriangle size={16} color="var(--error)" />} Reference Solution Verification</li>
           </ul>
           {validationReport.errors.length > 0 && (
@@ -359,7 +359,9 @@ const AddProblemPage = () => {
           <label>Solution Language</label>
           <select name="solutionLanguage" value={formData.solutionLanguage} onChange={handleChange}>
             <option value="javascript">JavaScript</option>
-            <option value="python">Python</option>
+                          <option value="typescript">TypeScript</option>
+                          <option value="python">Python</option>
+
             <option value="java">Java</option>
             <option value="go">Go</option>
             <option value="cpp">C++</option>

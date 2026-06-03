@@ -146,7 +146,7 @@ const EditAssessmentPage = () => {
         <div className="problem-card" style={{ marginBottom: '20px' }}>
           <h3>Allowed Languages</h3>
           <div className="flex-gap">
-            {['python', 'javascript', 'java', 'cpp', 'c', 'csharp', 'go'].map(lang => (
+            {['python', 'javascript', 'typescript', 'java', 'cpp', 'c', 'csharp', 'go'].map(lang => (
               <label key={lang} style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
                 <input 
                   type="checkbox" 

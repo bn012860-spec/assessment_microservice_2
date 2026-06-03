@@ -73,5 +73,17 @@ export const PROBLEM_TEMPLATES = [
       referenceSolution: "function maxDepth(root) {\n    if (!root) return 0;\n    return 1 + Math.max(maxDepth(root.left), maxDepth(root.right));\n}",
       solutionLanguage: "javascript"
     }
+  },
+  {
+    id: "graph",
+    label: "Graph / Clone style",
+    data: {
+      functionName: "cloneGraph",
+      parameters: [{ name: "node", type: "graph<number>" }],
+      returnType: "graph<number>",
+      testCases: [{ inputs: "[[[2,4],[1,3],[2,4],[1,3]]]", expected: "[[2,4],[1,3],[2,4],[1,3]]", isSample: true }],
+      referenceSolution: "function cloneGraph(node) {\n    if (!node) return null;\n    const map = new Map();\n    const dfs = (n) => {\n        if (map.has(n.val)) return map.get(n.val);\n        const copy = new Node(n.val);\n        map.set(n.val, copy);\n        for (const neighbor of n.neighbors) {\n            copy.neighbors.push(dfs(neighbor));\n        }\n        return copy;\n    };\n    return dfs(node);\n}",
+      solutionLanguage: "javascript"
+    }
   }
 ];

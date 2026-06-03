@@ -240,7 +240,7 @@ const EditProblemPage = () => {
           <ul className="report-list">
             <li>{validationReport.schemaValid ? '✅' : '✗'} Schema Validation</li>
             <li>{validationReport.typeValidation ? '✅' : '✗'} Type Conversion Validation</li>
-            <li>{validationReport.wrapperGeneration ? '✅' : '✗'} Wrapper Generation (JS, Python, Java, Go)</li>
+            <li>{validationReport.wrapperGeneration ? '✅' : '✗'} Wrapper Generation (JS, TS, PY, Java, Go, C#, C++, C)</li>
             <li>{validationReport.referenceSolutionPassed ? '✅' : '✗'} Reference Solution Verification</li>
           </ul>
           {validationReport.errors.length > 0 && (
@@ -372,7 +372,9 @@ const EditProblemPage = () => {
           <label>Solution Language</label>
           <select name="solutionLanguage" value={formData.solutionLanguage} onChange={handleChange}>
             <option value="javascript">JavaScript</option>
-            <option value="python">Python</option>
+                          <option value="typescript">TypeScript</option>
+                          <option value="python">Python</option>
+
             <option value="java">Java</option>
             <option value="go">Go</option>
             <option value="cpp">C++</option>

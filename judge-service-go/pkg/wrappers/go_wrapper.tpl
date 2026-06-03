@@ -107,6 +107,66 @@ func treeFromJSON(data json.RawMessage) *TreeNode {
 	return root
 }
 
+// Node defines a node in a graph.
+type Node struct {
+	Val       int
+	Neighbors []*Node
+}
+
+// MarshalJSON for Node to convert it back to an adjacency list for JSON output.
+func (n *Node) MarshalJSON() ([]byte, error) {
+	if n == nil {
+		return []byte("null"), nil
+	}
+	nodeMap := make(map[int]*Node)
+	queue := []*Node{n}
+	nodeMap[n.Val] = n
+	for len(queue) > 0 {
+		curr := queue[0]
+		queue = queue[1:]
+		for _, neighbor := range curr.Neighbors {
+			if _, ok := nodeMap[neighbor.Val]; !ok {
+				nodeMap[neighbor.Val] = neighbor
+				queue = append(queue, neighbor)
+			}
+		}
+	}
+	res := make([][]int, len(nodeMap))
+	for i := 1; i <= len(nodeMap); i++ {
+		if node, ok := nodeMap[i]; ok {
+			neighbors := make([]int, len(node.Neighbors))
+			for j, nb := range node.Neighbors {
+				neighbors[j] = nb.Val
+			}
+			res[i-1] = neighbors
+		} else {
+			res[i-1] = []int{}
+		}
+	}
+	return json.Marshal(res)
+}
+
+// graphFromJSON converts a JSON adjacency list to a Node graph.
+func graphFromJSON(data json.RawMessage) *Node {
+	var adj [][]int
+	if err := json.Unmarshal(data, &adj); err != nil {
+		return nil
+	}
+	if len(adj) == 0 {
+		return nil
+	}
+	nodes := make([]*Node, len(adj))
+	for i := range nodes {
+		nodes[i] = &Node{Val: i + 1}
+	}
+	for i, neighbors := range adj {
+		for _, nbIdx := range neighbors {
+			nodes[i].Neighbors = append(nodes[i].Neighbors, nodes[nbIdx-1])
+		}
+	}
+	return nodes[0]
+}
+
 // USER_CODE_MARKER
 
 func main() {

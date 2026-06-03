@@ -6,7 +6,7 @@ import api, { assessments } from '../api';
 import SubmissionOutput from '../components/SubmissionOutput';
 import { mapType } from '../utils/typeValidator';
 
-const supportedLanguages = ['python', 'javascript', 'java', 'cpp', 'c', 'csharp', 'go'];
+const supportedLanguages = ['python', 'javascript', 'typescript', 'java', 'cpp', 'c', 'csharp', 'go'];
 
 function buildTemplate(language, functionName, parameters, returnType) {
   const paramNames = (parameters || []).map(p => p.name);
@@ -14,6 +14,7 @@ function buildTemplate(language, functionName, parameters, returnType) {
 
   if (language === 'python') return `def ${functionName}(${params}):\n    # your code here\n    pass`;
   if (language === 'javascript') return `function ${functionName}(${params}) {\n  // your code here\n}`;
+  if (language === 'typescript') return `function ${functionName}(${params}): any {\n  // your code here\n}`;
   
   if (language === 'java') {
     const javaReturnType = mapType('java', returnType);

@@ -68,6 +68,7 @@ export function mapType(language, typeStr) {
     matrix: (t) => `vector<vector<${mapType('cpp', t)}>>`,
     tree: () => 'TreeNode*',
     linkedlist: () => 'ListNode*',
+    graph: () => 'Node*',
   };
 
   const javaMap = {
@@ -79,6 +80,7 @@ export function mapType(language, typeStr) {
     matrix: (t) => `${mapType('java', t)}[][]`,
     tree: () => 'TreeNode',
     linkedlist: () => 'ListNode',
+    graph: () => 'Node',
   };
 
   const csharpMap = {
@@ -90,6 +92,7 @@ export function mapType(language, typeStr) {
     matrix: (t) => `${mapType('csharp', t)}[][]`,
     tree: () => 'TreeNode',
     linkedlist: () => 'ListNode',
+    graph: () => 'Node',
   };
 
   const goMap = {
@@ -101,13 +104,27 @@ export function mapType(language, typeStr) {
     matrix: (t) => `[][]${mapType('go', t)}`,
     tree: () => '*TreeNode',
     linkedlist: () => '*ListNode',
+    graph: () => '*Node',
+  };
+
+  const tsMap = {
+    number: 'number',
+    string: 'string',
+    boolean: 'boolean',
+    void: 'void',
+    array: (t) => `${mapType('typescript', t)}[]`,
+    matrix: (t) => `${mapType('typescript', t)}[][]`,
+    tree: () => 'TreeNode | null',
+    linkedlist: () => 'ListNode | null',
+    graph: () => 'Node | null',
   };
 
   const maps = {
     cpp: cppMap,
     java: javaMap,
     csharp: csharpMap,
-    go: goMap
+    go: goMap,
+    typescript: tsMap
   };
 
   const currentMap = maps[language];

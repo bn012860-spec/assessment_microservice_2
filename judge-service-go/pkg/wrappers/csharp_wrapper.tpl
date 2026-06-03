@@ -5,202 +5,292 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Linq;
 
-// User's code will be included here (submission should NOT include a Main method).
-// The submission should define a class named UserSolution that contains the method
-// with the name {{FUNCTION_NAME}}. See contract below for expected method signatures.
-{{USER_CODE}}
+public class TreeNode {
+    public int val;
+    public TreeNode left;
+    public TreeNode right;
+    public TreeNode(int val=0, TreeNode left=null, TreeNode right=null) {
+        this.val = val;
+        this.left = left;
+        this.right = right;
+    }
+}
+
+public class ListNode {
+    public int val;
+    public ListNode next;
+    public ListNode(int val=0, ListNode next=null) {
+        this.val = val;
+        this.next = next;
+    }
+}
+
+public class Node {
+    public int val;
+    public IList<Node> neighbors;
+    public Node() {
+        val = 0;
+        neighbors = new List<Node>();
+    }
+    public Node(int _val) {
+        val = _val;
+        neighbors = new List<Node>();
+    }
+    public Node(int _val, List<Node> _neighbors) {
+        val = _val;
+        neighbors = _neighbors;
+    }
+}
+
+// USER_CODE_MARKER
 
 public static class Harness
 {
-    // Convert a JsonElement into a CLR object that best matches primitive types
-    static object ConvertJsonElement(JsonElement el)
+    static object ConvertInput(JsonElement el, string typeStr)
     {
-        switch (el.ValueKind)
+        if (typeStr == "tree<number>") return BuildTree(el);
+        if (typeStr == "linkedlist<number>") return BuildLinkedList(el);
+        if (typeStr == "graph<number>") return BuildGraph(el);
+        
+        return el.ValueKind switch
         {
-            case JsonValueKind.Number:
-                // prefer integer if it fits
-                if (el.TryGetInt64(out long l)) return l;
-                if (el.TryGetDouble(out double d)) return d;
-                // fallback to raw text
-                return el.GetRawText();
-            case JsonValueKind.String:
-                return el.GetString();
-            case JsonValueKind.True:
-            case JsonValueKind.False:
-                return el.GetBoolean();
-            case JsonValueKind.Array:
+            JsonValueKind.Number => el.TryGetInt32(out int i) ? i : (object)el.GetDouble(),
+            JsonValueKind.String => el.GetString(),
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.Array => ConvertArray(el, typeStr),
+            _ => null
+        };
+    }
+
+    static object ConvertArray(JsonElement el, string typeStr)
+    {
+        var list = new List<object>();
+        string innerType = "";
+        if (typeStr.StartsWith("array<") && typeStr.EndsWith(">"))
+            innerType = typeStr.Substring(6, typeStr.Length - 7);
+        else if (typeStr.StartsWith("matrix<") && typeStr.EndsWith(">"))
+            innerType = "array<" + typeStr.Substring(7, typeStr.Length - 8) + ">";
+
+        foreach (var item in el.EnumerateArray())
+        {
+            list.Add(ConvertInput(item, innerType));
+        }
+
+        if (innerType == "number") return list.Cast<int>().ToArray();
+        if (innerType == "string") return list.Cast<string>().ToArray();
+        if (innerType == "boolean") return list.Cast<bool>().ToArray();
+        if (innerType.StartsWith("array<number>")) return list.Cast<int[]>().ToArray();
+
+        return list.ToArray();
+    }
+
+    static TreeNode BuildTree(JsonElement el)
+    {
+        if (el.ValueKind == JsonValueKind.Null || (el.ValueKind == JsonValueKind.Array && el.GetArrayLength() == 0)) return null;
+        if (el.ValueKind != JsonValueKind.Array) return null;
+        var vals = el.EnumerateArray().Select(x => x.ValueKind == JsonValueKind.Null ? (int?)null : x.GetInt32()).ToList();
+        if (vals[0] == null) return null;
+
+        var root = new TreeNode(vals[0].Value);
+        var queue = new Queue<TreeNode>();
+        queue.Enqueue(root);
+        int i = 1;
+        while (queue.Count > 0 && i < vals.Count)
+        {
+            var curr = queue.Dequeue();
+            if (i < vals.Count && vals[i] != null)
             {
-                // convert to object[]
-                var arr = new List<object>();
-                foreach (var it in el.EnumerateArray())
+                curr.left = new TreeNode(vals[i].Value);
+                queue.Enqueue(curr.left);
+            }
+            i++;
+            if (i < vals.Count && vals[i] != null)
+            {
+                curr.right = new TreeNode(vals[i].Value);
+                queue.Enqueue(curr.right);
+            }
+            i++;
+        }
+        return root;
+    }
+
+    static ListNode BuildLinkedList(JsonElement el)
+    {
+        if (el.ValueKind != JsonValueKind.Array) return null;
+        var dummy = new ListNode();
+        var curr = dummy;
+        foreach (var item in el.EnumerateArray())
+        {
+            curr.next = new ListNode(item.GetInt32());
+            curr = curr.next;
+        }
+        return dummy.next;
+    }
+
+    static Node BuildGraph(JsonElement el)
+    {
+        if (el.ValueKind != JsonValueKind.Array) return null;
+        var adj = el.EnumerateArray().ToList();
+        if (adj.Count == 0) return null;
+        
+        var nodes = new Node[adj.Count];
+        for (int i = 0; i < adj.Count; i++) nodes[i] = new Node(i + 1);
+        
+        for (int i = 0; i < adj.Count; i++)
+        {
+            foreach (var neighborIdx in adj[i].EnumerateArray())
+            {
+                nodes[i].neighbors.Add(nodes[neighborIdx.GetInt32() - 1]);
+            }
+        }
+        return nodes[0];
+    }
+
+    static object Serialize(object obj, string typeStr)
+    {
+        if (obj == null) return null;
+        if (obj is TreeNode root) return SerializeTree(root);
+        if (obj is ListNode head) return SerializeLinkedList(head);
+        if (obj is Node node) return SerializeGraph(node);
+        return obj;
+    }
+
+    static int?[] SerializeTree(TreeNode root)
+    {
+        if (root == null) return new int?[0];
+        var res = new List<int?>();
+        var queue = new Queue<TreeNode>();
+        queue.Enqueue(root);
+        while (queue.Count > 0)
+        {
+            var curr = queue.Dequeue();
+            if (curr == null) res.Add(null);
+            else
+            {
+                res.Add(curr.val);
+                queue.Enqueue(curr.left);
+                queue.Enqueue(curr.right);
+            }
+        }
+        while (res.Count > 0 && res[res.Count - 1] == null) res.RemoveAt(res.Count - 1);
+        return res.ToArray();
+    }
+
+    static int[] SerializeLinkedList(ListNode head)
+    {
+        var res = new List<int>();
+        var curr = head;
+        while (curr != null)
+        {
+            res.Add(curr.val);
+            curr = curr.next;
+        }
+        return res.ToArray();
+    }
+
+    static List<List<int>> SerializeGraph(Node node)
+    {
+        if (node == null) return new List<List<int>>();
+        var map = new Dictionary<int, Node>();
+        var queue = new Queue<Node>();
+        queue.Enqueue(node);
+        map[node.val] = node;
+        
+        while (queue.Count > 0)
+        {
+            var curr = queue.Dequeue();
+            foreach (var neighbor in curr.neighbors)
+            {
+                if (!map.ContainsKey(neighbor.val))
                 {
-                    arr.Add(ConvertJsonElement(it));
+                    map[neighbor.val] = neighbor;
+                    queue.Enqueue(neighbor);
                 }
-                return arr.ToArray();
             }
-            case JsonValueKind.Object:
-            {
-                // return a JsonElement string for now
-                return el.GetRawText();
-            }
-            case JsonValueKind.Null:
-            default:
-                return null;
         }
+
+        var res = new List<List<int>>();
+        for (int i = 1; i <= map.Count; i++)
+        {
+            if (map.ContainsKey(i))
+                res.Add(map[i].neighbors.Select(n => n.val).ToList());
+            else
+                res.Add(new List<int>());
+        }
+        return res;
     }
 
-    // Try to coerce an object value to a target parameter type when possible
-    static object CoerceToType(object value, Type targetType)
+    public static void Main(string[] args)
     {
-        if (value == null)
-        {
-            if (targetType.IsValueType) return Activator.CreateInstance(targetType);
-            return null;
+        if (args.Length == 0) return;
+        string inputJson;
+        try {
+            byte[] data = Convert.FromBase64String(args[0]);
+            inputJson = Encoding.UTF8.GetString(data);
+        } catch {
+            return;
         }
 
-        if (targetType.IsAssignableFrom(value.GetType()))
-            return value;
-
-        try
-        {
-            // handle numeric conversions
-            if (value is long lv)
-            {
-                if (targetType == typeof(int)) return (int)lv;
-                if (targetType == typeof(long)) return lv;
-                if (targetType == typeof(double)) return (double)lv;
-                if (targetType == typeof(float)) return (float)lv;
-            }
-            if (value is double dv)
-            {
-                if (targetType == typeof(double)) return dv;
-                if (targetType == typeof(float)) return (float)dv;
-                if (targetType == typeof(long)) return (long)dv;
-                if (targetType == typeof(int)) return (int)dv;
-            }
-            if (value is string sv)
-            {
-                if (targetType == typeof(string)) return sv;
-                // try parse numbers
-                if (targetType == typeof(long) && long.TryParse(sv, out var outL)) return outL;
-                if (targetType == typeof(int) && int.TryParse(sv, out var outI)) return outI;
-                if (targetType == typeof(double) && double.TryParse(sv, out var outD)) return outD;
-            }
-            // arrays -> try to convert element-wise to typed arrays if target is array
-            if (value is object[] objArr && targetType.IsArray)
-            {
-                var elemType = targetType.GetElementType();
-                var newArr = Array.CreateInstance(elemType, objArr.Length);
-                for (int i = 0; i < objArr.Length; i++)
-                {
-                    newArr.SetValue(CoerceToType(objArr[i], elemType), i);
-                }
-                return newArr;
-            }
-            // fallback: try System.Convert
-            return Convert.ChangeType(value, targetType);
-        }
-        catch
-        {
-            // fallback to original value
-            return value;
-        }
-    }
-
-    // Build a JSON summary object for the entire run
-    static JsonDocument BuildSummary(List<JsonElement> details, int passed, int total)
-    {
-        using var doc = JsonDocument.Parse("{}");
-        // We will build using Utf8JsonWriter into a MemoryStream then parse back for convenience
-        var ms = new MemoryStream();
-        using (var w = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = false }))
-        {
-            w.WriteStartObject();
-            w.WriteString("status", "finished");
-            w.WriteNumber("passed", passed);
-            w.WriteNumber("total", total);
-            w.WritePropertyName("details");
-            w.WriteStartArray();
-            foreach (var e in details)
-            {
-                e.WriteTo(w);
-            }
-            w.WriteEndArray();
-            w.WriteEndObject();
-        }
-        ms.Position = 0;
-        return JsonDocument.Parse(ms);
-    }
-
-    public static int MainHarness()
-    {
-        string testsJsonStr = Environment.GetEnvironmentVariable("TESTS_JSON");
-        if (string.IsNullOrEmpty(testsJsonStr))
-        {
-            Console.WriteLine("{\"status\":\"error\",\"message\":\"TESTS_JSON environment variable not set\"}");
-            return 2;
-        }
-
-        JsonDocument parsed;
-        try
-        {
-            parsed = JsonDocument.Parse(testsJsonStr);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine("{\"status\":\"error\",\"message\":\"Invalid TESTS_JSON: " + JsonEncodedText.Encode(ex.Message) + "\"}");
-            return 3;
-        }
-
-        if (parsed.RootElement.ValueKind != JsonValueKind.Array)
-        {
-            Console.WriteLine("{\"status\":\"error\",\"message\":\"TESTS_JSON must be an array of test objects\"}");
-            return 4;
-        }
-
-        var detailsList = new List<JsonElement>();
-        int passed = 0;
-        int total = parsed.RootElement.GetArrayLength();
-
-        // Reflection: find the method in UserSolution
-        Type solverType = typeof(UserSolution);
+        using var doc = JsonDocument.Parse(inputJson);
+        var root = doc.RootElement;
+        var inputsArr = root.GetProperty("inputs");
+        
         string funcName = "{{FUNCTION_NAME}}";
-        MethodInfo[] allMethods = solverType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
-        MethodInfo targetMethod = null;
-        foreach (var m in allMethods)
-        {
-            if (m.Name == funcName)
-            {
-                targetMethod = m;
-                break;
-            }
-        }
-        if (targetMethod == null)
-        {
-            Console.WriteLine("{\"status\":\"error\",\"message\":\"Function " + funcName + " not found on UserSolution\"}");
-            return 5;
+        string returnTypeStr = "{{RETURN_TYPE}}";
+
+        var solverType = typeof(Solution);
+        var method = solverType.GetMethod(funcName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.NonPublic);
+        
+        if (method == null) {
+            Console.WriteLine("{\"error\": \"Method " + funcName + " not found in Solution class\"}");
+            return;
         }
 
-        bool isStatic = targetMethod.IsStatic;
-        object instance = null;
-        if (!isStatic)
-        {
-            try { instance = Activator.CreateInstance(solverType); }
-            catch (Exception ex) {
-                Console.WriteLine("{\"status\":\"error\",\"message\":\"failed to create UserSolution instance: " + JsonEncodedText.Encode(ex.Message) + "\"}");
-                return 6;
-            }
+        var paramInfos = method.GetParameters();
+        var convertedArgs = new object[paramInfos.Length];
+        
+        for (int i = 0; i < paramInfos.Length; i++) {
+            convertedArgs[i] = ConvertInput(inputsArr[i], GetTypeStr(i));
         }
 
-        // iterate tests
-        int testIndex = 0;
-        foreach (var testElement in parsed.RootElement.EnumerateArray())
-        {
-            testIndex++;
-            try
-            {
-                if (testElement.ValueKind != JsonValueKind.Object)
-                {
-                    // build error detail
-                    var err = JsonDocument.Parse("{\"test\":
+        object result = null;
+        try {
+            object instance = method.IsStatic ? null : Activator.CreateInstance(solverType);
+            result = method.Invoke(instance, convertedArgs);
+        } catch (TargetInvocationException ex) {
+            var res = new Dictionary<string, object> {
+                {"error", "Runtime Error"},
+                {"message", ex.InnerException?.Message ?? ex.Message},
+                {"traceback", ex.InnerException?.StackTrace ?? ex.StackTrace}
+            };
+            Console.WriteLine(JsonSerializer.Serialize(res));
+            return;
+        } catch (Exception ex) {
+            var res = new Dictionary<string, object> {
+                {"error", "Runtime Error"},
+                {"message", ex.Message},
+                {"traceback", ex.StackTrace}
+            };
+            Console.WriteLine(JsonSerializer.Serialize(res));
+            return;
+        }
+
+        var outputMap = new Dictionary<string, object>();
+        if (returnTypeStr == "void" && convertedArgs.Length > 0) {
+            outputMap["output"] = Serialize(convertedArgs[0], GetTypeStr(0));
+        } else {
+            outputMap["output"] = Serialize(result, returnTypeStr);
+        }
+
+        Console.WriteLine(JsonSerializer.Serialize(outputMap));
+    }
+
+    static string GetTypeStr(int index) {
+        string paramsJson = @"{{PARAMS_JSON}}";
+        using var doc = JsonDocument.Parse(paramsJson);
+        return doc.RootElement[index].GetProperty("type").GetString();
+    }
+}

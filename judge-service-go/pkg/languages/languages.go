@@ -77,6 +77,14 @@ var Languages = map[string]*Language{
 		RunCmd:          []string{"./main"},
 		WrapperTemplate: "go_wrapper.tpl",
 	},
+	"typescript": {
+		ID:              "typescript",
+		Name:            "TypeScript",
+		FileExt:         ".ts",
+		Image:           "judge-js-env", // We'll add ts-node to this image
+		RunCmd:          []string{"ts-node", "/app/wrapper.ts"},
+		WrapperTemplate: "ts_wrapper.tpl",
+	},
 }
 
 // GetLanguage returns a pointer to the Language configuration for the given id.
