@@ -34,6 +34,14 @@ class ListNode:
     def __repr__(self):
         return f"ListNode({self.val})"
 
+class Node:
+    def __init__(self, val=0, neighbors=None):
+        self.val = val
+        self.neighbors = neighbors if neighbors is not None else []
+    
+    def __repr__(self):
+        return f"Node({self.val})"
+
 def build_tree(data):
     if not data or data[0] is None:
         return None
@@ -89,11 +97,41 @@ def serialize_linked_list(head):
         curr = curr.next
     return result
 
+def build_graph(adj):
+    if not adj:
+        return None
+    nodes = [Node(i + 1) for i in range(len(adj))]
+    for i, neighbors in enumerate(adj):
+        for neighbor_idx in neighbors:
+            nodes[i].neighbors.append(nodes[neighbor_idx - 1])
+    return nodes[0]
+
+def serialize_graph(node):
+    if not node:
+        return []
+    node_map = {}
+    queue = collections.deque([node])
+    node_map[node.val] = node
+    while queue:
+        curr = queue.popleft()
+        for neighbor in curr.neighbors:
+            if neighbor.val not in node_map:
+                node_map[neighbor.val] = neighbor
+                queue.append(neighbor)
+    
+    res = []
+    for i in range(1, len(node_map) + 1):
+        n = node_map.get(i)
+        res.append([nb.val for nb in n.neighbors] if n else [])
+    return res
+
 def convert_input(val, type_str):
     if type_str.startswith("tree"):
         return build_tree(val)
     if type_str.startswith("linkedlist"):
         return build_linked_list(val)
+    if type_str.startswith("graph"):
+        return build_graph(val)
     return val
 
 def convert_output(val, type_str):
@@ -101,6 +139,8 @@ def convert_output(val, type_str):
         return serialize_tree(val)
     if isinstance(val, ListNode) or type_str.startswith("linkedlist"):
         return serialize_linked_list(val)
+    if isinstance(val, Node) or type_str.startswith("graph"):
+        return serialize_graph(val)
     return val
 
 # USER_CODE_MARKER

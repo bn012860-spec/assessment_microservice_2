@@ -31,17 +31,17 @@ func (CSharpAdapter) PrepareFiles(workDir string, submissionMsg models.Submissio
 	// But javascript.go does a manual replace of // USER_CODE_MARKER.
 	// Let's check wrapper/wrapper.go
 
-	if err := workspace.WriteFile(workDir, "main.cs", []byte(finalCode), 0644); err != nil {
-		return nil, fmt.Errorf("failed to write main.cs: %w", err)
+	if err := workspace.WriteFile(workDir, "Program.cs", []byte(finalCode), 0644); err != nil {
+		return nil, fmt.Errorf("failed to write Program.cs: %w", err)
 	}
 
-	return []string{"main.cs"}, nil
+	return []string{"Program.cs"}, nil
 }
 
 func (CSharpAdapter) RunCommand(inputB64 string) []string {
-	return []string{"mono", "/app/main.exe", inputB64}
+	return []string{"dotnet", "out/app.dll", inputB64}
 }
 
 func (CSharpAdapter) CompileCommand() []string {
-	return []string{"mcs", "-out:/app/main.exe", "/app/main.cs", "-r:System.Runtime.Serialization.dll"}
+	return []string{"sh", "-c", "cp /home/judge/app/app.csproj . && dotnet build -c Release -o out /p:StartupObject=Harness"}
 }

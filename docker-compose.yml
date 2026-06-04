@@ -91,6 +91,7 @@ services:
       - MONGO_URI=mongodb://mongo:27017/assessment_db
       - RABBITMQ_URL=amqp://user:password@rabbitmq:5672
       - REDIS_URI=redis://redis:6379
+      - LOG_LEVEL=debug
       - JUDGE_CENTRAL_COMPARE_PY=true
       - JUDGE_CENTRAL_COMPARE_JS=true
       - JUDGE_CENTRAL_COMPARE_JAVA=true

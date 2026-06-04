@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <queue>
+#include <unordered_map>
 #include <algorithm>
 #include <stdexcept>
 #include <sstream>
@@ -26,6 +27,15 @@ struct TreeNode {
     TreeNode() : val(0), left(nullptr), right(nullptr) {}
     TreeNode(int x) : val(x), left(nullptr), right(nullptr) {}
     TreeNode(int x, TreeNode *left, TreeNode *right) : val(x), left(left), right(right) {}
+};
+
+class Node {
+public:
+    int val;
+    std::vector<Node*> neighbors;
+    Node() { val = 0; neighbors = std::vector<Node*>(); }
+    Node(int _val) { val = _val; neighbors = std::vector<Node*>(); }
+    Node(int _val, std::vector<Node*> _neighbors) { val = _val; neighbors = _neighbors; }
 };
 
 // JSON conversions for ListNode

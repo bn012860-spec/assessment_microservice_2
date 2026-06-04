@@ -38,7 +38,80 @@ class ListNode {
     ListNode(int val, ListNode next) { this.val = val; this.next = next; }
 }
 
+class Node {
+    public int val;
+    public List<Node> neighbors;
+    public Node() { val = 0; neighbors = new ArrayList<Node>(); }
+    public Node(int _val) { val = _val; neighbors = new ArrayList<Node>(); }
+    public Node(int _val, ArrayList<Node> _neighbors) { val = _val; neighbors = _neighbors; }
+}
+
 public class Main {
+    private static class NodeAdapter extends TypeAdapter<Node> {
+        @Override
+        public void write(JsonWriter out, Node node) throws IOException {
+            if (node == null) {
+                out.nullValue();
+                return;
+            }
+            Map<Integer, Node> map = new HashMap<>();
+            Queue<Node> queue = new LinkedList<>();
+            queue.add(node);
+            map.put(node.val, node);
+            while (!queue.isEmpty()) {
+                Node curr = queue.poll();
+                for (Node neighbor : curr.neighbors) {
+                    if (!map.containsKey(neighbor.val)) {
+                        map.put(neighbor.val, neighbor);
+                        queue.add(neighbor);
+                    }
+                }
+            }
+            out.beginArray();
+            for (int i = 1; i <= map.size(); i++) {
+                Node n = map.get(i);
+                out.beginArray();
+                if (n != null) {
+                    for (Node neighbor : n.neighbors) {
+                        out.value(neighbor.val);
+                    }
+                }
+                out.endArray();
+            }
+            out.endArray();
+        }
+
+        @Override
+        public Node read(JsonReader in) throws IOException {
+            if (in.peek() == JsonToken.NULL) {
+                in.nextNull();
+                return null;
+            }
+            List<List<Integer>> adj = new ArrayList<>();
+            in.beginArray();
+            while (in.hasNext()) {
+                List<Integer> neighbors = new ArrayList<>();
+                in.beginArray();
+                while (in.hasNext()) {
+                    neighbors.add(in.nextInt());
+                }
+                in.endArray();
+                adj.add(neighbors);
+            }
+            in.endArray();
+
+            if (adj.isEmpty()) return null;
+            Node[] nodes = new Node[adj.size()];
+            for (int i = 0; i < adj.size(); i++) nodes[i] = new Node(i + 1);
+            for (int i = 0; i < adj.size(); i++) {
+                for (Integer neighborIdx : adj.get(i)) {
+                    nodes[i].neighbors.add(nodes[neighborIdx - 1]);
+                }
+            }
+            return nodes[0];
+        }
+    }
+
     private static class TreeNodeAdapter extends TypeAdapter<TreeNode> {
         @Override
         public void write(JsonWriter out, TreeNode root) throws IOException {
@@ -162,6 +235,7 @@ public class Main {
     private static final Gson GSON = new GsonBuilder()
         .registerTypeAdapter(TreeNode.class, new TreeNodeAdapter())
         .registerTypeAdapter(ListNode.class, new ListNodeAdapter())
+        .registerTypeAdapter(Node.class, new NodeAdapter())
         .create();
 
     public static void main(String[] args) {

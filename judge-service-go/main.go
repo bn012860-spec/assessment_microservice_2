@@ -350,10 +350,12 @@ func processAndStoreResults(ctx context.Context, executionPath string, stdout, s
 	var submissionTestResult *models.SubmissionResult
 
 	if stdout != "" {
+		slog.Info("Processing stdout", "submissionId", submissionMsg.SubmissionID, "stdoutLen", len(stdout), "stdoutHead", stdout[:min(len(stdout), 100)])
 		if err := json.Unmarshal([]byte(stdout), &result); err == nil {
 			submissionTestResult = &result
 			submissionTestResult.ExecutionPath = executionPath
 			result.NormalizeCounts()
+			slog.Info("Parsed submission result", "submissionId", submissionMsg.SubmissionID, "status", result.Status, "passed", result.Passed, "total", result.Total)
 			switch result.Status {
 			case models.SubmissionStatusAccepted:
 				submissionStatus = models.StatusSuccess
@@ -610,7 +612,7 @@ func isCentralCompareEnabled(language string) bool {
 			return isTruthyEnv(raw)
 		}
 		return true
-	case "go":
+	case "go", "csharp", "typescript":
 		return true
 	default:
 		return false

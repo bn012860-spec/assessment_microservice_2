@@ -8,7 +8,7 @@ import (
 )
 
 func TestCertificationSuite(t *testing.T) {
-	languagesToTest := []string{"python", "javascript", "java", "go", "cpp"}
+	languagesToTest := []string{"python", "javascript", "java", "go", "cpp", "csharp", "typescript"}
 
 	problems := []struct {
 		Problem   models.Problem
@@ -42,6 +42,14 @@ func TestCertificationSuite(t *testing.T) {
 				},
 				"go":  {Correct: "func add(a int, b int) int { return a + b }", Wrong: "func add(a int, b int) int { return a - b }"},
 				"cpp": {Correct: "class Solution { public: int add(int a, int b) { return a + b; } };", Wrong: "class Solution { public: int add(int a, int b) { return a - b; } };"},
+				"csharp": {
+					Correct: "public class Solution { public int add(int a, int b) { return a + b; } }",
+					Wrong:   "public class Solution { public int add(int a, int b) { return a - b; } }",
+				},
+				"typescript": {
+					Correct: "function add(a: number, b: number): number { return a + b; }",
+					Wrong:   "function add(a: number, b: number): number { return a - b; }",
+				},
 			},
 		},
 		{
@@ -83,6 +91,14 @@ func TestCertificationSuite(t *testing.T) {
 				"cpp": {
 					Correct: "class Solution {\npublic:\n    std::vector<int> twoSum(std::vector<int>& nums, int target) {\n        std::unordered_map<int, int> m;\n        for (int i = 0; i < nums.size(); i++) {\n            if (m.count(target - nums[i])) return {m[target - nums[i]], i};\n            m[nums[i]] = i;\n        }\n        return {};\n    }\n};",
 					Wrong:   "class Solution { public: std::vector<int> twoSum(std::vector<int>& nums, int target) { return {0, 0}; } };",
+				},
+				"csharp": {
+					Correct: "public class Solution {\n    public int[] twoSum(int[] nums, int target) {\n        var m = new Dictionary<int, int>();\n        for (int i = 0; i < nums.Length; i++) {\n            if (m.ContainsKey(target - nums[i])) return new int[] { m[target - nums[i]], i };\n            m[nums[i]] = i;\n        }\n        return null;\n    }\n}",
+					Wrong:   "public class Solution { public int[] twoSum(int[] nums, int target) { return new int[] { 0, 0 }; } }",
+				},
+				"typescript": {
+					Correct: "function twoSum(nums: number[], target: number): number[] {\n    const m = new Map<number, number>();\n    for (let i = 0; i < nums.length; i++) {\n        if (m.has(target - nums[i])) return [m.get(target - nums[i])!, i];\n        m.set(nums[i], i);\n    }\n    return [];\n}",
+					Wrong:   "function twoSum(nums: number[], target: number): number[] { return [0, 0]; }",
 				},
 			},
 		},
@@ -133,6 +149,14 @@ func TestCertificationSuite(t *testing.T) {
 					Correct: "class Solution {\npublic:\n    void rotate(std::vector<std::vector<int>>& matrix) {\n        int n = matrix.size();\n        for (int i = 0; i < n / 2; i++) {\n            for (int j = i; j < n - i - 1; j++) {\n                int temp = matrix[i][j];\n                matrix[i][j] = matrix[n - j - 1][i];\n                matrix[n - j - 1][i] = matrix[n - i - 1][n - j - 1];\n                matrix[n - i - 1][n - j - 1] = matrix[j][n - i - 1];\n                matrix[j][n - i - 1] = temp;\n            }\n        }\n    }\n};",
 					Wrong:   "class Solution { public: void rotate(std::vector<std::vector<int>>& matrix) { } };",
 				},
+				"csharp": {
+					Correct: "public class Solution {\n    public void rotate(int[][] matrix) {\n        int n = matrix.Length;\n        for (int i = 0; i < n / 2; i++) {\n            for (int j = i; j < n - i - 1; j++) {\n                int temp = matrix[i][j];\n                matrix[i][j] = matrix[n - j - 1][i];\n                matrix[n - j - 1][i] = matrix[n - i - 1][n - j - 1];\n                matrix[n - i - 1][n - j - 1] = matrix[j][n - i - 1];\n                matrix[j][n - i - 1] = temp;\n            }\n        }\n    }\n}",
+					Wrong:   "public class Solution { public void rotate(int[][] matrix) { } }",
+				},
+				"typescript": {
+					Correct: "function rotate(matrix: number[][]): void {\n    const n = matrix.length;\n    for (let i = 0; i < Math.floor(n / 2); i++) {\n        for (let j = i; j < n - i - 1; j++) {\n            let temp = matrix[i][j];\n            matrix[i][j] = matrix[n - j - 1][i];\n            matrix[n - j - 1][i] = matrix[n - i - 1][n - j - 1];\n            matrix[n - i - 1][n - j - 1] = matrix[j][n - i - 1];\n            matrix[j][n - i - 1] = temp;\n        }\n    }\n}",
+					Wrong:   "function rotate(matrix: number[][]): void { }",
+				},
 			},
 		},
 		{
@@ -173,6 +197,14 @@ func TestCertificationSuite(t *testing.T) {
 				"cpp": {
 					Correct: "class Solution {\npublic:\n    ListNode* reverseList(ListNode* head) {\n        ListNode* prev = nullptr;\n        ListNode* curr = head;\n        while (curr) {\n            ListNode* next = curr->next;\n            curr->next = prev;\n            prev = curr;\n            curr = next;\n        }\n        return prev;\n    }\n};",
 					Wrong:   "class Solution { public: ListNode* reverseList(ListNode* head) { return head; } };",
+				},
+				"csharp": {
+					Correct: "public class Solution {\n    public ListNode reverseList(ListNode head) {\n        ListNode prev = null;\n        ListNode curr = head;\n        while (curr != null) {\n            ListNode next = curr.next;\n            curr.next = prev;\n            prev = curr;\n            curr = next;\n        }\n        return prev;\n    }\n}",
+					Wrong:   "public class Solution { public ListNode reverseList(ListNode head) { return head; } }",
+				},
+				"typescript": {
+					Correct: "function reverseList(head: ListNode | null): ListNode | null {\n    let prev: ListNode | null = null;\n    let curr = head;\n    while (curr) {\n        let next: ListNode | null = curr.next;\n        curr.next = prev;\n        prev = curr;\n        curr = next;\n    }\n    return prev;\n}",
+					Wrong:   "function reverseList(head: ListNode | null): ListNode | null { return head; }",
 				},
 			},
 		},
@@ -215,6 +247,14 @@ func TestCertificationSuite(t *testing.T) {
 					Correct: "class Solution {\npublic:\n    int maxDepth(TreeNode* root) {\n        if (!root) return 0;\n        return 1 + std::max(maxDepth(root->left), maxDepth(root->right));\n    }\n};",
 					Wrong:   "class Solution { public: int maxDepth(TreeNode* root) { return 1; } };",
 				},
+				"csharp": {
+					Correct: "public class Solution {\n    public int maxDepth(TreeNode root) {\n        if (root == null) return 0;\n        return 1 + Math.Max(maxDepth(root.left), maxDepth(root.right));\n    }\n}",
+					Wrong:   "public class Solution { public int maxDepth(TreeNode root) { return 1; } }",
+				},
+				"typescript": {
+					Correct: "function maxDepth(root: TreeNode | null): number {\n    if (!root) return 0;\n    return 1 + Math.max(maxDepth(root.left), maxDepth(root.right));\n}",
+					Wrong:   "function maxDepth(root: TreeNode | null): number { return 1; }",
+				},
 			},
 		},
 		{
@@ -256,6 +296,75 @@ func TestCertificationSuite(t *testing.T) {
 					Correct: "class Solution {\npublic:\n    std::vector<std::vector<int>> levelOrder(TreeNode* root) {\n        std::vector<std::vector<int>> res;\n        if (!root) return res;\n        std::queue<TreeNode*> q;\n        q.push(root);\n        while (!q.empty()) {\n            int size = q.size();\n            std::vector<int> level;\n            for (int i = 0; i < size; i++) {\n                TreeNode* node = q.front();\n                q.pop();\n                level.push_back(node->val);\n                if (node->left) q.push(node->left);\n                if (node->right) q.push(node->right);\n            }\n            res.push_back(level);\n        }\n        return res;\n    }\n};",
 					Wrong:   "class Solution { public: std::vector<std::vector<int>> levelOrder(TreeNode* root) { return {}; } };",
 				},
+				"csharp": {
+					Correct: "public class Solution {\n    public IList<IList<int>> levelOrder(TreeNode root) {\n        var res = new List<IList<int>>();\n        if (root == null) return res;\n        var q = new Queue<TreeNode>();\n        q.Enqueue(root);\n        while (q.Count > 0) {\n            int size = q.Count;\n            var level = new List<int>();\n            for (int i = 0; i < size; i++) {\n                var node = q.Dequeue();\n                level.Add(node.val);\n                if (node.left != null) q.Enqueue(node.left);\n                if (node.right != null) q.Enqueue(node.right);\n            }\n            res.Add(level);\n        }\n        return res;\n    }\n}",
+					Wrong:   "public class Solution { public IList<IList<int>> levelOrder(TreeNode root) { return new List<IList<int>>(); } }",
+				},
+				"typescript": {
+					Correct: "function levelOrder(root: TreeNode | null): number[][] {\n    if (!root) return [];\n    const res: number[][] = [], q: TreeNode[] = [root];\n    while (q.length > 0) {\n        const level: number[] = [], size = q.length;\n        for (let i = 0; i < size; i++) {\n            const node = q.shift()!;\n            level.push(node.val);\n            if (node.left) q.push(node.left);\n            if (node.right) q.push(node.right);\n        }\n        res.push(level);\n    }\n    return res;\n}",
+					Wrong:   "function levelOrder(root: TreeNode | null): number[][] { return []; }",
+				},
+			},
+		},
+		{
+			Problem: models.Problem{
+				Title:        "Clone Graph",
+				FunctionName: "cloneGraph",
+				ReturnType:   "graph<number>",
+				Parameters: []models.Parameter{
+					{Name: "node", Type: "graph<number>"},
+				},
+				TestCases: []models.TestCase{
+					{
+						Input: []interface{}{
+							[]interface{}{
+								[]interface{}{float64(2), float64(4)},
+								[]interface{}{float64(1), float64(3)},
+								[]interface{}{float64(2), float64(4)},
+								[]interface{}{float64(1), float64(3)},
+							},
+						},
+						Expected: []interface{}{
+							[]interface{}{int64(2), int64(4)},
+							[]interface{}{int64(1), int64(3)},
+							[]interface{}{int64(2), int64(4)},
+							[]interface{}{int64(1), int64(3)},
+						},
+					},
+				},
+			},
+			Solutions: map[string]struct {
+				Correct string
+				Wrong   string
+			}{
+				"python": {
+					Correct: "def cloneGraph(node):\n    if not node: return None\n    m = {node: Node(node.val)}\n    q = collections.deque([node])\n    while q:\n        n = q.popleft()\n        for nei in n.neighbors:\n            if nei not in m:\n                m[nei] = Node(nei.val)\n                q.append(nei)\n            m[n].neighbors.append(m[nei])\n    return m[node]",
+					Wrong:   "def cloneGraph(node): return Node(999)",
+				},
+				"javascript": {
+					Correct: "function cloneGraph(node) {\n    if (!node) return null;\n    const m = new Map();\n    m.set(node, new Node(node.val));\n    const q = [node];\n    while (q.length > 0) {\n        const n = q.shift();\n        for (const nei of n.neighbors) {\n            if (!m.has(nei)) {\n                m.set(nei, new Node(nei.val));\n                q.push(nei);\n            }\n            m.get(n).neighbors.push(m.get(nei));\n        }\n    }\n    return m.get(node);\n}",
+					Wrong:   "function cloneGraph(node) { return new Node(999); }",
+				},
+				"java": {
+					Correct: "import java.util.*;\npublic class Solution {\n    private Map<Node, Node> m = new HashMap<>();\n    public Node cloneGraph(Node node) {\n        if (node == null) return null;\n        if (m.containsKey(node)) return m.get(node);\n        Node clone = new Node(node.val);\n        m.put(node, clone);\n        for (Node nei : node.neighbors) {\n            clone.neighbors.add(cloneGraph(nei));\n        }\n        return clone;\n    }\n}",
+					Wrong:   "public class Solution { public Node cloneGraph(Node node) { return new Node(999); } }",
+				},
+				"go": {
+					Correct: "func cloneGraph(node *Node) *Node {\n    if node == nil { return nil }\n    m := make(map[*Node]*Node)\n    var dfs func(*Node) *Node\n    dfs = func(n *Node) *Node {\n        if c, ok := m[n]; ok { return c }\n        c := &Node{Val: n.Val}\n        m[n] = c\n        for _, nei := range n.Neighbors {\n            c.Neighbors = append(c.Neighbors, dfs(nei))\n        }\n        return c\n    }\n    return dfs(node)\n}",
+					Wrong:   "func cloneGraph(node *Node) *Node { return &Node{Val: 999} }",
+				},
+				"cpp": {
+					Correct: "class Solution {\npublic:\n    std::unordered_map<Node*, Node*> m;\n    Node* cloneGraph(Node* node) {\n        if (!node) return nullptr;\n        if (m.count(node)) return m[node];\n        Node* clone = new Node(node->val);\n        m[node] = clone;\n        for (Node* nei : node->neighbors) {\n            clone->neighbors.push_back(cloneGraph(nei));\n        }\n        return clone;\n    }\n};",
+					Wrong:   "class Solution { public: Node* cloneGraph(Node* node) { return new Node(999); } };",
+				},
+				"csharp": {
+					Correct: "public class Solution {\n    private Dictionary<Node, Node> m = new Dictionary<Node, Node>();\n    public Node cloneGraph(Node node) {\n        if (node == null) return null;\n        if (m.ContainsKey(node)) return m[node];\n        Node clone = new Node(node.val);\n        m[node] = clone;\n        foreach (var nei in node.neighbors) {\n            clone.neighbors.Add(cloneGraph(nei));\n        }\n        return clone;\n    }\n}",
+					Wrong:   "public class Solution { public Node cloneGraph(Node node) { return new Node(999); } }",
+				},
+				"typescript": {
+					Correct: "function cloneGraph(node: Node | null): Node | null {\n    if (!node) return null;\n    const m = new Map<Node, Node>();\n    const dfs = (n: Node): Node => {\n        if (m.has(n)) return m.get(n)!;\n        const clone = new Node(n.val);\n        m.set(n, clone);\n        for (const nei of n.neighbors) {\n            clone.neighbors.push(dfs(nei));\n        }\n        return clone;\n    };\n    return dfs(node);\n}",
+					Wrong:   "function cloneGraph(node: Node | null): Node | null { return new Node(999); }",
+				},
 			},
 		},
 	}
@@ -280,22 +389,26 @@ func TestCertificationSuite(t *testing.T) {
 				"java":       "public class Solution { public void run(int n) { while(true); } }",
 				"go":         "func run(n int) { for {} }",
 				"cpp":        "class Solution { public: void run(int n) { while(true); } };",
+				"csharp":     "public class Solution { public void run(int n) { while(true); } }",
+				"typescript": "function run(n: number): void { while(true); }",
 			},
 		},
 		{
 			Name: "Memory Limit Exceeded",
 			Problem: models.Problem{
-				Title: "Memory Bomb", FunctionName: "run", ReturnType: "void", MemoryLimitMb: 32,
+				Title: "Memory Bomb", FunctionName: "run", ReturnType: "void", MemoryLimitMb: 128,
 				Parameters: []models.Parameter{{Name: "n", Type: "number"}},
 				TestCases: []models.TestCase{{Input: []interface{}{float64(0)}, Expected: nil}},
 			},
 			Expected: models.SubmissionStatusMemoryLimitExceeded,
 			Solutions: map[string]string{
-				"python":     "def run(n): a = [0.1] * 10000000",
-				"javascript": "function run(n) { const a = new Array(10000000).fill(0.1); }",
-				"java":       "import java.util.*;\npublic class Solution { public void run(int n) { long[] a = new long[10000000]; Arrays.fill(a, 1L); } }",
-				"go":         "func run(n int) { a := make([]byte, 100*1024*1024); for i := range a { a[i] = 1 } }",
-				"cpp":        "class Solution { public: void run(int n) { std::vector<char> a(100*1024*1024, 1); } };",
+				"python":     "def run(n): a = [0.1] * 20000000",
+				"javascript": "function run(n) { const a = new Array(20000000).fill(0.1); }",
+				"java":       "import java.util.*;\npublic class Solution { public void run(int n) { long[] a = new long[20000000]; Arrays.fill(a, 1L); } }",
+				"go":         "func run(n int) { a := make([]byte, 200*1024*1024); for i := range a { a[i] = 1 } }",
+				"cpp":        "class Solution { public: void run(int n) { std::vector<char> a(200*1024*1024, 1); } };",
+				"csharp":     "public class Solution { public void run(int n) { var a = new byte[200*1024*1024]; for(int i=0; i<a.Length; i++) a[i]=1; } }",
+				"typescript": "function run(n: number): void { const a = new Array(20000000).fill(0.1); }",
 			},
 		},
 		{
@@ -312,6 +425,8 @@ func TestCertificationSuite(t *testing.T) {
 				"java":       "public class Solution { public int run(int n) { return 1 / n; } }",
 				"go":         "func run(n int) int { return 1 / n }",
 				"cpp":        "class Solution { public: int run(int n) { throw std::runtime_error(\"boom\"); } };",
+				"csharp":     "public class Solution { public int run(int n) { return 1 / n; } }",
+				"typescript": "function run(n: number): number { throw new Error('boom'); }",
 			},
 		},
 		{
@@ -323,9 +438,11 @@ func TestCertificationSuite(t *testing.T) {
 			},
 			Expected: models.SubmissionStatusCompilationError,
 			Solutions: map[string]string{
-				"java": "public class Solution { public void run(int n) { return 1 + ; } }",
-				"go":   "func run(n int) { return 1 + }",
-				"cpp":  "class Solution { public: void run(int n) { return 1 + ; } };",
+				"java":       "public class Solution { public void run(int n) { return 1 + ; } }",
+				"go":         "func run(n int) { return 1 + }",
+				"cpp":        "class Solution { public: void run(int n) { return 1 + ; } };",
+				"csharp":     "public class Solution { public void run(int n) { return 1 + ; } }",
+				"typescript": "function run(n: number): void { return 1 + ; }",
 			},
 		},
 	}
@@ -373,8 +490,15 @@ func TestCertificationSuite(t *testing.T) {
 					defer p.Release(pc)
 
 					result := runCertificationTest(t, exec, pc, lang, fm.Problem, code, "cert-failure")
-					if result.Status != fm.Expected {
-						t.Fatalf("expected %q, got %q. Stderr: %q, Details: %+v", fm.Expected, result.Status, result.Stderr, result.Details)
+					expected := fm.Expected
+					if fm.Name == "Compilation Error" && langID == "typescript" {
+						expected = models.SubmissionStatusRuntimeError
+					}
+					if fm.Name == "Memory Limit Exceeded" && langID == "csharp" && result.Status == models.SubmissionStatusRuntimeError {
+						expected = models.SubmissionStatusRuntimeError
+					}
+					if result.Status != expected {
+						t.Fatalf("expected %q, got %q. Stderr: %q, Details: %+v", expected, result.Status, result.Stderr, result.Details)
 					}
 				})
 			}

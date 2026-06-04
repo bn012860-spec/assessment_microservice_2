@@ -55,8 +55,8 @@ var Languages = map[string]*Language{
 		Name:            "C#",
 		FileExt:         ".cs",
 		Image:           "judge-csharp-env",
-		CompileCmd:      []string{"mcs", "-out:/app/main.exe", "/app/main.cs"},
-		RunCmd:          []string{"mono", "/app/main.exe"},
+		CompileCmd:      []string{"sh", "-c", "cp /home/judge/app/app.csproj . && dotnet build -c Release -o out /p:StartupObject=Harness"},
+		RunCmd:          []string{"dotnet", "out/app.dll"},
 		WrapperTemplate: "csharp_wrapper.tpl",
 	},
 	"cpp": {

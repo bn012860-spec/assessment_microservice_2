@@ -16,6 +16,17 @@ class ListNode {
   }
 }
 
+class Node {
+  constructor(val, neighbors) {
+    this.val = (val === undefined ? 0 : val);
+    this.neighbors = (neighbors === undefined ? [] : neighbors);
+  }
+}
+
+global.TreeNode = TreeNode;
+global.ListNode = ListNode;
+global.Node = Node;
+
 function buildTree(data) {
   if (!data || data.length === 0 || data[0] === null) {
     return null;
@@ -101,12 +112,48 @@ function serializeLinkedList(head) {
   return result;
 }
 
+function buildGraph(adj) {
+  if (!adj || adj.length === 0) return null;
+  const nodes = adj.map((_, i) => new Node(i + 1));
+  adj.forEach((neighbors, i) => {
+    neighbors.forEach(neighborIdx => {
+      nodes[i].neighbors.push(nodes[neighborIdx - 1]);
+    });
+  });
+  return nodes[0];
+}
+
+function serializeGraph(node) {
+  if (!node) return [];
+  const map = new Map();
+  const queue = [node];
+  map.set(node.val, node);
+  while (queue.length > 0) {
+    const curr = queue.shift();
+    for (const neighbor of curr.neighbors) {
+      if (!map.has(neighbor.val)) {
+        map.set(neighbor.val, neighbor);
+        queue.push(neighbor);
+      }
+    }
+  }
+  const res = [];
+  for (let i = 1; i <= map.size; i++) {
+    const n = map.get(i);
+    res.push(n ? n.neighbors.map(nb => nb.val) : []);
+  }
+  return res;
+}
+
 function convertInput(val, typeStr) {
   if (typeStr && typeStr.startsWith("tree")) {
     return buildTree(val);
   }
   if (typeStr && typeStr.startsWith("linkedlist")) {
     return buildLinkedList(val);
+  }
+  if (typeStr && typeStr.startsWith("graph")) {
+    return buildGraph(val);
   }
   return val;
 }
@@ -117,6 +164,9 @@ function convertOutput(val, typeStr) {
   }
   if (val instanceof ListNode || (typeStr && typeStr.startsWith("linkedlist"))) {
     return serializeLinkedList(val);
+  }
+  if (val instanceof Node || (typeStr && typeStr.startsWith("graph"))) {
+    return serializeGraph(val);
   }
   return val;
 }

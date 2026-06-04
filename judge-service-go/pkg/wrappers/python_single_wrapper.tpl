@@ -164,10 +164,18 @@ def run_one():
             type_str = params[j]["type"] if params and j < len(params) else ""
             converted_inputs.append(convert_input(val, type_str))
 
+        target_func = globals().get("{{FUNCTION_NAME}}")
+        if not target_func and "Solution" in globals():
+            sol_instance = globals()["Solution"]()
+            target_func = getattr(sol_instance, "{{FUNCTION_NAME}}", None)
+        
+        if not target_func:
+            raise NameError("Function '{{FUNCTION_NAME}}' not found")
+
         if isinstance(converted_inputs, list):
-            out = {{FUNCTION_NAME}}(*converted_inputs)
+            out = target_func(*converted_inputs)
         else:
-            out = {{FUNCTION_NAME}}(converted_inputs)
+            out = target_func(converted_inputs)
 
         if return_type == "void" and len(converted_inputs) > 0:
             # For void functions, we assume the first argument is modified in-place

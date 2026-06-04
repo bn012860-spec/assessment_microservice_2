@@ -609,6 +609,36 @@ const PROBLEMS = [
       }
     ],
     tags: ["linked-list", "two-pointers"]
+  },
+  {
+    title: "Clone Graph",
+    description: "Given a reference of a node in a connected undirected graph, return a deep copy (clone) of the graph.",
+    difficulty: "Medium",
+    functionName: "cloneGraph",
+    parameters: [
+      { name: "node", type: "graph<number>" }
+    ],
+    returnType: "graph<number>",
+    compareConfig: {
+      mode: "STRUCTURAL",
+      floatTolerance: 0,
+      orderInsensitive: true
+    },
+    testCases: [
+      {
+        inputs: [[[2, 4], [1, 3], [2, 4], [1, 3]]],
+        expected: [[2, 4], [1, 3], [2, 4], [1, 3]],
+        isSample: true,
+        isHidden: false
+      },
+      {
+        inputs: [[[]]],
+        expected: [[]],
+        isSample: true,
+        isHidden: false
+      }
+    ],
+    tags: ["graph", "bfs", "dfs"]
   }
 ];
 

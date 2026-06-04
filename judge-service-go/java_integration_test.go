@@ -28,13 +28,13 @@ func setupJavaIntegration(t *testing.T) (*executor.Executor, *pool.ContainerPool
 	}
 
 	p := pool.NewPool(exec.Client(), 1)
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	if err := p.WarmUp(ctx, lang.ID, lang.Image, 1); err != nil {
 		t.Skipf("java container warm-up failed (is %q image available?): %v", lang.Image, err)
 	}
 
-	pc := p.Acquire(lang.ID)
+	pc := p.Acquire(ctx, lang.ID)
 	if pc == nil {
 		t.Fatal("failed to acquire pooled java container")
 	}

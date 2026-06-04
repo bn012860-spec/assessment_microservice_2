@@ -37,7 +37,7 @@ func setupIntegration(t *testing.T, languageID string) (*executor.Executor, *poo
 		t.Skipf("%s container warm-up failed (is %q image available?): %v", lang.ID, lang.Image, err)
 	}
 
-	pc := p.Acquire(lang.ID)
+	pc := p.Acquire(context.Background(), lang.ID)
 	if pc == nil {
 		t.Fatalf("failed to acquire pooled %s container", lang.ID)
 	}

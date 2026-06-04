@@ -92,7 +92,7 @@ func compileCentralSubmission(ctx context.Context, exec *executor.Executor, pool
 		return nil
 	}
 
-	_, stderr, err := exec.CompileInContainer(
+	stdout, stderr, err := exec.CompileInContainer(
 		ctx,
 		pooledContainer.ID,
 		files,
@@ -102,10 +102,14 @@ func compileCentralSubmission(ctx context.Context, exec *executor.Executor, pool
 		60*time.Second,
 	)
 	if err != nil {
-		if strings.TrimSpace(stderr) != "" {
-			return fmt.Errorf("%w | stderr=%s", err, strings.TrimSpace(stderr))
+		msg := err.Error()
+		if strings.TrimSpace(stdout) != "" {
+			msg += " | stdout=" + strings.TrimSpace(stdout)
 		}
-		return err
+		if strings.TrimSpace(stderr) != "" {
+			msg += " | stderr=" + strings.TrimSpace(stderr)
+		}
+		return fmt.Errorf("%w | %s", err, msg)
 	}
 
 	return nil

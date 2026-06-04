@@ -35,7 +35,7 @@ func setupJSIntegration(t *testing.T) (*executor.Executor, *pool.ContainerPool, 
 		t.Skipf("javascript container warm-up failed (is %q image available?): %v", lang.Image, err)
 	}
 
-	pc := p.Acquire(lang.ID)
+	pc := p.Acquire(ctx, lang.ID)
 	if pc == nil {
 		t.Fatal("failed to acquire pooled javascript container")
 	}
@@ -252,12 +252,15 @@ function twoSum(nums, target) {
 	_ = runCentralJSOnce(t, exec, pc, lang, problem, code)
 	_ = runCentralJSOnce(t, exec, pc, lang, problem, code)
 
-	if extra := p.Acquire(lang.ID); extra != nil {
+	shortCtx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	extra := p.Acquire(shortCtx, lang.ID)
+	cancel()
+	if extra != nil {
 		t.Fatalf("expected no second container while one is in use, got %s", extra.ID)
 	}
 
 	p.Release(pc)
-	reacquired := p.Acquire(lang.ID)
+	reacquired := p.Acquire(context.Background(), lang.ID)
 	if reacquired == nil {
 		t.Fatal("expected to reacquire pooled container")
 	}

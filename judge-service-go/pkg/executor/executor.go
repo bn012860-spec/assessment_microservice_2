@@ -423,6 +423,7 @@ func (e *Executor) RunInContainerStream(ctx context.Context, containerID string,
 	}
 
 	if len(compileCmd) > 0 {
+		slog.Info("Compiling in container", "containerId", containerID, "cmd", compileCmd)
 		compileStdout, compileStderr, _, err := e.runExecWithTimeout(subCtx, containerID, containerWorkDir, rewriteCommandForWorkspace(compileCmd, containerWorkDir), timeout)
 		if err != nil {
 			cancel()

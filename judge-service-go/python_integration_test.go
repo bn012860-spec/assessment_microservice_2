@@ -35,7 +35,7 @@ func setupPythonIntegration(t *testing.T) (*executor.Executor, *pool.ContainerPo
 		t.Skipf("python container warm-up failed (is %q image available?): %v", lang.Image, err)
 	}
 
-	pc := p.Acquire(lang.ID)
+	pc := p.Acquire(ctx, lang.ID)
 	if pc == nil {
 		t.Fatal("failed to acquire pooled python container")
 	}
@@ -245,12 +245,15 @@ def twoSum(nums, target):
 	_ = runCentralOnce(t, exec, pc, lang, problem, code)
 
 	// While held, a second acquire should fail for pool size 1.
-	if extra := p.Acquire(lang.ID); extra != nil {
+	shortCtx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+	if extra := p.Acquire(shortCtx, lang.ID); extra != nil {
 		t.Fatalf("expected no second container while one is in use, got %s", extra.ID)
 	}
 
 	p.Release(pc)
-	reacquired := p.Acquire(lang.ID)
+	released = true
+	reacquired := p.Acquire(context.Background(), lang.ID)
 	if reacquired == nil {
 		t.Fatal("expected to reacquire pooled container")
 	}

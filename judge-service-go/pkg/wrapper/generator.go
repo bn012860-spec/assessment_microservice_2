@@ -113,7 +113,11 @@ func GenerateWrapper(p models.Problem, lang *languages.Language, submissionFuncN
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal Parameters to JSON: %w", err)
 	}
-	tpl = strings.ReplaceAll(tpl, "{{PARAMS_JSON}}", string(paramsJSONBytes))
+	paramsJSON := string(paramsJSONBytes)
+	if lang.ID == "csharp" {
+		paramsJSON = strings.ReplaceAll(paramsJSON, "\"", "\"\"")
+	}
+	tpl = strings.ReplaceAll(tpl, "{{PARAMS_JSON}}", paramsJSON)
 	tpl = strings.ReplaceAll(tpl, "{{RETURN_TYPE}}", p.ReturnType)
 
 	tpl = strings.ReplaceAll(tpl, "{{EXPECTED_OUTPUT_TYPE}}", p.ReturnType)

@@ -22,6 +22,10 @@ class Node {
   }
 }
 
+global.TreeNode = TreeNode;
+global.ListNode = ListNode;
+global.Node = Node;
+
 function buildTree(data) {
   if (!data || data.length === 0 || data[0] === null) {
     return null;

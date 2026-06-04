@@ -34,7 +34,7 @@ func setupCppIntegration(t *testing.T) (*executor.Executor, *pool.ContainerPool,
 		t.Skipf("cpp container warm-up failed (is %q image available?): %v", lang.Image, err)
 	}
 
-	pc := p.Acquire(lang.ID)
+	pc := p.Acquire(ctx, lang.ID)
 	if pc == nil {
 		t.Fatal("failed to acquire pooled cpp container")
 	}

@@ -33,5 +33,5 @@ func (TypeScriptAdapter) PrepareFiles(workDir string, submissionMsg models.Submi
 }
 
 func (TypeScriptAdapter) RunCommand(inputB64 string) []string {
-	return []string{"ts-node", "/app/wrapper.ts", inputB64}
+	return []string{"tsx", "/app/wrapper.ts", inputB64}
 }

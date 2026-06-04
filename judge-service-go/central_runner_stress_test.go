@@ -164,20 +164,14 @@ func runOneStressSubmission(exec *executor.Executor, p *pool.ContainerPool, lang
 }
 
 func acquirePooledContainer(ctx context.Context, p *pool.ContainerPool, langID string) (*pool.PooledContainer, error) {
-	ticker := time.NewTicker(10 * time.Millisecond)
-	defer ticker.Stop()
-
-	for {
-		if pc := p.Acquire(langID); pc != nil {
-			return pc, nil
-		}
-
-		select {
-		case <-ctx.Done():
+	pc := p.Acquire(ctx, langID)
+	if pc == nil {
+		if ctx.Err() != nil {
 			return nil, ctx.Err()
-		case <-ticker.C:
 		}
+		return nil, fmt.Errorf("failed to acquire container for %s", langID)
 	}
+	return pc, nil
 }
 
 func makeStressProblem(functionName string, testCount int) models.Problem {
