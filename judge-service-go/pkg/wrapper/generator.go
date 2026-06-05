@@ -298,7 +298,7 @@ func buildCppCall(p models.Problem, funcName string) string {
 		sb.WriteString(");\n")
 
 		if len(p.Parameters) > 0 {
-			sb.WriteString(fmt.Sprintf("        result[\"output\"] = arg0;\n"))
+			sb.WriteString("        result[\"output\"] = arg0;\n")
 		} else {
 			sb.WriteString("        result[\"output\"] = nullptr;\n")
 		}

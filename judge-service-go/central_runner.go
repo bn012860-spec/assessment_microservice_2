@@ -40,6 +40,7 @@ type batchedTestExecOutput struct {
 
 var errBatchedOutputLimitExceeded = fmt.Errorf("batched wrapper output exceeded limit")
 
+//lint:ignore U1000 helper for tests
 func runSubmissionCentral(ctx context.Context, exec *executor.Executor, pooledContainer *pool.PooledContainer, submissionMsg models.SubmissionMessage, problem models.Problem, adapter adapters.LanguageAdapter) (*models.SubmissionResult, error) {
 	result, _, err := runSubmissionCentralDetailed(ctx, exec, pooledContainer, submissionMsg, problem, adapter)
 	return result, err

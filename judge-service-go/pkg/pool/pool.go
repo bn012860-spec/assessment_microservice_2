@@ -324,7 +324,7 @@ func (p *ContainerPool) checkHealth(ctx context.Context) {
 }
 
 func (p *ContainerPool) isContainerHealthy(id string) bool {
-	container, err := p.cli.InspectContainer(id)
+	container, err := p.cli.InspectContainerWithOptions(docker.InspectContainerOptions{ID: id})
 	if err != nil {
 		return false
 	}
