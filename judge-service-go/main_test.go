@@ -202,9 +202,7 @@ func TestShouldDiscardContainer(t *testing.T) {
 func TestIsCentralCompareEnabled_DefaultsAndOverrides(t *testing.T) {
 	t.Run("python defaults enabled", func(t *testing.T) {
 		restoreEnv(t, centralComparePythonEnv)
-		if err := os.Unsetenv(centralComparePythonEnv); err != nil {
-			t.Fatalf("unsetenv failed: %v", err)
-		}
+		os.Unsetenv(centralComparePythonEnv)
 		if !isCentralCompareEnabled("python") {
 			t.Fatalf("expected python central compare enabled by default")
 		}
@@ -212,9 +210,7 @@ func TestIsCentralCompareEnabled_DefaultsAndOverrides(t *testing.T) {
 
 	t.Run("javascript defaults enabled", func(t *testing.T) {
 		restoreEnv(t, centralCompareJSEnv)
-		if err := os.Unsetenv(centralCompareJSEnv); err != nil {
-			t.Fatalf("unsetenv failed: %v", err)
-		}
+		os.Unsetenv(centralCompareJSEnv)
 		if !isCentralCompareEnabled("javascript") {
 			t.Fatalf("expected javascript central compare enabled by default")
 		}
@@ -222,11 +218,17 @@ func TestIsCentralCompareEnabled_DefaultsAndOverrides(t *testing.T) {
 
 	t.Run("java defaults enabled", func(t *testing.T) {
 		restoreEnv(t, centralCompareJavaEnv)
-		if err := os.Unsetenv(centralCompareJavaEnv); err != nil {
-			t.Fatalf("unsetenv failed: %v", err)
-		}
+		os.Unsetenv(centralCompareJavaEnv)
 		if !isCentralCompareEnabled("java") {
 			t.Fatalf("expected java central compare enabled by default")
+		}
+	})
+
+	t.Run("cpp defaults enabled", func(t *testing.T) {
+		restoreEnv(t, centralCompareCppEnv)
+		os.Unsetenv(centralCompareCppEnv)
+		if !isCentralCompareEnabled("cpp") {
+			t.Fatalf("expected cpp central compare enabled by default")
 		}
 	})
 
@@ -237,19 +239,10 @@ func TestIsCentralCompareEnabled_DefaultsAndOverrides(t *testing.T) {
 		}
 	})
 
-	t.Run("javascript explicit true enables", func(t *testing.T) {
-		t.Setenv(centralCompareJSEnv, "true")
-		if !isCentralCompareEnabled("javascript") {
-			t.Fatalf("expected javascript central compare enabled when env=true")
-		}
-	})
-
-	t.Run("unsupported language stays legacy", func(t *testing.T) {
-		if isCentralCompareEnabled("c") {
-			t.Fatalf("expected c to remain on legacy path")
-		}
-		if isCentralCompareEnabled("csharp") {
-			t.Fatalf("expected csharp to remain on legacy path")
+	t.Run("javascript explicit false disables", func(t *testing.T) {
+		t.Setenv(centralCompareJSEnv, "false")
+		if isCentralCompareEnabled("javascript") {
+			t.Fatalf("expected javascript central compare disabled when env=false")
 		}
 	})
 
@@ -257,6 +250,34 @@ func TestIsCentralCompareEnabled_DefaultsAndOverrides(t *testing.T) {
 		t.Setenv(centralCompareJavaEnv, "false")
 		if isCentralCompareEnabled("java") {
 			t.Fatalf("expected java central compare disabled when env=false")
+		}
+	})
+
+	t.Run("cpp explicit false disables", func(t *testing.T) {
+		t.Setenv(centralCompareCppEnv, "false")
+		if isCentralCompareEnabled("cpp") {
+			t.Fatalf("expected cpp central compare disabled when env=false")
+		}
+	})
+
+	t.Run("unsupported language stays legacy", func(t *testing.T) {
+		if isCentralCompareEnabled("c") {
+			t.Fatalf("expected c to remain on legacy path")
+		}
+		if isCentralCompareEnabled("ruby") {
+			t.Fatalf("expected ruby to remain on legacy path")
+		}
+	})
+
+	t.Run("modern languages always enabled", func(t *testing.T) {
+		if !isCentralCompareEnabled("go") {
+			t.Fatalf("expected go to be enabled")
+		}
+		if !isCentralCompareEnabled("csharp") {
+			t.Fatalf("expected csharp to be enabled")
+		}
+		if !isCentralCompareEnabled("typescript") {
+			t.Fatalf("expected typescript to be enabled")
 		}
 	})
 }
