@@ -1,6 +1,6 @@
 # Dockerfile (multi-stage) - production-ready
 # Builder stage
-FROM golang:1.24-alpine AS builder
+FROM golang:alpine AS builder
 
 # Install any native deps needed for build (if using CGO)
 RUN apk add --no-cache build-base git

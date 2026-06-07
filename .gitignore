@@ -76,6 +76,11 @@ lerna-debug.log*
 # Docker
 docker-compose.override.yml
 
+# Unused/Binaries
+image.png
+judge-service-go/judge-service
+judge-service-go/judge-service-go
+
 # Secrets
 secrets/
 

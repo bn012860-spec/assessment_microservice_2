@@ -1,4 +1,5 @@
 # Binaries
+judge-service
 judge-service-go
 *.exe
 *.exe~

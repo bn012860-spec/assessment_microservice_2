@@ -1,5 +1,9 @@
 {
   "scripts": {
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "cd assessment-api && npm test",
+    "test:frontend": "cd frontend && npm test",
+    "test:e2e": "cd e2e && npx playwright test",
     "test:submission": "node scripts/test_submission.js",
     "test:submission:docker": "docker compose run --rm harness",
     "seed:problems": "docker compose exec -T assessment-api node scripts/seed_problems_api.mjs"

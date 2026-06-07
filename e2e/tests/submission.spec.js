@@ -1,0 +1,71 @@
+import { test, expect } from '@playwright/test';
+
+test.describe('Student Submissions', () => {
+  test.beforeEach(async ({ page }) => {
+    test.setTimeout(60000);
+    // Login as student before each test
+    await page.goto('/login');
+    await page.fill('input[type="email"]', 'student@test.com');
+    await page.fill('input[type="password"]', 'password123');
+    await page.click('button[type="submit"]');
+    await expect(page).toHaveURL('/');
+  });
+
+  test('student can solve Two Sum problem', async ({ page }) => {
+    // Find and click on "Two Sum" problem
+    await page.click('text=Two Sum');
+    await expect(page).toHaveURL(/\/problems\/[a-f0-9]+/);
+
+    // Select Python
+    await page.selectOption('select', 'python');
+
+    const pythonCode = `def twoSum(nums, target):
+    seen = {}
+    for i, num in enumerate(nums):
+        diff = target - num
+        if diff in seen:
+            return [seen[diff], i]
+        seen[num] = i
+    return []`;
+
+    // Wait for the editor to load
+    await page.waitForSelector('.monaco-editor');
+
+    // Set code in Monaco
+    const isSet = await page.evaluate((code) => {
+      if (window.monaco && window.monaco.editor) {
+        const models = window.monaco.editor.getModels();
+        if (models.length > 0) {
+          models[0].setValue(code);
+          return true;
+        }
+      }
+      return false;
+    }, pythonCode);
+
+    if (!isSet) {
+      console.log('window.monaco not available, falling back to keyboard typing');
+      await page.click('.monaco-editor');
+      await page.keyboard.press('Control+A');
+      await page.keyboard.press('Backspace');
+      await page.keyboard.insertText(pythonCode);
+    }
+
+    // Click Submit
+    await page.click('button:has-text("Submit")');
+
+    // Console drawer should show up
+    const consoleDrawer = page.locator('.console-drawer');
+    await expect(consoleDrawer).toBeVisible();
+
+    // Wait for "Accepted" or "Success" status
+    const statusTextLocator = page.locator('.verdict-banner span');
+    
+    // Increased timeout and added polling for debug
+    await expect(async () => {
+      const text = await statusTextLocator.innerText();
+      console.log(`Current status: ${text}`);
+      expect(['Accepted', 'Success']).toContain(text);
+    }).toPass({ timeout: 45000, intervals: [2000] });
+  });
+});

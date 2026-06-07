@@ -638,25 +638,53 @@ func startHealthServer(ctx context.Context, containerPool *pool.ContainerPool, p
 			return
 		}
 
-		problem, err := fetchProblemData(r.Context(), problemsCollection, msg.ProblemID)
-		if err != nil {
-			http.Error(w, "Problem not found", http.StatusNotFound)
-			return
+		var problem models.Problem
+		var err error
+
+		// If it's a "temp" ID, we don't even try to fetch from DB
+		if msg.ProblemID != "" && msg.ProblemID != "temp" {
+			problem, err = fetchProblemData(r.Context(), problemsCollection, msg.ProblemID)
+		} else {
+			err = fmt.Errorf("ephemeral problem request")
 		}
 
-		// If the message contains custom tests, override the problem's tests
-		if len(msg.Tests) > 0 {
-			problem.TestCases = msg.Tests
-		} else {
-			// For "Run", usually we only run sample test cases
-			var samples []models.TestCase
-			for _, tc := range problem.TestCases {
-				if tc.IsSample {
-					samples = append(samples, tc)
+		if err != nil {
+			// If problem not found in DB or it's ephemeral, we can still proceed if the message has test cases
+			if len(msg.Tests) > 0 {
+				slog.Info("Using ephemeral problem definition", "submissionId", msg.SubmissionID)
+				problem = models.Problem{
+					ID:           primitive.NewObjectID(), // Dummy ID
+					Title:        "Ephemeral Problem",
+					Description:  "Temporary problem for validation",
+					TestCases:    msg.Tests,
+					FunctionName: msg.FunctionName,
+					Parameters:   msg.Parameters,
+					ReturnType:   msg.ReturnType,
 				}
+				// Default return type if missing to pass ValidateBasic
+				if problem.ReturnType == "" {
+					problem.ReturnType = "void"
+				}
+			} else {
+				slog.Warn("Problem not found and no test cases provided", "problemId", msg.ProblemID)
+				http.Error(w, "Problem not found and no test cases provided", http.StatusNotFound)
+				return
 			}
-			if len(samples) > 0 {
-				problem.TestCases = samples
+		} else {
+			// If the message contains custom tests, override the problem's tests
+			if len(msg.Tests) > 0 {
+				problem.TestCases = msg.Tests
+			} else {
+				// For "Run", usually we only run sample test cases
+				var samples []models.TestCase
+				for _, tc := range problem.TestCases {
+					if tc.IsSample {
+						samples = append(samples, tc)
+					}
+				}
+				if len(samples) > 0 {
+					problem.TestCases = samples
+				}
 			}
 		}
 

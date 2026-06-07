@@ -1,0 +1,12 @@
+{
+  "name": "assessment-microservice-e2e",
+  "version": "1.0.0",
+  "description": "E2E tests for Assessment Microservice",
+  "main": "index.js",
+  "scripts": {
+    "test": "npx playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.42.0"
+  }
+}

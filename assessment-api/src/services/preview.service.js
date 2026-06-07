@@ -91,6 +91,7 @@ export async function validateProblemDefinition(problem) {
 
   // Stage 4: Reference Solution Verification
   if (report.wrapperGeneration && problem.referenceSolution && problem.solutionLanguage) {
+    console.log(`[Validation] Starting reference solution verification for problem: ${problem.title}`);
     try {
       const judgeMsg = {
         schemaVersion: "1",
@@ -99,6 +100,8 @@ export async function validateProblemDefinition(problem) {
         language: problem.solutionLanguage,
         code: problem.referenceSolution,
         functionName: problem.functionName,
+        parameters: problem.parameters,
+        returnType: problem.returnType,
         compareMode: problem.compareConfig?.mode || "STRUCTURAL",
         floatTolerance: problem.compareConfig?.floatTolerance || 0,
         orderInsensitive: !!problem.compareConfig?.orderInsensitive,
@@ -109,6 +112,7 @@ export async function validateProblemDefinition(problem) {
         }))
       };
 
+      console.log(`[Validation] Sending POST to http://judge-service-go:8081/run`);
       const response = await fetch("http://judge-service-go:8081/run", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -117,17 +121,20 @@ export async function validateProblemDefinition(problem) {
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error(`[Validation] Judge service error: ${errorText}`);
         report.errors.push(`Judge service error during certification: ${errorText}`);
       } else {
         const result = await response.json();
-        if (result.status === "Success") {
+        console.log(`[Validation] Judge service result: ${result.status}`);
+        if (result.status === "Success" || result.status === "Accepted") {
           report.referenceSolutionPassed = true;
         } else {
           const failMsg = result.message || "Reference solution failed one or more tests";
+          console.error(`[Validation] Reference solution failed: ${failMsg}`);
           report.errors.push(`Reference solution failed: ${failMsg}`);
           if (result.testResults) {
             result.testResults.forEach((tr, idx) => {
-              if (tr.status !== "Success") {
+              if (tr.status !== "Success" && tr.status !== "Accepted") {
                 report.errors.push(`Test case ${idx + 1} (${tr.isHidden ? 'Hidden' : 'Sample'}): ${tr.message || tr.status}`);
               }
             });
@@ -135,6 +142,7 @@ export async function validateProblemDefinition(problem) {
         }
       }
     } catch (err) {
+      console.error(`[Validation] Reference solution verification crashed: ${err.message}`);
       report.errors.push(`Reference solution verification crashed: ${err.message}`);
     }
   }
