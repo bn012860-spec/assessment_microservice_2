@@ -89,11 +89,12 @@ const LoginPage = () => {
         </form>
         
         <div className="text-center mt-8 pt-6 w-100" style={{ width: '100%', borderTop: '1px solid var(--border)' }}>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-            Don't have an account?{' '}
-            <Link to="/register" style={{ color: 'var(--primary)', fontWeight: '600', textDecoration: 'none' }}>
-              Create one now
-            </Link>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.6' }}>
+            <strong>Accounts are provided by your department.</strong><br />
+            If you cannot log in or forgot your password,<br />
+            <span style={{ color: 'var(--primary)', fontWeight: '600' }}>
+              contact your faculty or administrator.
+            </span>
           </p>
         </div>
       </div>

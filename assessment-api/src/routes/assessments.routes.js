@@ -10,7 +10,9 @@ import {
   submitAssessment,
   getAssessmentAttemptById,
   listAssessmentAttempts,
-  getAttemptSubmissions
+  getAttemptSubmissions,
+  getAssessmentAttendance,
+  logAntiCheatingEvent
 } from "../controllers/assessments.controller.js";
 
 const router = express.Router();
@@ -22,8 +24,10 @@ router.put("/:_id", verifyToken, authorizeRoles("admin", "faculty", "superadmin"
 router.delete("/:_id", verifyToken, authorizeRoles("admin", "faculty", "superadmin"), deleteAssessment);
 
 router.post("/:_id/start", verifyToken, authorizeRoles("student"), startAssessment);
-router.post("/attempts/:attemptId/submit", verifyToken, authorizeRoles("student"), submitAssessment);
+router.post("/attempts/:attemptId/submit", verifyToken, authorizeRoles("student", "admin", "faculty", "superadmin"), submitAssessment);
+router.post("/attempts/:attemptId/log-event", verifyToken, authorizeRoles("student"), logAntiCheatingEvent);
 router.get("/:_id/attempts", verifyToken, authorizeRoles("admin", "faculty", "superadmin"), listAssessmentAttempts);
+router.get("/:_id/attendance", verifyToken, authorizeRoles("admin", "faculty", "superadmin"), getAssessmentAttendance);
 router.get("/attempts/:attemptId", verifyToken, getAssessmentAttemptById);
 router.get("/attempts/:attemptId/submissions", verifyToken, getAttemptSubmissions);
 

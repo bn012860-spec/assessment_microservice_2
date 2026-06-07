@@ -12,9 +12,21 @@ const AssessmentAttemptSchema = new Schema(
       type: String,
       enum: ["Active", "Submitted", "TimedOut"],
       default: "Active"
-    }
+    },
+    // Anti-cheating tracking
+    tabSwitchCount: { type: Number, default: 0 },
+    copyCount: { type: Number, default: 0 },
+    pasteCount: { type: Number, default: 0 },
+    fullscreenExitCount: { type: Number, default: 0 },
+    problemOrder: [{ type: Schema.Types.ObjectId, ref: "Problem" }]
   },
   { timestamps: true }
 );
+
+// Add indexes for scalability
+AssessmentAttemptSchema.index({ assessmentId: 1 });
+AssessmentAttemptSchema.index({ studentId: 1 });
+// Compound index for unique attempts and faster lookups
+AssessmentAttemptSchema.index({ assessmentId: 1, studentId: 1 });
 
 export default mongoose.model("AssessmentAttempt", AssessmentAttemptSchema);

@@ -1,7 +1,9 @@
 import * as assessmentsRepo from "../repositories/assessments.repo.js";
 import * as attemptsRepo from "../repositories/assessmentAttempts.repo.js";
 import Submission from "../../models/Submission.mjs";
+import User from "../../models/User.mjs";
 import { HttpError } from "../utils/httpError.js";
+import * as auditService from "./audit.service.js";
 
 export async function listAssessments(query = {}, user) {
   const filter = {};
@@ -47,7 +49,7 @@ export async function deleteAssessment(id) {
   return assessmentsRepo.deleteById(id);
 }
 
-export async function startAssessment(assessmentId, userId) {
+export async function startAssessment(assessmentId, userId, auditInfo = {}) {
   const assessment = await assessmentsRepo.findById(assessmentId);
   if (!assessment) throw new HttpError(404, "Assessment not found");
   if (assessment.status !== 'Published') throw new HttpError(400, "Assessment is not active");
@@ -60,28 +62,101 @@ export async function startAssessment(assessmentId, userId) {
   let attempt = await attemptsRepo.findOne({ assessmentId, studentId: userId });
   if (attempt) return attempt;
 
+  // Shuffle problem order for anti-cheating
+  const problemIds = assessment.problems.map(p => p.problemId._id || p.problemId);
+  const shuffledOrder = [...problemIds].sort(() => Math.random() - 0.5);
+
   attempt = await attemptsRepo.create({
     assessmentId,
     studentId: userId,
     startedAt: now,
-    status: 'Active'
+    status: 'Active',
+    problemOrder: shuffledOrder
+  });
+
+  await auditService.logEvent({
+    event: "ASSESSMENT_STARTED",
+    userId,
+    details: { assessmentId, attemptId: attempt._id },
+    ...auditInfo
   });
 
   return attempt;
 }
 
+export async function logAntiCheatingEvent(attemptId, eventType, user) {
+  const attempt = await attemptsRepo.findById(attemptId);
+  if (!attempt) throw new HttpError(404, "Attempt not found");
+
+  const studentId = attempt.studentId._id || attempt.studentId;
+  if (String(studentId) !== String(user._id)) {
+    throw new HttpError(403, "Forbidden");
+  }
+
+  if (attempt.status !== 'Active') return attempt;
+
+  const update = {};
+  switch (eventType) {
+    case 'TAB_SWITCH':
+      update.$inc = { tabSwitchCount: 1 };
+      break;
+    case 'COPY':
+      update.$inc = { copyCount: 1 };
+      break;
+    case 'PASTE':
+      update.$inc = { pasteCount: 1 };
+      break;
+    case 'FULLSCREEN_EXIT':
+      update.$inc = { fullscreenExitCount: 1 };
+      break;
+    default:
+      throw new HttpError(400, "Invalid event type");
+  }
+
+  return attemptsRepo.updateById(attemptId, update);
+}
+
 export async function getAssessmentAttemptById(attemptId, user) {
-  await recalculateAttemptScore(attemptId);
   const attempt = await attemptsRepo.findById(attemptId);
   if (!attempt) return null;
 
+  const assessment = await assessmentsRepo.findById(attempt.assessmentId);
+  if (!assessment) return null;
+
+  // Auto-timeout check
+  if (attempt.status === 'Active' && isAttemptExpired(attempt, assessment)) {
+    await attemptsRepo.updateById(attemptId, { status: 'TimedOut', submittedAt: getExpirationTime(attempt, assessment) });
+    attempt.status = 'TimedOut';
+    attempt.submittedAt = getExpirationTime(attempt, assessment);
+  }
+
+  await recalculateAttemptScore(attemptId);
+  
+  // Re-fetch after score update and status change
+  const finalAttempt = await attemptsRepo.findById(attemptId);
+
   // Check permission
-  const studentId = attempt.studentId._id || attempt.studentId;
+  const studentId = finalAttempt.studentId._id || finalAttempt.studentId;
   if (user.role === 'student' && String(studentId) !== String(user._id)) {
     throw new HttpError(403, "Forbidden");
   }
 
-  return attempt;
+  // Reorder assessment problems based on attempt's problemOrder
+  if (finalAttempt.problemOrder && finalAttempt.problemOrder.length > 0) {
+    const orderMap = new Map();
+    finalAttempt.problemOrder.forEach((id, index) => orderMap.set(String(id), index));
+    
+    // Create a lean copy of assessment and sort problems
+    const assessmentObj = assessment.toObject ? assessment.toObject() : assessment;
+    assessmentObj.problems.sort((a, b) => {
+      const idxA = orderMap.get(String(a.problemId._id || a.problemId)) ?? 999;
+      const idxB = orderMap.get(String(b.problemId._id || b.problemId)) ?? 999;
+      return idxA - idxB;
+    });
+    finalAttempt.assessmentId = assessmentObj;
+  }
+
+  return finalAttempt;
 }
 
 export async function recalculateAttemptScore(attemptId) {
@@ -102,7 +177,8 @@ export async function recalculateAttemptScore(attemptId) {
   const solvedProblemIds = new Set(submissions.map(s => String(s.problemId)));
 
   for (const p of assessment.problems) {
-    if (solvedProblemIds.has(String(p.problemId._id))) {
+    const pId = p.problemId._id || p.problemId;
+    if (solvedProblemIds.has(String(pId))) {
       totalScore += p.maxScore;
     }
   }
@@ -120,9 +196,51 @@ export async function listAssessmentAttempts(assessmentId, user) {
   return attemptsRepo.findAll({ assessmentId });
 }
 
-export async function submitAssessment(attemptId, user) {
+export async function getAssessmentAttendance(assessmentId, user) {
+  // Only faculty/admin can see attendance
+  if (user.role === 'student') {
+    throw new HttpError(403, "Forbidden");
+  }
+
+  const assessment = await assessmentsRepo.findById(assessmentId);
+  if (!assessment) throw new HttpError(404, "Assessment not found");
+
+  // Get all students
+  // For now, let's get all users with role 'student'
+  // In a real multi-college setup, we'd filter by collegeId
+  const students = await User.find({ role: 'student' }).select('name email');
+
+  // Get all attempts for this assessment
+  const attempts = await attemptsRepo.findAll({ assessmentId });
+
+  // Map students to status
+  const attendance = students.map(student => {
+    const attempt = attempts.find(a => String(a.studentId._id || a.studentId) === String(student._id));
+    return {
+      studentId: student._id,
+      name: student.name,
+      email: student.email,
+      status: attempt ? attempt.status : 'Not Started',
+      attemptId: attempt ? attempt._id : null,
+      score: attempt ? attempt.score : 0,
+      startedAt: attempt ? attempt.startedAt : null,
+      submittedAt: attempt ? attempt.submittedAt : null,
+      tabSwitchCount: attempt ? (attempt.tabSwitchCount || 0) : 0,
+      copyCount: attempt ? (attempt.copyCount || 0) : 0,
+      pasteCount: attempt ? (attempt.pasteCount || 0) : 0,
+      fullscreenExitCount: attempt ? (attempt.fullscreenExitCount || 0) : 0
+    };
+  });
+
+  return attendance;
+}
+
+export async function submitAssessment(attemptId, user, auditInfo = {}) {
   const attempt = await attemptsRepo.findById(attemptId);
   if (!attempt) throw new HttpError(404, "Attempt not found");
+
+  const assessment = await assessmentsRepo.findById(attempt.assessmentId);
+  if (!assessment) throw new HttpError(404, "Assessment not found");
 
   // Permission check
   const studentId = attempt.studentId._id || attempt.studentId;
@@ -131,15 +249,58 @@ export async function submitAssessment(attemptId, user) {
   }
 
   if (attempt.status !== 'Active') {
-    return attempt; // Already submitted
+    return attempt; // Already submitted or timed out
+  }
+
+  // Check for timeout
+  if (isAttemptExpired(attempt, assessment)) {
+    await recalculateAttemptScore(attemptId);
+    const result = await attemptsRepo.updateById(attemptId, {
+      status: 'TimedOut',
+      submittedAt: getExpirationTime(attempt, assessment)
+    });
+
+    await auditService.logEvent({
+      event: "ASSESSMENT_TIMEOUT",
+      userId: user._id,
+      details: { attemptId, assessmentId: attempt.assessmentId },
+      ...auditInfo
+    });
+
+    return result;
   }
 
   await recalculateAttemptScore(attemptId);
   
-  return attemptsRepo.updateById(attemptId, {
+  const result = await attemptsRepo.updateById(attemptId, {
     status: 'Submitted',
     submittedAt: new Date()
   });
+
+  await auditService.logEvent({
+    event: "ASSESSMENT_SUBMITTED",
+    userId: user._id,
+    details: { attemptId, assessmentId: attempt.assessmentId, score: result.score },
+    ...auditInfo
+  });
+
+  return result;
+}
+
+function isAttemptExpired(attempt, assessment) {
+  const now = new Date();
+  const expirationTime = getExpirationTime(attempt, assessment);
+  return now > expirationTime;
+}
+
+function getExpirationTime(attempt, assessment) {
+  const startTime = new Date(attempt.startedAt);
+  const durationMs = assessment.durationMinutes * 60000;
+  const relativeExpiry = new Date(startTime.getTime() + durationMs);
+  const absoluteExpiry = new Date(assessment.endTime);
+  
+  // Expiry is whichever comes first
+  return relativeExpiry < absoluteExpiry ? relativeExpiry : absoluteExpiry;
 }
 
 export async function getAttemptSubmissions(attemptId, user) {

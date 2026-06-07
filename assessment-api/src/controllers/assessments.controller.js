@@ -1,5 +1,12 @@
 import * as assessmentsService from "../services/assessments.service.js";
 
+function getAuditInfo(req) {
+  return {
+    ip: req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress,
+    userAgent: req.headers['user-agent']
+  };
+}
+
 export async function listAssessments(req, res, next) {
   try {
     const assessments = await assessmentsService.listAssessments(req.query, req.user);
@@ -49,7 +56,7 @@ export async function deleteAssessment(req, res, next) {
 
 export async function startAssessment(req, res, next) {
   try {
-    const attempt = await assessmentsService.startAssessment(req.params._id, req.user._id);
+    const attempt = await assessmentsService.startAssessment(req.params._id, req.user._id, getAuditInfo(req));
     res.json(attempt);
   } catch (err) {
     next(err);
@@ -58,7 +65,17 @@ export async function startAssessment(req, res, next) {
 
 export async function submitAssessment(req, res, next) {
   try {
-    const attempt = await assessmentsService.submitAssessment(req.params.attemptId, req.user);
+    const attempt = await assessmentsService.submitAssessment(req.params.attemptId, req.user, getAuditInfo(req));
+    res.json(attempt);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function logAntiCheatingEvent(req, res, next) {
+  try {
+    const { eventType } = req.body;
+    const attempt = await assessmentsService.logAntiCheatingEvent(req.params.attemptId, eventType, req.user);
     res.json(attempt);
   } catch (err) {
     next(err);
@@ -79,6 +96,15 @@ export async function listAssessmentAttempts(req, res, next) {
   try {
     const attempts = await assessmentsService.listAssessmentAttempts(req.params._id, req.user);
     res.json(attempts);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getAssessmentAttendance(req, res, next) {
+  try {
+    const attendance = await assessmentsService.getAssessmentAttendance(req.params._id, req.user);
+    res.json(attendance);
   } catch (err) {
     next(err);
   }

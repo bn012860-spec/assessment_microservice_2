@@ -135,6 +135,56 @@ const AssessmentWorkspace = ({ user }) => {
   useEffect(() => {
     if (timeLeft === null || timeLeft <= 0) return;
 
+    // Anti-cheating: Tab Switching
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        assessments.logEvent(attemptId, 'TAB_SWITCH').catch(() => {});
+      }
+    };
+
+    // Anti-cheating: Copy/Paste
+    const handleCopy = () => {
+      assessments.logEvent(attemptId, 'COPY').catch(() => {});
+    };
+
+    const handlePaste = () => {
+      assessments.logEvent(attemptId, 'PASTE').catch(() => {});
+    };
+
+    // Anti-cheating: Fullscreen
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement) {
+        assessments.logEvent(attemptId, 'FULLSCREEN_EXIT').catch(() => {});
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener('copy', handleCopy);
+    document.addEventListener('paste', handlePaste);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+
+    // Try to enter fullscreen (user must have interacted first, so we do it on a slight delay or wait for interaction)
+    // Actually, browser usually blocks automatic fullscreen. We can prompt the user.
+    const enterFS = () => {
+       if (document.documentElement.requestFullscreen) {
+         document.documentElement.requestFullscreen().catch(() => {});
+       }
+       document.removeEventListener('click', enterFS);
+    };
+    document.addEventListener('click', enterFS);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('copy', handleCopy);
+      document.removeEventListener('paste', handlePaste);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('click', enterFS);
+    };
+  }, [attemptId, timeLeft]);
+
+  useEffect(() => {
+    if (timeLeft === null || timeLeft <= 0) return;
+
     const timer = setInterval(() => {
       setTimeLeft(prev => {
         if (prev <= 1) {

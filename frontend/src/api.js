@@ -78,7 +78,9 @@ export const assessments = {
   submitAttempt: (attemptId) => api.post(`/api/assessments/attempts/${attemptId}/submit`),
   getAttempt: (attemptId) => api.get(`/api/assessments/attempts/${attemptId}`),
   getAttemptSubmissions: (attemptId) => api.get(`/api/assessments/attempts/${attemptId}/submissions`),
-  listAttempts: (assessmentId) => api.get(`/api/assessments/${assessmentId}/attempts`)
+  listAttempts: (assessmentId) => api.get(`/api/assessments/${assessmentId}/attempts`),
+  getAttendance: (id) => api.get(`/api/assessments/${id}/attendance`),
+  logEvent: (attemptId, eventType) => api.post(`/api/assessments/attempts/${attemptId}/log-event`, { eventType })
 };
 
 export const problems = {
@@ -87,6 +89,14 @@ export const problems = {
   run: (id, data) => api.post(`/api/problems/${id}/run`, data),
   getStats: (id) => api.get(`/api/problems/${id}/stats`),
   delete: (id) => api.delete(`/api/problems/${id}`)
+};
+
+export const admin = {
+  getSystemStats: () => api.get("/api/admin/system-stats"),
+  getAuditLogs: (params) => api.get("/api/admin/audit-logs", { params }),
+  bulkImportStudents: (data) => api.post("/api/admin/bulk-import-students", data),
+  listUsers: (params) => api.get("/api/admin/users", { params }),
+  resetPassword: (userId, newPassword) => api.post(`/api/admin/users/${userId}/reset-password`, { newPassword })
 };
 
 export default api;

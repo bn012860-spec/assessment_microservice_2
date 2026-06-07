@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Route, Routes, Link, useNavigate, useLocation } from 'react-router-dom';
-import { Code2, BookOpen, Settings, PlusCircle, LogIn, UserPlus, Database, LogOut, LayoutDashboard } from 'lucide-react';
+import { Code2, BookOpen, Settings, PlusCircle, LogIn, Database, LogOut, LayoutDashboard, Users } from 'lucide-react';
 import ProblemListPage from './pages/ProblemListPage';
 import AssessmentListPage from './pages/AssessmentListPage';
 import AssessmentManagementPage from './pages/AssessmentManagementPage';
 import AddAssessmentPage from './pages/AddAssessmentPage';
 import EditAssessmentPage from './pages/EditAssessmentPage';
 import AssessmentDetailsPage from './pages/AssessmentDetailsPage';
+import AssessmentPreviewPage from './pages/AssessmentPreviewPage';
 import AssessmentWorkspace from './pages/AssessmentWorkspace';
 import AssessmentResultPage from './pages/AssessmentResultPage';
 import AssessmentResultsPage from './pages/AssessmentResultsPage';
@@ -15,9 +16,9 @@ import ProblemPage from './pages/ProblemPage';
 import AddProblemPage from './pages/AddProblemPage';
 import EditProblemPage from './pages/EditProblemPage';
 import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
 import MySubmissionsPage from './pages/MySubmissionsPage';
 import SystemDashboardPage from './pages/SystemDashboardPage';
+import UserManagementPage from './pages/UserManagementPage';
 import { setAuthToken } from './api';
 
 function AppContent() {
@@ -101,6 +102,9 @@ function AppContent() {
                     {canCreateProblem && (
                         <NavLink to="/admin/assessments" icon={Settings}>Manage</NavLink>
                     )}
+                    {canCreateProblem && (
+                        <NavLink to="/admin/users" icon={Users}>Users</NavLink>
+                    )}
                     {isSuperAdmin && (
                         <NavLink to="/admin/system" icon={Database}>System</NavLink>
                     )}
@@ -109,9 +113,6 @@ function AppContent() {
                     )}
                     {!user && (
                         <NavLink to="/login" icon={LogIn}>Login</NavLink>
-                    )}
-                    {!user && (
-                        <NavLink to="/register" icon={UserPlus}>Register</NavLink>
                     )}
                     {user && (
                         <NavLink to="/my-submissions" icon={Code2}>My Submissions</NavLink>
@@ -135,15 +136,16 @@ function AppContent() {
                 <Route path="/admin/assessments" element={<AssessmentManagementPage />} />
                 <Route path="/admin/assessments/add" element={<AddAssessmentPage />} />
                 <Route path="/admin/assessments/:id/edit" element={<EditAssessmentPage />} />
+                <Route path="/admin/assessments/:id/preview" element={<AssessmentPreviewPage />} />
                 <Route path="/admin/assessments/:id/results" element={<AssessmentResultsPage />} />
                 <Route path="/admin/assessment-attempt/:attemptId" element={<AssessmentAttemptDetailPage />} />
                 <Route path="/admin/system" element={<SystemDashboardPage />} />
+                <Route path="/admin/users" element={<UserManagementPage />} />
 
                 <Route path="/problems/:_id" element={<ProblemPage user={user} />} />
                 <Route path="/add-problem" element={<AddProblemPage />} />
                 <Route path="/problems/:_id/edit" element={<EditProblemPage />} />
                 <Route path="/login" element={<LoginPage />} />
-                <Route path="/register" element={<RegisterPage />} />
                 <Route path="/my-submissions" element={<MySubmissionsPage />} />
             </Routes>
         </>

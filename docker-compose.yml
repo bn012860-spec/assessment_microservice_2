@@ -35,7 +35,7 @@ services:
 
   # 3. Infrastructure: MongoDB Database Service
   mongo:
-    image: mongo:latest
+    image: mongo:6.0
     container_name: codespace_mongo
     ports:
       - "27017:27017"

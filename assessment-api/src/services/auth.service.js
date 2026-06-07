@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import User from "../../models/User.mjs";
 import { env } from "../config/env.js";
 import { HttpError } from "../utils/httpError.js";
+import * as auditService from "./audit.service.js";
 
 function toPublicUser(user) {
   return {
@@ -46,7 +47,47 @@ export async function register({ name, email, password, role, collegeId }) {
   return { token, user: toPublicUser(user) };
 }
 
-export async function login({ email, password }) {
+export async function bulkRegister(users, defaultPassword, collegeId) {
+  const results = {
+    created: [],
+    errors: [],
+    count: 0
+  };
+
+  const hashedDefault = await bcrypt.hash(defaultPassword, 10);
+
+  for (const userData of users) {
+    try {
+      const email = userData.email.toLowerCase();
+      const existing = await User.findOne({ email });
+      
+      if (existing) {
+        results.errors.push({ email, error: "Email already exists" });
+        continue;
+      }
+
+      const user = await User.create({
+        name: userData.name,
+        email,
+        password: hashedDefault,
+        role: "student",
+        collegeId: collegeId || undefined
+      });
+
+      results.created.push(toPublicUser(user));
+      results.count++;
+    } catch (err) {
+      results.errors.push({ 
+        email: userData.email, 
+        error: err.message 
+      });
+    }
+  }
+
+  return results;
+}
+
+export async function login({ email, password }, auditInfo = {}) {
   const user = await User.findOne({ email: email.toLowerCase() });
   if (!user) {
     throw new HttpError(401, "Invalid credentials", { message: "Invalid credentials" });
@@ -54,6 +95,11 @@ export async function login({ email, password }) {
 
   const ok = await bcrypt.compare(password, user.password);
   if (!ok) {
+    await auditService.logEvent({
+      event: "LOGIN_FAILED",
+      details: { email: email.toLowerCase() },
+      ...auditInfo
+    });
     throw new HttpError(401, "Invalid credentials", { message: "Invalid credentials" });
   }
 
@@ -63,5 +109,58 @@ export async function login({ email, password }) {
     { expiresIn: "7d" }
   );
 
+  await auditService.logEvent({
+    event: "LOGIN_SUCCESS",
+    userId: user._id,
+    ...auditInfo
+  });
+
   return { token, user: toPublicUser(user) };
+}
+
+export async function listUsers(query = {}) {
+  const { search, role, page = 1, limit = 50 } = query;
+  const filter = {};
+  
+  if (search) {
+    filter.$or = [
+      { name: { $regex: search, $options: 'i' } },
+      { email: { $regex: search, $options: 'i' } }
+    ];
+  }
+  
+  if (role) {
+    filter.role = role;
+  }
+
+  const total = await User.countDocuments(filter);
+  const users = await User.find(filter)
+    .sort({ createdAt: -1 })
+    .skip((page - 1) * limit)
+    .limit(limit)
+    .select('-password');
+
+  return {
+    users: users.map(toPublicUser),
+    total,
+    page: Number(page),
+    totalPages: Math.ceil(total / limit)
+  };
+}
+
+export async function resetUserPassword(userId, newPassword, adminUser, auditInfo = {}) {
+  const user = await User.findById(userId);
+  if (!user) throw new HttpError(404, "User not found");
+
+  const hashed = await bcrypt.hash(newPassword, 10);
+  await User.updateOne({ _id: userId }, { password: hashed });
+
+  await auditService.logEvent({
+    event: "USER_PASSWORD_RESET",
+    userId: adminUser._id,
+    details: { targetUserId: userId, targetEmail: user.email },
+    ...auditInfo
+  });
+
+  return { msg: "Password reset successful" };
 }

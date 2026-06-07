@@ -7,8 +7,70 @@ import User from "../../models/User.mjs";
 import { getChannel } from "../config/rabbit.js";
 import { getRedis } from "../config/redis.js";
 import { verifyToken, authorizeRoles } from "../middleware/auth.mjs";
+import * as authService from "../services/auth.service.js";
+import * as auditService from "../services/audit.service.js";
 
 const router = express.Router();
+
+router.get("/audit-logs", verifyToken, authorizeRoles("admin", "superadmin"), async (req, res) => {
+  try {
+    const logs = await auditService.listLogs(req.query);
+    res.json(logs);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get("/users", verifyToken, authorizeRoles("admin", "superadmin", "faculty"), async (req, res) => {
+  try {
+    const results = await authService.listUsers(req.query);
+    res.json(results);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post("/users/:userId/reset-password", verifyToken, authorizeRoles("admin", "superadmin", "faculty"), async (req, res) => {
+  try {
+    const { newPassword } = req.body;
+    if (!newPassword) return res.status(400).json({ error: "New password is required" });
+
+    const auditInfo = {
+      ip: req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress,
+      userAgent: req.headers['user-agent']
+    };
+
+    const result = await authService.resetUserPassword(req.params.userId, newPassword, req.user, auditInfo);
+    res.json(result);
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message });
+  }
+});
+
+router.post("/bulk-import-students", verifyToken, authorizeRoles("admin", "superadmin", "faculty"), async (req, res) => {
+  try {
+    const { users, defaultPassword } = req.body;
+    
+    if (!Array.isArray(users) || users.length === 0) {
+      return res.status(400).json({ error: "Invalid or empty users list" });
+    }
+
+    if (!defaultPassword) {
+      return res.status(400).json({ error: "Default password is required" });
+    }
+
+    // Faculty can only import into their own college context if we had one
+    // For now, let's just pass the collegeId if provided in body or from user
+    const collegeId = req.body.collegeId || req.user.collegeId;
+
+    const results = await authService.bulkRegister(users, defaultPassword, collegeId);
+    
+    res.json(results);
+  } catch (error) {
+    console.error("Bulk import error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 router.get("/system-stats", verifyToken, authorizeRoles("admin", "superadmin"), async (req, res) => {
   try {

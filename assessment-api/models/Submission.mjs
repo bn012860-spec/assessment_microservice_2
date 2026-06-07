@@ -51,5 +51,8 @@ const SubmissionSchema = new Schema({
 
 // Optional: add an index for faster lookups by status
 SubmissionSchema.index({ status: 1 });
+SubmissionSchema.index({ userId: 1 });
+SubmissionSchema.index({ assessmentId: 1 });
+SubmissionSchema.index({ attemptId: 1 });
 
 export default mongoose.model('Submission', SubmissionSchema);

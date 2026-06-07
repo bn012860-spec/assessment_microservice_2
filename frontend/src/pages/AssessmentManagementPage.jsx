@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Edit2, Trash2, Users, Calendar, AlertCircle, Settings } from 'lucide-react';
+import { Plus, Edit2, Trash2, Users, Calendar, AlertCircle, Settings, Eye } from 'lucide-react';
 import { assessments } from '../api';
 
 const AssessmentManagementPage = () => {
@@ -101,6 +101,9 @@ const AssessmentManagementPage = () => {
               </div>
 
               <div className="flex-center gap-3">
+                <Link to={`/admin/assessments/${a._id}/preview`} className="button button-outline" style={{ padding: '8px 16px' }}>
+                  <Eye size={16} /> Preview
+                </Link>
                 <Link to={`/admin/assessments/${a._id}/results`} className="button button-outline" style={{ padding: '8px 16px', color: 'var(--primary)', borderColor: 'var(--primary-glow)', backgroundColor: 'var(--primary-glow)' }}>
                   <Users size={16} /> Results
                 </Link>
