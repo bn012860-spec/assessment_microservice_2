@@ -158,6 +158,7 @@ def run_tests():
     
     results = []
     for i, t in enumerate(tests):
+        expected = t.get("expected")
         try:
             raw_inputs = t.get("inputs", [])
             converted_inputs = []
@@ -180,13 +181,11 @@ def run_tests():
             else:
                 converted_out = convert_output(out, return_type)
 
-            expected = t.get("expected")
-            
             ok = converted_out == expected
-            results.append({"test": i+1, "ok": ok, "output": converted_out})
+            results.append({"test": i+1, "ok": ok, "output": converted_out, "expected": expected})
         except Exception as e:
             tb = traceback.format_exc()
-            results.append({"test": i+1, "ok": False, "error": str(e), "traceback": tb})
+            results.append({"test": i+1, "ok": False, "error": str(e), "traceback": tb, "expected": expected})
     
     summary = {
         "status": "finished",
