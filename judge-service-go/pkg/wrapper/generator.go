@@ -127,7 +127,13 @@ func GenerateWrapper(p models.Problem, lang *languages.Language, submissionFuncN
 		replCompare = p.CompareConfig.Mode
 	}
 	tpl = strings.ReplaceAll(tpl, "{{COMPARE_MODE}}", replCompare)
-	tpl = strings.ReplaceAll(tpl, "{{REQUIRE_DEEP_COPY}}", fmt.Sprintf("%t", p.CompareConfig.RequireDeepCopy))
+	// Inject deep-copy flag, using language-appropriate boolean literal
+deepCopyStr := fmt.Sprintf("%t", p.CompareConfig.RequireDeepCopy)
+if lang.ID == "python" {
+// Python booleans are capitalized
+deepCopyStr = strings.Title(deepCopyStr)
+}
+tpl = strings.ReplaceAll(tpl, "{{REQUIRE_DEEP_COPY}}", deepCopyStr)
 
 	return tpl, nil
 }
