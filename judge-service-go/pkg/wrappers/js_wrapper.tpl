@@ -200,14 +200,16 @@ async function runTests(userFunction) {
       results.push({
         test: i + 1,
         ok,
-        output: convertedOut
+        output: convertedOut,
+        expected: t.expected
       });
     } catch (err) {
       results.push({
         test: i + 1,
         ok: false,
         error: String(err),
-        stack: err && err.stack ? err.stack : undefined
+        stack: err && err.stack ? err.stack : undefined,
+        expected: t.expected
       });
     }
   }
