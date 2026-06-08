@@ -335,10 +335,14 @@ const AssessmentWorkspace = ({ user }) => {
     let tests = [];
     const tcs = testCasesMap[currentProblem._id] || ['[]'];
     try {
-      tests = tcs.map(tcStr => {
+      tests = tcs.map((tcStr, idx) => {
         const parsed = JSON.parse(tcStr || '[]');
         const inputArr = Array.isArray(parsed) ? parsed : [parsed];
-        return { inputs: inputArr, expected: null, isSample: true };
+        // Attach expected value from problem's sample test cases if available
+        const expectedFromProblem = (currentProblem.testCases && currentProblem.testCases[idx] && currentProblem.testCases[idx].expected !== undefined)
+          ? currentProblem.testCases[idx].expected
+          : null;
+        return { inputs: inputArr, expected: expectedFromProblem, isSample: true };
       });
     } catch (err) {
       setRunResultMap(prev => ({ 
