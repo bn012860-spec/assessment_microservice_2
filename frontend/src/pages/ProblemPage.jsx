@@ -55,14 +55,15 @@ function buildTemplate(language, functionName, parameters, returnType) {
     const usesGraph = (parameters || []).some(p => p.type && p.type.includes('graph')) || (returnType && returnType.includes('graph'));
 
     let defs = 'import java.util.*;\n\n';
+    // Show structure definitions as comments to avoid class name conflicts with wrapper
     if (usesList) {
-      defs += `class ListNode {\n    int val;\n    ListNode next;\n    ListNode() { val = 0; next = null; }\n    ListNode(int val) { this.val = val; next = null; }\n    ListNode(int val, ListNode next) { this.val = val; this.next = next; }\n}\n\n`;
+      defs += `/*\nclass ListNode {\n    int val;\n    ListNode next;\n    ListNode() { val = 0; next = null; }\n    ListNode(int val) { this.val = val; next = null; }\n    ListNode(int val, ListNode next) { this.val = val; this.next = next; }\n}\n*/\n\n`;
     }
     if (usesTree) {
-      defs += `class TreeNode {\n    int val;\n    TreeNode left;\n    TreeNode right;\n    TreeNode() { val = 0; left = right = null; }\n    TreeNode(int val) { this.val = val; left = right = null; }\n    TreeNode(int val, TreeNode left, TreeNode right) { this.val = val; this.left = left; this.right = right; }\n}\n\n`;
+      defs += `/*\nclass TreeNode {\n    int val;\n    TreeNode left;\n    TreeNode right;\n    TreeNode() { val = 0; left = right = null; }\n    TreeNode(int val) { this.val = val; left = right = null; }\n    TreeNode(int val, TreeNode left, TreeNode right) { this.val = val; this.left = left; this.right = right; }\n}\n*/\n\n`;
     }
     if (usesGraph) {
-      defs += `class Node {\n    public int val;\n    public List<Node> neighbors;\n    public Node() { val = 0; neighbors = new ArrayList<>(); }\n    public Node(int val) { this.val = val; neighbors = new ArrayList<>(); }\n    public Node(int val, List<Node> neighbors) { this.val = val; this.neighbors = neighbors; }\n}\n\n`;
+      defs += `/*\nclass Node {\n    public int val;\n    public List<Node> neighbors;\n    public Node() { val = 0; neighbors = new ArrayList<>(); }\n    public Node(int val) { this.val = val; neighbors = new ArrayList<>(); }\n    public Node(int val, List<Node> neighbors) { this.val = val; this.neighbors = neighbors; }\n}\n*/\n\n`;
     }
 
     defs += `class Solution {\n    public ${javaReturnType} ${functionName}(${javaParams}) {\n        // your code here\n    }\n}`;
@@ -101,9 +102,10 @@ function buildTemplate(language, functionName, parameters, returnType) {
     const usesListCS = (parameters || []).some(p => p.type && p.type.includes('linkedlist')) || (returnType && returnType.includes('linkedlist'));
     const usesGraphCS = (parameters || []).some(p => p.type && p.type.includes('graph')) || (returnType && returnType.includes('graph'));
     let defsCS = `using System;\nusing System.Collections.Generic;\n\n`;
-    if (usesListCS) defsCS += `public class ListNode { public int val; public ListNode next; public ListNode(int x=0) { val = x; next = null; } }\n\n`;
-    if (usesTreeCS) defsCS += `public class TreeNode { public int val; public TreeNode left; public TreeNode right; public TreeNode(int x=0) { val = x; left = right = null; } }\n\n`;
-    if (usesGraphCS) defsCS += `public class Node { public int val; public List<Node> neighbors; public Node() { neighbors = new List<Node>(); } public Node(int v) { val = v; neighbors = new List<Node>(); } }\n\n`;
+    // Show as comments to avoid duplicate type definitions at compile time
+    if (usesListCS) defsCS += `/*\npublic class ListNode { public int val; public ListNode next; public ListNode(int x=0) { val = x; next = null; } }\n*/\n\n`;
+    if (usesTreeCS) defsCS += `/*\npublic class TreeNode { public int val; public TreeNode left; public TreeNode right; public TreeNode(int x=0) { val = x; left = right = null; } }\n*/\n\n`;
+    if (usesGraphCS) defsCS += `/*\npublic class Node { public int val; public List<Node> neighbors; public Node() { neighbors = new List<Node>(); } public Node(int v) { val = v; neighbors = new List<Node>(); } }\n*/\n\n`;
     defsCS += `public class Solution {\n    public ${csReturnType} ${functionName}(${csParams}) {\n        // your code here\n    }\n}`;
     return defsCS;
   }
@@ -116,9 +118,10 @@ function buildTemplate(language, functionName, parameters, returnType) {
     const usesListGo = (parameters || []).some(p => p.type && p.type.includes('linkedlist')) || (returnType && returnType.includes('linkedlist'));
     const usesGraphGo = (parameters || []).some(p => p.type && p.type.includes('graph')) || (returnType && returnType.includes('graph'));
     let defsGo = `package main\n\n`;
-    if (usesListGo) defsGo += `type ListNode struct { Val int; Next *ListNode }\n\n`;
-    if (usesTreeGo) defsGo += `type TreeNode struct { Val int; Left *TreeNode; Right *TreeNode }\n\n`;
-    if (usesGraphGo) defsGo += `type Node struct { Val int; Neighbors []*Node }\n\n`;
+    // Show type definitions as comments to avoid duplicate type names when wrapper also defines helpers
+    if (usesListGo) defsGo += `/*\ntype ListNode struct { Val int; Next *ListNode }\n*/\n\n`;
+    if (usesTreeGo) defsGo += `/*\ntype TreeNode struct { Val int; Left *TreeNode; Right *TreeNode }\n*/\n\n`;
+    if (usesGraphGo) defsGo += `/*\ntype Node struct { Val int; Neighbors []*Node }\n*/\n\n`;
     defsGo += `func ${functionName}(${goParams}) ${goReturnType} {\n    // your code here\n    return ${goReturnType === 'string' ? '\"\"' : goReturnType === 'bool' ? 'false' : goReturnType.includes('[]') ? 'nil' : '0'}\n}`;
     return defsGo;
   }
