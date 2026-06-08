@@ -315,6 +315,39 @@ export async function runProblem(id, payload) {
     tests: customTests || [] // Pass custom tests if provided
   };
 
+  // If custom tests were provided without expected values, try to fill expected
+  // from the problem's sample test cases (match by inputs JSON) so the judge and UI
+  // can show Expected Output even when the frontend omitted it.
+  try {
+    if (Array.isArray(judgeMsg.tests) && judgeMsg.tests.length > 0 && Array.isArray(problem.testCases) && problem.testCases.length > 0) {
+      const fillMap = new Map();
+      for (const tc of problem.testCases) {
+        try {
+          fillMap.set(JSON.stringify(tc.inputs), tc.expected);
+        } catch (e) {
+          // ignore non-serializable
+        }
+      }
+      judgeMsg.tests = judgeMsg.tests.map((t) => {
+        if (t == null) return t;
+        if (t.expected !== undefined && t.expected !== null) return t;
+        try {
+          const key = JSON.stringify(t.inputs);
+          if (fillMap.has(key)) {
+            t.expected = fillMap.get(key);
+          }
+        } catch (e) {
+          // ignore
+        }
+        return t;
+      });
+    }
+  } catch (e) {
+    // best-effort only; do not fail the run if merging fails
+    // eslint-disable-next-line no-console
+    console.warn('Failed to merge expected values into custom tests:', e && e.message ? e.message : e);
+  }
+
   try {
     const response = await fetch("http://judge-service-go:8081/run", {
       method: 'POST',
