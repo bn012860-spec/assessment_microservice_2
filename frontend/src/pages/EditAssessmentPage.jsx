@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api, { assessments } from '../api';
 
+const LANGS = ['python', 'javascript', 'typescript', 'java', 'cpp', 'c', 'csharp', 'go'];
+
 const EditAssessmentPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -21,7 +23,6 @@ const EditAssessmentPage = () => {
         ]);
         
         const assessmentData = assessmentRes.data;
-        // Format dates for datetime-local input (YYYY-MM-DDThh:mm)
         const formatDate = (date) => {
           const d = new Date(date);
           return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
@@ -41,7 +42,7 @@ const EditAssessmentPage = () => {
           })),
           status: assessmentData.status
         });
-        setProblems(problemsRes.data);
+        setProblems(problemsRes.data || []);
       } catch (err) {
         setError(err.response?.data?.msg || 'Failed to fetch assessment data');
       } finally {
@@ -56,7 +57,7 @@ const EditAssessmentPage = () => {
     setFormData({ ...formData, [name]: value });
   };
 
-  const handleLanguageToggle = (lang) => {
+  const toggleLanguage = (lang) => {
     const next = formData.allowedLanguages.includes(lang)
       ? formData.allowedLanguages.filter(l => l !== lang)
       : [...formData.allowedLanguages, lang];
@@ -76,7 +77,7 @@ const EditAssessmentPage = () => {
       problems: [...formData.problems, { 
         problemId: selectedProblemId, 
         title: problem.title, 
-        maxScore: problemScore 
+        maxScore: Number(problemScore) || 0
       }]
     });
     setSelectedProblemId('');
@@ -86,6 +87,13 @@ const EditAssessmentPage = () => {
     setFormData({
       ...formData,
       problems: formData.problems.filter(p => p.problemId !== id)
+    });
+  };
+
+  const updateProblemScore = (problemId, newScore) => {
+    setFormData({
+      ...formData,
+      problems: formData.problems.map(p => p.problemId === problemId ? { ...p, maxScore: Number(newScore) || 0 } : p)
     });
   };
 
@@ -115,109 +123,127 @@ const EditAssessmentPage = () => {
 
   return (
     <div className="container">
-      <h2>Edit Assessment</h2>
-      <form onSubmit={handleSubmit}>
-        <div className="problem-card" style={{ marginBottom: '20px' }}>
+      <div className="flex-between mb-6">
+        <div>
+          <h2 style={{ margin: 0 }}>Edit Assessment</h2>
+          <div className="text-muted">Update assessment details, allowed languages and included problems.</div>
+        </div>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button className="button button-outline" onClick={() => navigate('/admin/assessments')}>Cancel</button>
+          <button form="edit-assessment-form" type="submit" className="button button-primary">Save</button>
+        </div>
+      </div>
+
+      <form id="edit-assessment-form" onSubmit={handleSubmit}>
+        <div className="problem-card mb-6">
           <h3>Basic Information</h3>
+
           <div className="form-group">
-            <label>Title:</label>
+            <label>Title</label>
             <input type="text" name="title" value={formData.title} onChange={handleChange} required />
           </div>
+
           <div className="form-group">
-            <label>Description:</label>
+            <label>Description</label>
             <textarea name="description" value={formData.description} onChange={handleChange} />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
             <div className="form-group">
-              <label>Duration (Minutes):</label>
-              <input type="number" name="durationMinutes" value={formData.durationMinutes} onChange={handleChange} required min="1" />
+              <label>Duration (minutes)</label>
+              <input type="number" name="durationMinutes" value={formData.durationMinutes} onChange={handleChange} min={1} />
             </div>
+
             <div className="form-group">
-              <label>Start Time:</label>
-              <input type="datetime-local" name="startTime" value={formData.startTime} onChange={handleChange} required />
+              <label>Start time</label>
+              <input type="datetime-local" name="startTime" value={formData.startTime} onChange={handleChange} />
             </div>
+
             <div className="form-group">
-              <label>End Time:</label>
-              <input type="datetime-local" name="endTime" value={formData.endTime} onChange={handleChange} required />
+              <label>End time</label>
+              <input type="datetime-local" name="endTime" value={formData.endTime} onChange={handleChange} />
             </div>
           </div>
         </div>
 
-        <div className="problem-card" style={{ marginBottom: '20px' }}>
+        <div className="problem-card mb-6">
           <h3>Allowed Languages</h3>
-          <div className="flex-gap">
-            {['python', 'javascript', 'typescript', 'java', 'cpp', 'c', 'csharp', 'go'].map(lang => (
-              <label key={lang} style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
-                <input 
-                  type="checkbox" 
-                  checked={formData.allowedLanguages.includes(lang)} 
-                  onChange={() => handleLanguageToggle(lang)}
-                />
-                {lang}
-              </label>
-            ))}
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {LANGS.map(lang => {
+              const active = formData.allowedLanguages.includes(lang);
+              return (
+                <button
+                  key={lang}
+                  type="button"
+                  onClick={() => toggleLanguage(lang)}
+                  className={active ? 'button' : 'button button-outline'}
+                  style={{ textTransform: 'capitalize', padding: '8px 12px' }}
+                >{lang}</button>
+              );
+            })}
           </div>
         </div>
 
-        <div className="problem-card" style={{ marginBottom: '20px' }}>
+        <div className="problem-card mb-6">
           <h3>Problems</h3>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', marginBottom: '20px' }}>
-            <div className="form-group" style={{ flex: 2, marginBottom: 0 }}>
-              <label>Select Problem:</label>
-              <select value={selectedProblemId} onChange={(e) => setSelectedProblemId(e.target.value)}>
+
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', marginBottom: '18px' }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ display: 'block', marginBottom: '6px' }}>Select problem</label>
+              <select value={selectedProblemId} onChange={(e) => setSelectedProblemId(e.target.value)} style={{ width: '100%' }}>
                 <option value="">Choose a problem...</option>
                 {problems.map(p => (
-                  <option key={p._id} value={p._id}>{p.title} ({p.difficulty})</option>
+                  <option key={p._id} value={p._id}>{p.title} — {p.difficulty}</option>
                 ))}
               </select>
             </div>
-            <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-              <label>Marks:</label>
-              <input type="number" value={problemScore} onChange={(e) => setProblemScore(e.target.value)} min="1" />
+
+            <div style={{ width: 140 }}>
+              <label style={{ display: 'block', marginBottom: '6px' }}>Marks</label>
+              <input type="number" value={problemScore} onChange={(e) => setProblemScore(e.target.value)} min={1} />
             </div>
-            <button type="button" className="button" onClick={addProblemToAssessment}>Add</button>
+
+            <div>
+              <button type="button" className="button button-primary" onClick={addProblemToAssessment}>Add</button>
+            </div>
           </div>
 
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ textAlign: 'left', borderBottom: '1px solid #eee' }}>
-                <th style={{ padding: '10px' }}>Problem</th>
-                <th style={{ padding: '10px' }}>Max Score</th>
-                <th style={{ padding: '10px' }}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {formData.problems.map((p) => (
-                <tr key={p.problemId} style={{ borderBottom: '1px solid #eee' }}>
-                  <td style={{ padding: '10px' }}>{p.title}</td>
-                  <td style={{ padding: '10px' }}>{p.maxScore}</td>
-                  <td style={{ padding: '10px' }}>
-                    <button type="button" onClick={() => removeProblem(p.problemId)} style={{ color: '#e74c3c', background: 'none', border: 'none', cursor: 'pointer' }}>Remove</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td style={{ padding: '10px' }}><strong>Total Score:</strong></td>
-                <td style={{ padding: '10px' }}><strong>{totalScore}</strong></td>
-                <td></td>
-              </tr>
-            </tfoot>
-          </table>
+          <div className="problem-card-grid">
+            {formData.problems.map(p => (
+              <div key={p.problemId} className="problem-card" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontWeight: 700 }}>{p.title}</div>
+                    <div className="text-muted" style={{ fontSize: '0.85rem' }}>{/* could show tags/difficulty if available */}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input type="number" value={p.maxScore} onChange={(e) => updateProblemScore(p.problemId, e.target.value)} style={{ width: 90 }} min={0} />
+                    <button type="button" className="button button-outline" onClick={() => removeProblem(p.problemId)}>Remove</button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
+            <div className="text-muted">Total problems: {formData.problems.length}</div>
+            <div style={{ fontWeight: 700 }}>Total Score: {totalScore}</div>
+          </div>
         </div>
 
-        <div className="form-group">
-          <label>Status:</label>
-          <select name="status" value={formData.status} onChange={handleChange}>
-            <option value="Draft">Draft</option>
-            <option value="Published">Published</option>
-            <option value="Completed">Completed</option>
-          </select>
-        </div>
+        <div className="problem-card mb-6" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '6px' }}>Status</label>
+            <select name="status" value={formData.status} onChange={handleChange}>
+              <option value="Draft">Draft</option>
+              <option value="Published">Published</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </div>
 
-        <div className="mt-20">
-          <button type="submit" className="button" style={{ padding: '15px 40px' }}>Update Assessment</button>
+          <div>
+            <button type="submit" className="button button-primary">Update Assessment</button>
+          </div>
         </div>
       </form>
     </div>
