@@ -17,7 +17,7 @@ const AddAssessmentPage = () => {
   });
   const [selectedProblemId, setSelectedProblemId] = useState('');
   const [problemScore, setProblemScore] = useState(100);
-  const [loadingProblems, setLoadingProblems] = useState(true);
+  const [setLoadingProblems] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -32,7 +32,7 @@ const AddAssessmentPage = () => {
       }
     };
     fetchProblems();
-  }, []);
+  });
 
   const handleChange = (e) => {
     const { name, value } = e.target;

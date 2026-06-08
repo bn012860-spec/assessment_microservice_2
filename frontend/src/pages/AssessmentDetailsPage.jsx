@@ -51,7 +51,6 @@ const AssessmentDetailsPage = ({ user }) => {
   const endTime = new Date(assessment.endTime);
   const isAvailable = now >= startTime && now <= endTime && assessment.status === 'Published';
   const isUpcoming = now < startTime;
-  const isEnded = now > endTime || assessment.status !== 'Published';
 
   const isStudent = user && user.role === 'student';
   const availableForUser = isAvailable && isStudent;

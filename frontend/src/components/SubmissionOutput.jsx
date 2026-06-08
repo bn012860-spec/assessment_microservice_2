@@ -5,7 +5,7 @@ const formatValue = (val) => {
     if (val === undefined || val === null) return 'null';
     if (typeof val === 'object') {
         try {
-            return JSON.stringify(val, null, 2);
+            return JSON.stringify(val);
         } catch (e) {
             return String(val);
         }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Users, Upload, CheckCircle, AlertCircle, Trash2, UserPlus, FileText, Download, Search, Key, Shield, User as UserIcon, Filter, FileSpreadsheet } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { admin } from '../api';
@@ -14,31 +14,30 @@ const UserManagementPage = () => {
 
   // List users state
   const [users, setUsers] = useState([]);
-  const [totalUsers, setTotalUsers] = useState(0);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  useEffect(() => {
-    if (activeTab === 'list') {
-      fetchUsers();
-    }
-  }, [activeTab, search, roleFilter, page]);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
       const res = await admin.listUsers({ search, role: roleFilter, page });
       setUsers(res.data.users);
-      setTotalUsers(res.data.total);
       setTotalPages(res.data.totalPages);
     } catch (err) {
+      console.error(err);
       setError('Failed to fetch users');
     } finally {
       setLoading(false);
     }
-  };
+  }, [search, roleFilter, page]);
+
+  useEffect(() => {
+    if (activeTab === 'list') {
+      fetchUsers();
+    }
+  }, [activeTab, fetchUsers]);
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -71,6 +70,7 @@ const UserManagementPage = () => {
         setUsersJson(JSON.stringify(processedUsers, null, 2));
         setError(null);
       } catch (err) {
+        console.error(err);
         setError('Failed to parse file: ' + err.message);
       }
     };
@@ -125,6 +125,7 @@ const UserManagementPage = () => {
       await admin.resetPassword(userId, newPass);
       alert('Password reset successfully');
     } catch (err) {
+      console.error(err);
       alert(err.response?.data?.error || 'Failed to reset password');
     }
   };

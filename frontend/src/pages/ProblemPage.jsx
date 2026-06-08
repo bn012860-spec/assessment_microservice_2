@@ -5,142 +5,9 @@ import { Play, Send, ChevronLeft, Info, History, Settings2, Terminal, AlertCircl
 import api, { problems } from '../api';
 import SubmissionOutput from '../components/SubmissionOutput';
 import { mapType } from '../utils/typeValidator';
+import buildTemplate, { getDefinitionsSnippet, detectUses } from '../utils/buildTemplate';
 
 const supportedLanguages = ['python', 'javascript', 'java', 'cpp', 'c', 'csharp', 'go'];
-
-function buildTemplate(language, functionName, parameters, returnType) {
-  const paramNames = (parameters || []).map(p => p.name);
-  const params = paramNames.join(', ');
-
-  const usesTree = (parameters || []).some(p => p.type && p.type.includes('tree')) || (returnType && returnType.includes('tree'));
-  const usesList = (parameters || []).some(p => p.type && p.type.includes('linkedlist')) || (returnType && returnType.includes('linkedlist'));
-  const usesGraph = (parameters || []).some(p => p.type && p.type.includes('graph')) || (returnType && returnType.includes('graph'));
-
-  if (language === 'python') {
-    let defs = '';
-    if (usesList) {
-      defs += `class ListNode:\n    def __init__(self, val=0, next=None):\n        self.val = val\n        self.next = next\n\n`;
-    }
-    if (usesTree) {
-      defs += `class TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\n`;
-    }
-    if (usesGraph) {
-      defs += `class Node:\n    def __init__(self, val=0, neighbors=None):\n        self.val = val\n        self.neighbors = neighbors if neighbors is not None else []\n\n`;
-    }
-    defs += `def ${functionName}(${params}):\n    # your code here\n    pass`;
-    return defs;
-  }
-
-  if (language === 'javascript') {
-    let defs = '';
-    if (usesList) {
-      defs += `class ListNode {\n  constructor(val=0, next=null) { this.val = val; this.next = next; }\n}\n\n`;
-    }
-    if (usesTree) {
-      defs += `class TreeNode {\n  constructor(val=0, left=null, right=null) { this.val = val; this.left = left; this.right = right; }\n}\n\n`;
-    }
-    if (usesGraph) {
-      defs += `class Node {\n  constructor(val=0, neighbors=[]) { this.val = val; this.neighbors = neighbors; }\n}\n\n`;
-    }
-    defs += `function ${functionName}(${params}) {\n  // your code here\n}`;
-    return defs;
-  }
-
-  if (language === 'java') {
-    const javaReturnType = mapType('java', returnType);
-    const javaParams = (parameters || []).map(p => `${mapType('java', p.type)} ${p.name}`).join(', ');
-
-    const usesTree = (parameters || []).some(p => p.type && p.type.includes('tree')) || (returnType && returnType.includes('tree'));
-    const usesList = (parameters || []).some(p => p.type && p.type.includes('linkedlist')) || (returnType && returnType.includes('linkedlist'));
-    const usesGraph = (parameters || []).some(p => p.type && p.type.includes('graph')) || (returnType && returnType.includes('graph'));
-
-    let defs = 'import java.util.*;\n\n';
-    // Show structure definitions as comments to avoid class name conflicts with wrapper
-    if (usesList) {
-      defs += `/*\nclass ListNode {\n    int val;\n    ListNode next;\n    ListNode() { val = 0; next = null; }\n    ListNode(int val) { this.val = val; next = null; }\n    ListNode(int val, ListNode next) { this.val = val; this.next = next; }\n}\n*/\n\n`;
-    }
-    if (usesTree) {
-      defs += `/*\nclass TreeNode {\n    int val;\n    TreeNode left;\n    TreeNode right;\n    TreeNode() { val = 0; left = right = null; }\n    TreeNode(int val) { this.val = val; left = right = null; }\n    TreeNode(int val, TreeNode left, TreeNode right) { this.val = val; this.left = left; this.right = right; }\n}\n*/\n\n`;
-    }
-    if (usesGraph) {
-      defs += `/*\nclass Node {\n    public int val;\n    public List<Node> neighbors;\n    public Node() { val = 0; neighbors = new ArrayList<>(); }\n    public Node(int val) { this.val = val; neighbors = new ArrayList<>(); }\n    public Node(int val, List<Node> neighbors) { this.val = val; this.neighbors = neighbors; }\n}\n*/\n\n`;
-    }
-
-    defs += `class Solution {\n    public ${javaReturnType} ${functionName}(${javaParams}) {\n        // your code here\n    }\n}`;
-    return defs;
-  }
- 
-  if (language === 'cpp') {
-    const cppReturnType = mapType('cpp', returnType);
-    const cppParams = (parameters || []).map(p => {
-      const type = mapType('cpp', p.type);
-      const isComplex = type.startsWith('vector') || type === 'string';
-      return `${type}${isComplex ? '&' : ''} ${p.name}`;
-    }).join(', ');
-
-    let template = `#include <iostream>\n#include <vector>\n#include <string>\n#include <algorithm>\n\nusing namespace std;\n\n`;
-
-    const usesTree = (parameters || []).some(p => p.type.includes('tree')) || (returnType && returnType.includes('tree'));
-    const usesList = (parameters || []).some(p => p.type.includes('linkedlist')) || (returnType && returnType.includes('linkedlist'));
-
-    if (usesList) {
-      template += `/**\n * struct ListNode {\n *     int val;\n *     ListNode *next;\n *     ListNode(int x) : val(x), next(nullptr) {}\n * };\n */\n\n`;
-    }
-    if (usesTree) {
-      template += `/**\n * struct TreeNode {\n *     int val;\n *     TreeNode *left;\n *     TreeNode *right;\n *     TreeNode(int x) : val(x), left(nullptr), right(nullptr) {}\n * };\n */\n\n`;
-    }
-
-    template += `class Solution {\npublic:\n    ${cppReturnType} ${functionName}(${cppParams}) {\n        // your code here\n    }\n};`;
-    return template;
-  }
-
-  // C# starter with optional node definitions
-  if (language === 'csharp') {
-    const csReturnType = mapType('csharp', returnType);
-    const csParams = (parameters || []).map(p => `${mapType('csharp', p.type)} ${p.name}`).join(', ');
-    const usesTreeCS = (parameters || []).some(p => p.type && p.type.includes('tree')) || (returnType && returnType.includes('tree'));
-    const usesListCS = (parameters || []).some(p => p.type && p.type.includes('linkedlist')) || (returnType && returnType.includes('linkedlist'));
-    const usesGraphCS = (parameters || []).some(p => p.type && p.type.includes('graph')) || (returnType && returnType.includes('graph'));
-    let defsCS = `using System;\nusing System.Collections.Generic;\n\n`;
-    // Show as comments to avoid duplicate type definitions at compile time
-    if (usesListCS) defsCS += `/*\npublic class ListNode { public int val; public ListNode next; public ListNode(int x=0) { val = x; next = null; } }\n*/\n\n`;
-    if (usesTreeCS) defsCS += `/*\npublic class TreeNode { public int val; public TreeNode left; public TreeNode right; public TreeNode(int x=0) { val = x; left = right = null; } }\n*/\n\n`;
-    if (usesGraphCS) defsCS += `/*\npublic class Node { public int val; public List<Node> neighbors; public Node() { neighbors = new List<Node>(); } public Node(int v) { val = v; neighbors = new List<Node>(); } }\n*/\n\n`;
-    defsCS += `public class Solution {\n    public ${csReturnType} ${functionName}(${csParams}) {\n        // your code here\n    }\n}`;
-    return defsCS;
-  }
-
-  // Go starter with optional node definitions
-  if (language === 'go') {
-    const goReturnType = mapType('go', returnType);
-    const goParams = (parameters || []).map(p => `${p.name} ${mapType('go', p.type)}`).join(', ');
-    const usesTreeGo = (parameters || []).some(p => p.type && p.type.includes('tree')) || (returnType && returnType.includes('tree'));
-    const usesListGo = (parameters || []).some(p => p.type && p.type.includes('linkedlist')) || (returnType && returnType.includes('linkedlist'));
-    const usesGraphGo = (parameters || []).some(p => p.type && p.type.includes('graph')) || (returnType && returnType.includes('graph'));
-    let defsGo = `package main\n\n`;
-    // Show type definitions as comments to avoid duplicate type names when wrapper also defines helpers
-    if (usesListGo) defsGo += `/*\ntype ListNode struct { Val int; Next *ListNode }\n*/\n\n`;
-    if (usesTreeGo) defsGo += `/*\ntype TreeNode struct { Val int; Left *TreeNode; Right *TreeNode }\n*/\n\n`;
-    if (usesGraphGo) defsGo += `/*\ntype Node struct { Val int; Neighbors []*Node }\n*/\n\n`;
-    defsGo += `func ${functionName}(${goParams}) ${goReturnType} {\n    // your code here\n    return ${goReturnType === 'string' ? '\"\"' : goReturnType === 'bool' ? 'false' : goReturnType.includes('[]') ? 'nil' : '0'}\n}`;
-    return defsGo;
-  }
-
-  if (language === 'csharp') {
-    const csReturnType = mapType('csharp', returnType);
-    const csParams = (parameters || []).map(p => `${mapType('csharp', p.type)} ${p.name}`).join(', ');
-    return `using System;\nusing System.Collections.Generic;\n\npublic class Solution {\n    public ${csReturnType} ${functionName}(${csParams}) {\n        // your code here\n    }\n}`;
-  }
-
-  if (language === 'go') {
-    const goReturnType = mapType('go', returnType);
-    const goParams = (parameters || []).map(p => `${p.name} ${mapType('go', p.type)}`).join(', ');
-    return `package main\n\nfunc ${functionName}(${goParams}) ${goReturnType} {\n    // your code here\n    return ${goReturnType === 'string' ? '""' : goReturnType === 'bool' ? 'false' : goReturnType.includes('[]') ? 'nil' : '0'}\n}`;
-  }
-
-  if (language === 'c') return `long ${functionName}(long *args, int argc) {\n    // your code here\n    return 0;\n}`;
-  return `public class UserSolution {\n    public object ${functionName}(${paramNames.map((p) => `object ${p}`).join(', ')}) {\n        // your code here\n        return null;\n    }\n}`;
-}
 
 const ProblemPage = ({ user }) => {
   const { _id } = useParams();
@@ -218,6 +85,8 @@ const ProblemPage = ({ user }) => {
       setCode(buildTemplate(selectedLanguage, problem.functionName || 'solution', problem.parameters, problem.returnType));
     }
   }, [selectedLanguage, problem]);
+
+  const defsSnippet = problem ? getDefinitionsSnippet(selectedLanguage, problem.parameters, problem.returnType) : '';
 
   const checkStatus = async (submissionId) => {
     try {
@@ -377,6 +246,13 @@ const ProblemPage = ({ user }) => {
               <div style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', marginBottom: '2rem' }}>
                 {problem.description}
               </div>
+
+              {defsSnippet && (
+                <div style={{ background: 'var(--surface)', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', marginBottom: '1rem' }}>
+                  <h4 style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Data Structure Definitions</h4>
+                  <pre style={{ whiteSpace: 'pre-wrap', fontSize: '0.85rem', margin: 0 }}>{defsSnippet}</pre>
+                </div>
+              )}
 
               <div style={{ background: 'var(--surface)', padding: '20px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)' }}>
                 <h4 style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '1rem' }}>Problem Specs</h4>

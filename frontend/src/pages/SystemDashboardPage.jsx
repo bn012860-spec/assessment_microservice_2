@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Activity, Server, Database, Users, Code2, RefreshCw, AlertCircle, BookOpen, History, Target, TrendingUp, Trophy, AlertTriangle } from 'lucide-react';
-import api, { admin, submissions } from '../api';
+import { admin, submissions } from '../api';
 
 const SystemDashboardPage = ({ user }) => {
   const [stats, setStats] = useState(null);
@@ -9,7 +9,7 @@ const SystemDashboardPage = ({ user }) => {
   const [error, setError] = useState(null);
   const [refreshInterval, setRefreshInterval] = useState(5000);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       if (user?.role === 'student') {
         const res = await submissions.getAnalytics();
@@ -29,13 +29,13 @@ const SystemDashboardPage = ({ user }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     fetchStats();
-    const interval = setInterval(fetchStats, refreshInterval);
-    return () => clearInterval(interval);
-  }, [refreshInterval]);
+    const interval = refreshInterval ? setInterval(fetchStats, refreshInterval) : null;
+    return () => { if (interval) clearInterval(interval); };
+  }, [fetchStats, refreshInterval]);
 
   if (loading && !stats) return <div className="container">Loading system dashboard...</div>;
 

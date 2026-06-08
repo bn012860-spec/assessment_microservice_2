@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { questions } from '../api';
 
@@ -13,7 +13,7 @@ const QuestionBankPage = ({ user }) => {
   const [totalPages, setTotalPages] = useState(1);
   const [tagFilter, setTagFilter] = useState('');
 
-  const fetchQuestions = async () => {
+  const fetchQuestions = useCallback(async () => {
     setLoading(true);
     try {
       const params = { search, page, limit };
@@ -35,9 +35,9 @@ const QuestionBankPage = ({ user }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [search, page, limit, tagFilter]);
 
-  useEffect(() => { fetchQuestions(); }, [search, page, limit, tagFilter]);
+  useEffect(() => { fetchQuestions(); }, [fetchQuestions]);
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this question?')) return;
@@ -58,13 +58,14 @@ const QuestionBankPage = ({ user }) => {
         const res = await questions.tags();
         if (mounted) setAvailableTags(res.data || []);
       } catch (err) {
+        console.error(err);
         // fallback to current-page derived tags
         setAvailableTags(Array.from(new Set(list.flatMap(q => q.tags || []))));
       }
     };
-    loadTags();
-    return () => { mounted = false; };
-  }, [user]);
+      loadTags();
+      return () => { mounted = false; };
+    }, [user, list]);
 
   return (
     <div className="container fade-in">

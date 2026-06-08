@@ -25,6 +25,7 @@ const EditQuestionPage = () => {
         setTimeLimitMs(q.timeLimitMs || 2000);
         setMemoryLimitMb(q.memoryLimitMb || 256);
       } catch (err) {
+        console.error(err);
         alert('Failed to load question');
       } finally {
         setLoading(false);
@@ -47,6 +48,7 @@ const EditQuestionPage = () => {
       await questions.update(id, payload);
       navigate('/questions');
     } catch (err) {
+      console.error(err);
       alert(err.response?.data?.msg || 'Failed to update question');
     }
   };

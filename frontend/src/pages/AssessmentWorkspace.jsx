@@ -112,7 +112,7 @@ function buildTemplate(language, functionName, parameters, returnType) {
     if (usesList) defsGo += `/*\ntype ListNode struct { Val int; Next *ListNode }\n*/\n\n`;
     if (usesTree) defsGo += `/*\ntype TreeNode struct { Val int; Left *TreeNode; Right *TreeNode }\n*/\n\n`;
     if (usesGraph) defsGo += `/*\ntype Node struct { Val int; Neighbors []*Node }\n*/\n\n`;
-    defsGo += `func ${functionName}(${goParams}) ${goReturnType} {\n    // your code here\n    return ${goReturnType === 'string' ? '\"\"' : goReturnType === 'bool' ? 'false' : goReturnType.includes('[]') ? 'nil' : '0'}\n}`;
+    defsGo += `func ${functionName}(${goParams}) ${goReturnType} {\n    // your code here\n    return ${goReturnType === 'string' ? '""' : goReturnType === 'bool' ? 'false' : goReturnType.includes('[]') ? 'nil' : '0'}\n}`;
     return defsGo;
   }
 
@@ -120,7 +120,7 @@ function buildTemplate(language, functionName, parameters, returnType) {
   return `public class UserSolution {\n    public object ${functionName}(${paramNames.map((p) => `object ${p}`).join(', ')}) {\n        // your code here\n        return null;\n    }\n}`;
 }
 
-const AssessmentWorkspace = ({ user }) => {
+const AssessmentWorkspace = (props) => {
   const { attemptId } = useParams();
   const navigate = useNavigate();
   
@@ -314,6 +314,7 @@ const AssessmentWorkspace = ({ user }) => {
         delete intervalRefs.current[problemId];
       }
     } catch (err) {
+      console.error(err);
       clearInterval(intervalRefs.current[problemId]);
       delete intervalRefs.current[problemId];
     }
@@ -345,6 +346,7 @@ const AssessmentWorkspace = ({ user }) => {
         return { inputs: inputArr, expected: expectedFromProblem, isSample: true };
       });
     } catch (err) {
+      console.error(err);
       setRunResultMap(prev => ({ 
         ...prev, 
         [currentProblem._id]: { status: 'Error', error: 'Invalid JSON in one of the test cases.' }
@@ -361,6 +363,7 @@ const AssessmentWorkspace = ({ user }) => {
       });
       setRunResultMap(prev => ({ ...prev, [currentProblem._id]: res.data }));
     } catch (err) {
+      console.error(err);
       setRunResultMap(prev => ({ ...prev, [currentProblem._id]: { status: 'Error', error: 'Failed to run code' } }));
     } finally {
       setIsRunning(false);
@@ -388,6 +391,7 @@ const AssessmentWorkspace = ({ user }) => {
       setSubmissionMap(prev => ({ ...prev, [problemId]: newSubmission }));
       intervalRefs.current[problemId] = setInterval(() => checkStatus(newSubmission._id, problemId), 2000);
     } catch (err) {
+      console.error(err);
       setSubmissionMap(prev => ({ ...prev, [problemId]: { status: 'Error', error: 'Submission failed' } }));
     }
   };
@@ -405,6 +409,7 @@ const AssessmentWorkspace = ({ user }) => {
         await assessments.submitAttempt(attemptId);
         navigate(`/assessment-attempt/${attemptId}/result`);
       } catch (err) {
+        console.error(err);
         alert('Failed to finish assessment. Please try again.');
       }
     }
