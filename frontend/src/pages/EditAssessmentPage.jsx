@@ -239,10 +239,7 @@ const EditAssessmentPage = () => {
               <option value="Published">Published</option>
               <option value="Completed">Completed</option>
             </select>
-          </div>
-
-          <div>
-            <button type="submit" className="button button-primary">Update Assessment</button>
+            <div className="text-muted" style={{ fontSize: '0.85rem', marginTop: '8px' }}>Use the Save button at the top to update this assessment.</div>
           </div>
         </div>
       </form>
