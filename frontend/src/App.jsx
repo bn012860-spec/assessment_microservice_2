@@ -11,6 +11,9 @@ import AssessmentPreviewPage from './pages/AssessmentPreviewPage';
 import AssessmentWorkspace from './pages/AssessmentWorkspace';
 import AssessmentResultPage from './pages/AssessmentResultPage';
 import AssessmentResultsPage from './pages/AssessmentResultsPage';
+import QuestionBankPage from './pages/QuestionBankPage';
+import AddQuestionPage from './pages/AddQuestionPage';
+import EditQuestionPage from './pages/EditQuestionPage';
 import AssessmentAttemptDetailPage from './pages/AssessmentAttemptDetailPage';
 import ProblemPage from './pages/ProblemPage';
 import AddProblemPage from './pages/AddProblemPage';
@@ -128,6 +131,9 @@ function AppContent() {
             <Routes>
                 <Route path="/" element={<ProblemListPage user={user} />} />
                 <Route path="/assessments" element={user ? <AssessmentListPage user={user} /> : <Navigate to="/login" replace />} />
+                <Route path="/questions" element={user ? <QuestionBankPage user={user} /> : <Navigate to="/login" replace />} />
+                <Route path="/questions/add" element={user ? <AddQuestionPage user={user} /> : <Navigate to="/login" replace />} />
+                <Route path="/questions/:id/edit" element={user ? <EditQuestionPage user={user} /> : <Navigate to="/login" replace />} />
                 <Route path="/assessments/:id" element={<AssessmentDetailsPage user={user} />} />
                 <Route path="/assessment-attempt/:attemptId" element={<AssessmentWorkspace user={user} />} />
                 <Route path="/assessment-attempt/:attemptId/result" element={<AssessmentResultPage user={user} />} />
