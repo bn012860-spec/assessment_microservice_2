@@ -120,6 +120,8 @@ function buildGraph(adj) {
       nodes[i].neighbors.push(nodes[neighborIdx - 1]);
     });
   });
+  // preserve original node list for deep-copy checks
+  global.ORIGINAL_NODES = nodes;
   return nodes[0];
 }
 
@@ -143,6 +145,37 @@ function serializeGraph(node) {
     res.push(n ? n.neighbors.map(nb => nb.val) : []);
   }
   return res;
+}
+
+function nodeListByVal(root) {
+  if (!root) return [];
+  const map = new Map();
+  const queue = [root];
+  map.set(root.val, root);
+  while (queue.length > 0) {
+    const curr = queue.shift();
+    for (const neighbor of curr.neighbors) {
+      if (!map.has(neighbor.val)) {
+        map.set(neighbor.val, neighbor);
+        queue.push(neighbor);
+      }
+    }
+  }
+  const out = [];
+  for (let i = 1; i <= map.size; i++) {
+    out.push(map.get(i));
+  }
+  return out;
+}
+
+function verifyDeepCopy(origRoot, retRoot) {
+  const origNodes = nodeListByVal(origRoot);
+  const retNodes = nodeListByVal(retRoot);
+  if (origNodes.length !== retNodes.length) throw new Error(`Deep copy failed: size mismatch ${origNodes.length} vs ${retNodes.length}`);
+  for (let i = 0; i < origNodes.length; i++) {
+    if (origNodes[i] === retNodes[i]) throw new Error(`Deep copy failed: node ${i+1} is the same object as original`);
+    if (origNodes[i].val !== retNodes[i].val) throw new Error(`Deep copy failed: node ${i+1} value mismatch ${origNodes[i].val} vs ${retNodes[i].val}`);
+  }
 }
 
 function convertInput(val, typeStr) {
@@ -171,6 +204,8 @@ function convertOutput(val, typeStr) {
   return val;
 }
 
+// REQUIRE_DEEP_COPY: {{REQUIRE_DEEP_COPY}}
+
 // USER_CODE_MARKER
 
 function runOne() {
@@ -195,8 +230,27 @@ function runOne() {
 
     let out = {{FUNCTION_NAME}}(...convertedInputs);
     
+    // parse require deep flag
+    let requireDeep = false;
+    try { requireDeep = {{REQUIRE_DEEP_COPY}}; } catch(e) { requireDeep = false; }
+
+    
     if (out instanceof Promise) {
         out.then(resolvedOut => {
+            // deep copy verify for graphs
+            if (returnType.startsWith('graph') && requireDeep) {
+                try {
+                    const origRoot = (global.ORIGINAL_NODES && global.ORIGINAL_NODES.length>0) ? global.ORIGINAL_NODES[0] : null;
+                    const retRoot = resolvedOut;
+                    if (origRoot && retRoot) {
+                        verifyDeepCopy(origRoot, retRoot);
+                    }
+                } catch (e) {
+                    emitError(e);
+                    return;
+                }
+            }
+
             let convertedOut;
             if (returnType === "void" && convertedInputs.length > 0) {
               convertedOut = convertOutput(convertedInputs[0], params[0] ? params[0].type : "");
@@ -208,6 +262,20 @@ function runOne() {
             emitError(err);
         });
     } else {
+        // deep copy verify for graphs
+        if (returnType.startsWith('graph') && requireDeep) {
+            try {
+                const origRoot = (global.ORIGINAL_NODES && global.ORIGINAL_NODES.length>0) ? global.ORIGINAL_NODES[0] : null;
+                const retRoot = out;
+                if (origRoot && retRoot) {
+                    verifyDeepCopy(origRoot, retRoot);
+                }
+            } catch (e) {
+                emitError(e);
+                return;
+            }
+        }
+
         let convertedOut;
         if (returnType === "void" && convertedInputs.length > 0) {
           convertedOut = convertOutput(convertedInputs[0], params[0] ? params[0].type : "");

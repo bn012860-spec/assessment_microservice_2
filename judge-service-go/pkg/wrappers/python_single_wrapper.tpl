@@ -104,6 +104,9 @@ def build_graph(adj):
     for i, neighbors in enumerate(adj):
         for neighbor_idx in neighbors:
             nodes[i].neighbors.append(nodes[neighbor_idx - 1])
+    # preserve original node list for deep-copy checks
+    global ORIGINAL_NODES
+    ORIGINAL_NODES = nodes
     return nodes[0]
 
 def serialize_graph(node):
@@ -125,6 +128,37 @@ def serialize_graph(node):
         res.append([nb.val for nb in n.neighbors] if n else [])
     return res
 
+
+def node_list_by_val(root):
+    if not root:
+        return []
+    node_map = {}
+    queue = collections.deque([root])
+    node_map[root.val] = root
+    while queue:
+        curr = queue.popleft()
+        for neighbor in curr.neighbors:
+            if neighbor.val not in node_map:
+                node_map[neighbor.val] = neighbor
+                queue.append(neighbor)
+    out = []
+    for i in range(1, len(node_map) + 1):
+        out.append(node_map.get(i))
+    return out
+
+
+def verify_deep_copy(orig_root, ret_root):
+    orig_nodes = node_list_by_val(orig_root)
+    ret_nodes = node_list_by_val(ret_root)
+    if len(orig_nodes) != len(ret_nodes):
+        raise ValueError(f"Deep copy failed: structure size mismatch {len(orig_nodes)} vs {len(ret_nodes)}")
+    for idx, (o, r) in enumerate(zip(orig_nodes, ret_nodes), start=1):
+        if o is r:
+            raise ValueError(f"Deep copy failed: node {idx} is the same object as original")
+        if o.val != r.val:
+            raise ValueError(f"Deep copy failed: node {idx} value mismatch {o.val} vs {r.val}")
+    return True
+
 def convert_input(val, type_str):
     if type_str.startswith("tree"):
         return build_tree(val)
@@ -144,6 +178,8 @@ def convert_output(val, type_str):
     return val
 
 # USER_CODE_MARKER
+
+# REQUIRE_DEEP_COPY: {{REQUIRE_DEEP_COPY}}
 
 def run_one():
     try:
@@ -176,6 +212,26 @@ def run_one():
             out = target_func(*converted_inputs)
         else:
             out = target_func(converted_inputs)
+
+        # If deep-copy is required for graph types, verify before serialization
+        try:
+            require_deep = {{REQUIRE_DEEP_COPY}}
+        except Exception:
+            require_deep = False
+
+        if return_type.startswith("graph") and require_deep:
+            # original nodes preserved in ORIGINAL_NODES by build_graph
+            try:
+                orig_root = ORIGINAL_NODES[0] if 'ORIGINAL_NODES' in globals() and ORIGINAL_NODES else None
+            except Exception:
+                orig_root = None
+            try:
+                ret_root = out
+                if orig_root is not None and ret_root is not None:
+                    verify_deep_copy(orig_root, ret_root)
+            except Exception as e:
+                # Raise to surface a meaningful failure to the user
+                raise
 
         if return_type == "void" and len(converted_inputs) > 0:
             # For void functions, we assume the first argument is modified in-place

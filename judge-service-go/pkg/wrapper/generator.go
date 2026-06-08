@@ -121,7 +121,13 @@ func GenerateWrapper(p models.Problem, lang *languages.Language, submissionFuncN
 	tpl = strings.ReplaceAll(tpl, "{{RETURN_TYPE}}", p.ReturnType)
 
 	tpl = strings.ReplaceAll(tpl, "{{EXPECTED_OUTPUT_TYPE}}", p.ReturnType)
-	tpl = strings.ReplaceAll(tpl, "{{COMPARE_MODE}}", "") // Default to empty string
+	// Inject compare mode and deep-copy flag
+	replCompare := ""
+	if p.CompareConfig.Mode != "" {
+		replCompare = p.CompareConfig.Mode
+	}
+	tpl = strings.ReplaceAll(tpl, "{{COMPARE_MODE}}", replCompare)
+	tpl = strings.ReplaceAll(tpl, "{{REQUIRE_DEEP_COPY}}", fmt.Sprintf("%t", p.CompareConfig.RequireDeepCopy))
 
 	return tpl, nil
 }
