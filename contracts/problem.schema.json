@@ -56,7 +56,8 @@
       "properties": {
         "mode": { "type": "string", "enum": ["EXACT", "STRUCTURAL"] },
         "floatTolerance": { "type": "number", "minimum": 0 },
-        "orderInsensitive": { "type": "boolean" }
+        "orderInsensitive": { "type": "boolean" },
+          "requireDeepCopy": { "type": "boolean" }
       },
       "additionalProperties": false
     },
