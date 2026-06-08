@@ -665,6 +665,7 @@ func startHealthServer(ctx context.Context, containerPool *pool.ContainerPool, p
 					FunctionName: msg.FunctionName,
 					Parameters:   msg.Parameters,
 					ReturnType:   msg.ReturnType,
+					CompareConfig: msg.CompareConfig,
 				}
 				// Default return type if missing to pass ValidateBasic
 				if problem.ReturnType == "" {

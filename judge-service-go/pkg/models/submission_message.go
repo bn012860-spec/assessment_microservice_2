@@ -17,6 +17,7 @@ type SubmissionMessage struct {
 	Parameters    []Parameter `json:"parameters,omitempty"`
 	ReturnType    string      `json:"returnType,omitempty"`
 	CompareMode   string      `json:"compareMode,omitempty"`
+	CompareConfig CompareConfig `json:"compareConfig,omitempty"`
 	RequestID     string      `json:"requestId,omitempty"`
 }
 
