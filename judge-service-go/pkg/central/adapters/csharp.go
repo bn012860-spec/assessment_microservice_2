@@ -8,6 +8,7 @@ import (
 	"judge-service-go/pkg/models"
 	"judge-service-go/pkg/workspace"
 	"judge-service-go/pkg/wrapper"
+	"judge-service-go/pkg/util"
 )
 
 type CSharpAdapter struct{}
@@ -26,7 +27,7 @@ func (CSharpAdapter) PrepareFiles(workDir string, submissionMsg models.Submissio
 	// C# wrapper template has {{USER_CODE}} which wrapper.GenerateWrapper should have handled if it follows the pattern.
 	// Actually, let's check how GenerateWrapper works.
 	
-	finalCode := strings.Replace(wrapperCode, "// USER_CODE_MARKER", submissionMsg.Code, 1)
+	finalCode := strings.Replace(wrapperCode, "// USER_CODE_MARKER", util.UnescapeCode(submissionMsg.Code), 1)
 	// If the template uses {{USER_CODE}}, GenerateWrapper might have already replaced it if it's using text/template.
 	// But javascript.go does a manual replace of // USER_CODE_MARKER.
 	// Let's check wrapper/wrapper.go
