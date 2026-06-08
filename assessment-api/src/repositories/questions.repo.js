@@ -12,6 +12,16 @@ export async function distinctTags(filter = {}) {
   return Question.distinct('tags', filter);
 }
 
+export async function sample(filter = {}, size = 1) {
+  // Use aggregation $sample for efficient random selection
+  const s = Math.max(0, Number(size) || 0);
+  if (s <= 0) return [];
+  return Question.aggregate([
+    { $match: filter },
+    { $sample: { size: s } }
+  ]);
+}
+
 export async function findById(id) {
   return Question.findById(id);
 }

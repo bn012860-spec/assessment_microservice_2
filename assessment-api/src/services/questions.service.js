@@ -58,6 +58,63 @@ export async function listTags(query = {}, user = null) {
   return (tags || []).sort();
 }
 
+export async function selectQuestions(payload = {}, user = null) {
+  const { easy = 0, medium = 0, hard = 0, tags = [] } = payload || {};
+
+  const toNumber = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+  };
+
+  const reqEasy = toNumber(easy);
+  const reqMedium = toNumber(medium);
+  const reqHard = toNumber(hard);
+
+  if (reqEasy + reqMedium + reqHard === 0) {
+    throw new Error('At least one question count must be provided');
+  }
+
+  const baseFilter = {};
+  if (Array.isArray(tags) && tags.length) baseFilter.tags = { $in: tags };
+
+  // Visibility / college scoping
+  if (user && user.role === 'faculty') {
+    if (user.collegeId) baseFilter.collegeId = user.collegeId;
+  } else if (!user || (user && !(user.role === 'admin' || user.role === 'superadmin' || user.role === 'faculty'))) {
+    baseFilter.visibility = 'Public';
+  }
+
+  const picked = [];
+  const addUnique = (docs) => {
+    const map = new Map(picked.map(d => [String(d._id), d]));
+    for (const d of docs) {
+      if (!map.has(String(d._id))) {
+        map.set(String(d._id), d);
+      }
+    }
+    // rebuild picked
+    picked.length = 0;
+    for (const v of map.values()) picked.push(v);
+  };
+
+  const results = [];
+  if (reqEasy > 0) {
+    const docs = await questionsRepo.sample({ ...baseFilter, difficulty: 'Easy' }, reqEasy);
+    addUnique(docs);
+  }
+  if (reqMedium > 0) {
+    const docs = await questionsRepo.sample({ ...baseFilter, difficulty: 'Medium' }, reqMedium);
+    addUnique(docs);
+  }
+  if (reqHard > 0) {
+    const docs = await questionsRepo.sample({ ...baseFilter, difficulty: 'Hard' }, reqHard);
+    addUnique(docs);
+  }
+
+  return { questions: picked };
+}
+
+
 export async function getQuestionById(id, user = null) {
   const q = await questionsRepo.findById(id);
   if (!q) return null;

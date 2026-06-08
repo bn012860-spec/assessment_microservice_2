@@ -54,3 +54,13 @@ export async function getTags(req, res, next) {
     next(err);
   }
 }
+
+export async function selectQuestions(req, res, next) {
+  try {
+    const result = await questionsService.selectQuestions(req.body, req.user);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
