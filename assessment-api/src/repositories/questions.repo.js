@@ -8,6 +8,10 @@ export async function count(filter = {}) {
   return Question.countDocuments(filter);
 }
 
+export async function distinctTags(filter = {}) {
+  return Question.distinct('tags', filter);
+}
+
 export async function findById(id) {
   return Question.findById(id);
 }

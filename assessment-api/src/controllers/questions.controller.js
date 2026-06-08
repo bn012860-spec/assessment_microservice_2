@@ -45,3 +45,12 @@ export async function deleteQuestion(req, res, next) {
     next(err);
   }
 }
+
+export async function getTags(req, res, next) {
+  try {
+    const tags = await questionsService.listTags(req.query, req.user);
+    res.json(tags);
+  } catch (err) {
+    next(err);
+  }
+}

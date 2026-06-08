@@ -42,6 +42,22 @@ export async function listQuestions(query = {}, user = null) {
   return { questions, total, page, totalPages };
 }
 
+export async function listTags(query = {}, user = null) {
+  // Build filter similar to listQuestions but only for tags
+  const filter = {};
+  // If faculty, limit to their college
+  if (user && user.role === 'faculty') {
+    if (user.collegeId) filter.collegeId = user.collegeId;
+  } else if (!user || (user && !(user.role === 'admin' || user.role === 'superadmin' || user.role === 'faculty'))) {
+    // non-privileged users only see public tags
+    filter.visibility = 'Public';
+  }
+
+  const tags = await questionsRepo.distinctTags(filter);
+  // return sorted unique tags
+  return (tags || []).sort();
+}
+
 export async function getQuestionById(id, user = null) {
   const q = await questionsRepo.findById(id);
   if (!q) return null;
