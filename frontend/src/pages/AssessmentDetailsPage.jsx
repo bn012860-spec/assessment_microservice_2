@@ -53,6 +53,9 @@ const AssessmentDetailsPage = ({ user }) => {
   const isUpcoming = now < startTime;
   const isEnded = now > endTime || assessment.status !== 'Published';
 
+  const isStudent = user && user.role === 'student';
+  const availableForUser = isAvailable && isStudent;
+
   return (
     <div className="container fade-in">
       <div className="mb-8">
@@ -113,13 +116,13 @@ const AssessmentDetailsPage = ({ user }) => {
           {/* Action Box */}
           <div className="problem-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '40px 24px', background: isAvailable ? 'var(--surface-hover)' : 'var(--surface)', borderColor: isAvailable ? 'var(--primary)' : 'var(--border)' }}>
             
-            {isAvailable ? (
+            {availableForUser ? (
               <>
                 <div className="mb-4" style={{ width: '16px', height: '16px', borderRadius: '50%', background: 'var(--success)', boxShadow: '0 0 16px var(--success)', animation: 'pulse 2s infinite' }}></div>
                 <h3 className="mb-2" style={{ color: 'var(--success)' }}>Live Now</h3>
                 <p className="text-secondary mb-6">You have {assessment.durationMinutes} minutes to complete {assessment.problems?.length} problems.</p>
-                <button 
-                  className="button" 
+                <button
+                  className="button"
                   style={{ padding: '16px 40px', fontSize: '1.15rem', borderRadius: '100px' }}
                   onClick={handleStart}
                   disabled={starting}
@@ -127,6 +130,12 @@ const AssessmentDetailsPage = ({ user }) => {
                   <Play size={20} />
                   {starting ? 'Preparing Workspace...' : 'Start Assessment'}
                 </button>
+              </>
+            ) : isAvailable && !isStudent ? (
+              <>
+                <AlertTriangle size={48} className="text-muted mb-4" />
+                <h3 className="mb-2 text-muted">Cannot Start</h3>
+                <p className="text-secondary mb-6">You cannot start this assessment because your account role is <strong>{user?.role || 'guest'}</strong>. Only students can start assessments.</p>
               </>
             ) : isUpcoming ? (
               <>
