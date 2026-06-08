@@ -6,17 +6,22 @@ import { HttpError } from "../utils/httpError.js";
 import * as auditService from "./audit.service.js";
 
 export async function listAssessments(query = {}, user) {
+  const page = Math.max(1, Number(query.page || 1));
+  const limit = Math.min(100, Math.max(1, Number(query.limit || 50)));
   const filter = {};
   
-  // If student, only show Published or Completed assessments
-  if (user.role === 'student') {
+  // If guest or student, only show Published or Completed assessments
+  if (!user || user.role === 'student') {
     filter.status = { $in: ['Published', 'Completed'] };
-  } else if (user.role === 'faculty') {
-    // Faculty sees their own assessments or all if they are admin
-    // For now, let's just show all to faculty/admin for simplicity
   }
 
-  return assessmentsRepo.findAll(filter);
+  const options = {
+    sort: { startTime: -1 },
+    skip: (page - 1) * limit,
+    limit: limit
+  };
+
+  return assessmentsRepo.findAll(filter, options);
 }
 
 export async function getAssessmentById(id, user) {
@@ -188,12 +193,21 @@ export async function recalculateAttemptScore(attemptId) {
   }
 }
 
-export async function listAssessmentAttempts(assessmentId, user) {
+export async function listAssessmentAttempts(assessmentId, user, query = {}) {
+  const page = Math.max(1, Number(query.page || 1));
+  const limit = Math.min(100, Math.max(1, Number(query.limit || 50)));
   // Only faculty/admin can list all attempts for an assessment
   if (user.role === 'student') {
     throw new HttpError(403, "Forbidden");
   }
-  return attemptsRepo.findAll({ assessmentId });
+
+  const options = {
+    sort: { startedAt: -1 },
+    skip: (page - 1) * limit,
+    limit: limit
+  };
+
+  return attemptsRepo.findAll({ assessmentId }, options);
 }
 
 export async function getAssessmentAttendance(assessmentId, user) {
@@ -303,7 +317,10 @@ function getExpirationTime(attempt, assessment) {
   return relativeExpiry < absoluteExpiry ? relativeExpiry : absoluteExpiry;
 }
 
-export async function getAttemptSubmissions(attemptId, user) {
+export async function getAttemptSubmissions(attemptId, user, query = {}) {
+  const page = Math.max(1, Number(query.page || 1));
+  const limit = Math.min(100, Math.max(1, Number(query.limit || 50)));
+
   const attempt = await attemptsRepo.findById(attemptId);
   if (!attempt) throw new HttpError(404, "Attempt not found");
 
@@ -313,7 +330,11 @@ export async function getAttemptSubmissions(attemptId, user) {
     throw new HttpError(403, "Forbidden");
   }
 
-  return Submission.find({ attemptId }).sort({ createdAt: -1 }).populate('problemId', 'title');
+  return Submission.find({ attemptId })
+    .sort({ createdAt: -1 })
+    .skip((page - 1) * limit)
+    .limit(limit)
+    .populate('problemId', 'title');
 }
 
 function validateAssessmentPayload(payload) {

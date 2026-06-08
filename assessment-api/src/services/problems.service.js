@@ -168,15 +168,12 @@ function validateProblemPayload(payload) {
 }
 
 function parsePagination(query) {
-  const page = Number(query.page || 1);
-  const limitRaw = Number(query.limit || 0);
-  const limit = Number.isFinite(limitRaw) ? Math.max(0, Math.min(100, limitRaw)) : 0;
-  const safePage = Number.isFinite(page) ? Math.max(1, page) : 1;
-  const options = {};
-  if (limit > 0) {
-    options.limit = limit;
-    options.skip = (safePage - 1) * limit;
-  }
+  const page = Math.max(1, Number(query.page || 1));
+  const limit = Math.min(100, Math.max(1, Number(query.limit || 50)));
+  const options = {
+    limit: limit,
+    skip: (page - 1) * limit
+  };
   return options;
 }
 

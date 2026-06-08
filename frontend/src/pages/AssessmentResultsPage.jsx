@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Download, Users, CheckCircle, Clock, AlertCircle, Search, RefreshCw, BarChart3, ChevronRight, FileSpreadsheet, MonitorOff, Copy, ClipboardPaste, Maximize } from 'lucide-react';
+import { Download, Users, CheckCircle, Clock, AlertCircle, Search, RefreshCw, BarChart3, ChevronRight, FileSpreadsheet, MonitorOff, Copy, ClipboardPaste, Maximize, AlertTriangle, Trophy } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { assessments } from '../api';
 
@@ -13,6 +13,7 @@ const AssessmentResultsPage = () => {
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [riskFilter, setRiskFilter] = useState('');
 
   const fetchData = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -39,6 +40,19 @@ const AssessmentResultsPage = () => {
     return () => clearInterval(interval);
   }, [id]);
 
+  const calculateRiskLevel = (a) => {
+    let score = 0;
+    if (a.tabSwitchCount > 5) score += 2;
+    if (a.tabSwitchCount > 15) score += 3;
+    if (a.copyCount > 10) score += 1;
+    if (a.pasteCount > 5) score += 2;
+    if (a.fullscreenExitCount > 0) score += 3;
+
+    if (score >= 5) return 'High';
+    if (score >= 2) return 'Medium';
+    return 'Low';
+  };
+
   const exportToExcel = () => {
     const data = attendance.map(a => {
       const timeUsed = a.submittedAt && a.startedAt
@@ -49,6 +63,7 @@ const AssessmentResultsPage = () => {
         'Email': a.email,
         'Status': a.status,
         'Score': a.score,
+        'Risk Level': calculateRiskLevel(a),
         'Tab Switches': a.tabSwitchCount || 0,
         'Copy Events': a.copyCount || 0,
         'Paste Events': a.pasteCount || 0,
@@ -80,17 +95,32 @@ const AssessmentResultsPage = () => {
     const email = a.email || '';
     const matchesSearch = name.toLowerCase().includes(search.toLowerCase()) || email.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === '' || a.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesRisk = riskFilter === '' || calculateRiskLevel(a) === riskFilter;
+    return matchesSearch && matchesStatus && matchesRisk;
   });
 
+  const activeOrCompleted = attendance.filter(a => a.status !== 'Not Started');
+  
+  const maxPossibleScore = assessment.problems?.reduce((acc, p) => acc + (p.maxScore || 100), 0) || 100;
+  
   const stats = {
     total: attendance.length,
-    started: attendance.filter(a => a.status !== 'Not Started').length,
+    started: activeOrCompleted.length,
     submitted: attendance.filter(a => a.status === 'Submitted' || a.status === 'TimedOut').length,
-    avgScore: attendance.filter(a => a.status !== 'Not Started').length > 0 
-      ? (attendance.reduce((acc, a) => acc + (a.score || 0), 0) / attendance.filter(a => a.status !== 'Not Started').length).toFixed(1) 
-      : 0
+    avgScore: activeOrCompleted.length > 0 
+      ? (activeOrCompleted.reduce((acc, a) => acc + (a.score || 0), 0) / activeOrCompleted.length).toFixed(1) 
+      : 0,
+    passRate: activeOrCompleted.length > 0
+      ? ((activeOrCompleted.filter(a => (a.score || 0) >= (maxPossibleScore * 0.4)).length / activeOrCompleted.length) * 100).toFixed(0)
+      : 0,
+    highRisk: attendance.filter(a => calculateRiskLevel(a) === 'High').length
   };
+
+  // Top Performers (Top 3)
+  const topPerformers = [...attendance]
+    .filter(a => a.status === 'Submitted' || a.status === 'TimedOut')
+    .sort((a, b) => (b.score || 0) - (a.score || 0))
+    .slice(0, 3);
 
   const getStatusTagClass = (status) => {
     switch (status) {
@@ -99,6 +129,15 @@ const AssessmentResultsPage = () => {
       case 'TimedOut': return 'difficulty-hard';
       case 'Not Started': return '';
       default: return '';
+    }
+  };
+
+  const getRiskTagStyle = (risk) => {
+    switch (risk) {
+      case 'High': return { background: 'rgba(239, 68, 68, 0.1)', color: 'var(--error)', border: '1px solid rgba(239, 68, 68, 0.3)' };
+      case 'Medium': return { background: 'rgba(245, 158, 11, 0.1)', color: 'var(--warning)', border: '1px solid rgba(245, 158, 11, 0.3)' };
+      case 'Low': return { background: 'rgba(16, 185, 129, 0.1)', color: 'var(--success)', border: '1px solid rgba(16, 185, 129, 0.3)' };
+      default: return {};
     }
   };
 
@@ -150,7 +189,54 @@ const AssessmentResultsPage = () => {
           <div className="text-muted mb-2 flex-center gap-2" style={{ fontSize: '0.8rem', textTransform: 'uppercase', fontWeight: '700' }}>
             <BarChart3 size={14} /> Avg. Score
           </div>
-          <div style={{ fontSize: '2rem', fontWeight: '800' }}>{stats.avgScore}</div>
+          <div style={{ fontSize: '2rem', fontWeight: '800' }}>{stats.avgScore} <span style={{ fontSize: '1rem', color: 'var(--text-muted)' }}>/ {maxPossibleScore}</span></div>
+        </div>
+      </div>
+
+      {/* Insights Section */}
+      <div className="grid grid-cols-2 gap-6 mb-8" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+        <div className="problem-card" style={{ borderLeft: '4px solid var(--warning)' }}>
+          <div className="flex-between mb-4">
+            <h3 className="flex-center gap-2" style={{ margin: 0 }}><AlertTriangle size={18} color="var(--warning)" /> Integrity Insights</h3>
+            <span className="tag" style={getRiskTagStyle('High')}>{stats.highRisk} High Risk</span>
+          </div>
+          <p className="text-secondary mb-4" style={{ fontSize: '0.9rem' }}>
+            {stats.highRisk > 0 
+              ? `${stats.highRisk} student(s) flagged for highly suspicious activity (excessive tab switches, pastes, or leaving fullscreen). We recommend reviewing their detailed attempts.`
+              : 'No students flagged for high-risk behavior. Academic integrity appears strong.'}
+          </p>
+          <button 
+            className="button button-outline" 
+            style={{ padding: '6px 12px', fontSize: '0.85rem' }}
+            onClick={() => setRiskFilter('High')}
+          >
+            Filter High Risk
+          </button>
+        </div>
+
+        <div className="problem-card" style={{ borderLeft: '4px solid var(--primary)' }}>
+          <div className="flex-between mb-4">
+            <h3 className="flex-center gap-2" style={{ margin: 0 }}><Trophy size={18} color="var(--primary)" /> Performance Insights</h3>
+            <span className="tag difficulty-easy">{stats.passRate}% Pass Rate</span>
+          </div>
+          <p className="text-secondary mb-3" style={{ fontSize: '0.9rem' }}>
+            Top Performers:
+          </p>
+          {topPerformers.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {topPerformers.map((p, idx) => (
+                <div key={p.studentId} className="flex-between" style={{ background: 'var(--bg)', padding: '8px 12px', borderRadius: 'var(--radius-sm)' }}>
+                  <div className="flex-center gap-2">
+                    <span style={{ color: 'var(--text-muted)', fontWeight: '600' }}>#{idx + 1}</span>
+                    <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>{p.name}</span>
+                  </div>
+                  <span style={{ fontWeight: '700', color: 'var(--primary)' }}>{p.score} pts</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted" style={{ fontSize: '0.9rem' }}>No submissions yet.</p>
+          )}
         </div>
       </div>
 
@@ -178,6 +264,16 @@ const AssessmentResultsPage = () => {
             <option value="Submitted">Submitted</option>
             <option value="TimedOut">Timed Out</option>
           </select>
+          <select 
+            value={riskFilter} 
+            onChange={(e) => setRiskFilter(e.target.value)}
+            style={{ width: '150px', background: 'var(--bg)' }}
+          >
+            <option value="">All Risks</option>
+            <option value="High">High Risk</option>
+            <option value="Medium">Medium Risk</option>
+            <option value="Low">Low Risk</option>
+          </select>
         </div>
 
         <div className="table-container" style={{ border: 'none', borderRadius: 0 }}>
@@ -187,6 +283,7 @@ const AssessmentResultsPage = () => {
                 <th>Student</th>
                 <th>Status</th>
                 <th>Score</th>
+                <th>Risk Level</th>
                 <th>Security Metrics</th>
                 <th>Timeline</th>
                 <th style={{ textAlign: 'right' }}>Actions</th>
@@ -208,6 +305,11 @@ const AssessmentResultsPage = () => {
                     <div style={{ fontSize: '1.1rem', fontWeight: '700', color: a.score > 0 ? 'var(--text)' : 'var(--text-muted)' }}>
                       {a.score}
                     </div>
+                  </td>
+                  <td>
+                    <span className="tag" style={{ ...getRiskTagStyle(calculateRiskLevel(a)), fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: '700' }}>
+                      {calculateRiskLevel(a)}
+                    </span>
                   </td>
                   <td>
                     <div className="flex-center gap-3" style={{ justifyContent: 'flex-start' }}>

@@ -118,7 +118,11 @@ func validateAndDecodeSubmission(d amqp.Delivery) (models.SubmissionMessage, err
 	}
 
 	// Log ASAP, but validation will catch missing ID.
-	slog.Info("Received a message", "submissionId", msg.SubmissionID)
+	reqId := msg.RequestID
+	if reqId == "" {
+		reqId = "none"
+	}
+	slog.Info("Received a message", "submissionId", msg.SubmissionID, "reqId", reqId)
 
 	if err := msg.Validate(); err != nil {
 		return msg, fmt.Errorf("invalid submission message: %w", err)
@@ -896,13 +900,25 @@ func main() {
 	err = ch.Qos(runtime.NumCPU(), 0, false)
 	failOnError(err, "Failed to set QoS")
 
+	// Declare DLX and DLQ
+	dlxName := "submission_dlx"
+	dlqName := "submission_dead_letters"
+	err = ch.ExchangeDeclare(dlxName, "direct", true, false, false, false, nil)
+	failOnError(err, "Failed to declare DLX")
+	_, err = ch.QueueDeclare(dlqName, true, false, false, false, nil)
+	failOnError(err, "Failed to declare DLQ")
+	err = ch.QueueBind(dlqName, "", dlxName, false, nil)
+	failOnError(err, "Failed to bind DLQ")
+
 	_, err = ch.QueueDeclare(
 		submissionQueueName, // name
 		true,                // durable
 		false,               // delete when unused
 		false,               // exclusive
 		false,               // no-wait
-		nil,                 // arguments
+		amqp.Table{
+			"x-dead-letter-exchange": dlxName,
+		}, // arguments
 	)
 	failOnError(err, "Failed to declare submission queue")
 

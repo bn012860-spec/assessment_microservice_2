@@ -54,5 +54,6 @@ SubmissionSchema.index({ status: 1 });
 SubmissionSchema.index({ userId: 1 });
 SubmissionSchema.index({ assessmentId: 1 });
 SubmissionSchema.index({ attemptId: 1 });
+SubmissionSchema.index({ assessmentId: 1, userId: 1 });
 
 export default mongoose.model('Submission', SubmissionSchema);

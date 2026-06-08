@@ -12,7 +12,8 @@ router.get("/", async (req, res) => {
     services: {
       mongodb: "unknown",
       redis: "unknown",
-      rabbitmq: "unknown"
+      rabbitmq: "unknown",
+      judge: "unknown"
     }
   };
 
@@ -49,11 +50,31 @@ router.get("/", async (req, res) => {
       health.status = "unhealthy";
     }
 
+    // Check Judge Service
+    try {
+      const judgeRes = await fetch("http://judge-service-go:8081/health", { signal: AbortSignal.timeout(2000) });
+      if (judgeRes.ok) {
+        health.services.judge = "connected";
+      } else {
+        health.services.judge = "error";
+        health.status = "unhealthy";
+      }
+    } catch (err) {
+      health.services.judge = "disconnected";
+      health.status = "unhealthy";
+    }
+
     const statusCode = health.status === "healthy" ? 200 : 503;
     res.status(statusCode).json(health);
   } catch (error) {
     res.status(500).json({ status: "error", message: error.message });
   }
+});
+
+router.get("/ready", (req, res) => {
+  // A simple readiness check that doesn't deep-ping all dependencies, 
+  // useful for load balancers.
+  res.status(200).json({ status: "ready" });
 });
 
 export default router;

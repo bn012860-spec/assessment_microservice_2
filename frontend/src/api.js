@@ -91,6 +91,10 @@ export const problems = {
   delete: (id) => api.delete(`/api/problems/${id}`)
 };
 
+export const submissions = {
+  getAnalytics: () => api.get('/api/submissions/analytics/my')
+};
+
 export const admin = {
   getSystemStats: () => api.get("/api/admin/system-stats"),
   getAuditLogs: (params) => api.get("/api/admin/audit-logs", { params }),

@@ -1,5 +1,5 @@
 import express from "express";
-import { verifyToken, authorizeRoles } from "../middleware/auth.mjs";
+import { verifyToken, optionalVerifyToken, authorizeRoles } from "../middleware/auth.mjs";
 import {
   listAssessments,
   getAssessmentById,
@@ -17,7 +17,7 @@ import {
 
 const router = express.Router();
 
-router.get("/", verifyToken, listAssessments);
+router.get("/", optionalVerifyToken, listAssessments);
 router.get("/:_id", verifyToken, getAssessmentById);
 router.post("/", verifyToken, authorizeRoles("admin", "faculty", "superadmin"), createAssessment);
 router.put("/:_id", verifyToken, authorizeRoles("admin", "faculty", "superadmin"), updateAssessment);

@@ -82,7 +82,7 @@ function sanitizeSubmissionForStudent(submission, problem) {
   return normalized;
 }
 
-export async function submitSolution({ problemId, code, language, userId, assessmentId = null, attemptId = null }) {
+export async function submitSolution({ problemId, code, language, userId, assessmentId = null, attemptId = null, requestId = null }) {
   const submissionData = {
     problemId,
     code,
@@ -118,7 +118,8 @@ export async function submitSolution({ problemId, code, language, userId, assess
     code,
     tests: tests,
     functionName: functionName,
-    compareMode: problem.compareConfig?.mode || "EXACT"
+    compareMode: problem.compareConfig?.mode || "EXACT",
+    requestId: requestId
   };
 
   if (!validateSubmissionMessage(messageBody)) {
@@ -165,7 +166,110 @@ export async function getSubmissionById(id, auth = {}) {
   return { submission };
 }
 
-export async function getMySubmissions(userId) {
-  const submissions = await submissionsRepo.findByUserId(userId);
+export async function getMySubmissions(userId, query = {}) {
+  const page = Math.max(1, Number(query.page || 1));
+  const limit = Math.min(100, Math.max(1, Number(query.limit || 50)));
+  const options = {
+    skip: (page - 1) * limit,
+    limit: limit
+  };
+  const submissions = await submissionsRepo.findByUserId(userId, options);
   return { submissions };
+}
+
+import mongoose from 'mongoose';
+
+export async function getMyAnalytics(userId) {
+  const submissions = await submissionsRepo.findByUserId(userId, { limit: 1000 }); // Max 1000 for realistic analytics
+  
+  let totalAttempted = 0;
+  let totalSolved = 0;
+  const tagStats = {};
+  const problemDifficultyStats = { Easy: 0, Medium: 0, Hard: 0 };
+  const solvedProblemIds = new Set();
+
+  for (const sub of submissions) {
+    const pId = sub.problemId?._id?.toString() || sub.problemId?.toString();
+    if (!pId) continue;
+
+    totalAttempted++;
+    const isSuccess = sub.status === "Success";
+    
+    if (isSuccess) {
+      solvedProblemIds.add(pId);
+    }
+
+    // Using the populated problemId object if available
+    if (sub.problemId && typeof sub.problemId === 'object' && sub.problemId.tags) {
+      const difficulty = sub.problemId.difficulty || 'Medium';
+      
+      // We only count difficulty for solved problems to get "average solved difficulty"
+      // But we can also track attempted difficulty. Let's just track solved for simplicity.
+      
+      const tags = sub.problemId.tags || [];
+      tags.forEach(tag => {
+        if (!tagStats[tag]) {
+          tagStats[tag] = { attempted: 0, solved: 0 };
+        }
+        tagStats[tag].attempted++;
+        if (isSuccess) {
+          tagStats[tag].solved++;
+        }
+      });
+    } else {
+      // If not fully populated, we would need to fetch it, but findByUserId populates 'title'.
+      // To get tags and difficulty, we need to modify findByUserId to populate those, or fetch here.
+      // Let's fetch the full problem if tags are missing to be safe, but ideally repo is updated.
+      const problem = await problemsRepo.findById(pId);
+      if (problem) {
+        const difficulty = problem.difficulty || 'Medium';
+        if (isSuccess) problemDifficultyStats[difficulty]++;
+        
+        const tags = problem.tags || [];
+        tags.forEach(tag => {
+          if (!tagStats[tag]) {
+            tagStats[tag] = { attempted: 0, solved: 0 };
+          }
+          tagStats[tag].attempted++;
+          if (isSuccess) {
+            tagStats[tag].solved++;
+          }
+        });
+      }
+    }
+  }
+
+  totalSolved = solvedProblemIds.size;
+
+  // Process tag stats into an array
+  const tagsArray = Object.keys(tagStats).map(tag => ({
+    tag,
+    attempted: tagStats[tag].attempted,
+    solved: tagStats[tag].solved,
+    successRate: Math.round((tagStats[tag].solved / tagStats[tag].attempted) * 100)
+  }));
+
+  // Sort by success rate
+  tagsArray.sort((a, b) => b.successRate - a.successRate);
+
+  // Strong areas: high success rate, at least 2 attempts
+  const strongAreas = tagsArray.filter(t => t.attempted >= 2 && t.successRate >= 70).slice(0, 3);
+  
+  // Weak areas: low success rate, at least 2 attempts
+  const weakAreas = [...tagsArray].reverse().filter(t => t.attempted >= 2 && t.successRate < 50).slice(0, 3);
+
+  // Determine average difficulty
+  let avgDiff = "Medium";
+  const { Easy, Medium, Hard } = problemDifficultyStats;
+  if (Hard > Medium && Hard > Easy) avgDiff = "Hard";
+  else if (Easy > Medium && Easy > Hard) avgDiff = "Easy";
+
+  return {
+    totalAttempted,
+    totalSolved,
+    averageDifficulty: avgDiff,
+    strongAreas,
+    weakAreas,
+    tagStats: tagsArray
+  };
 }

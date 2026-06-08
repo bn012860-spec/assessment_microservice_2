@@ -6,6 +6,7 @@ import previewRoutes from "./preview.routes.js";
 import authRoutes from "./auth.routes.js";
 import healthRoutes from "./health.routes.js";
 import adminRoutes from "./admin.routes.js";
+import integrationRoutes from "./integration.routes.js";
 
 const router = express.Router();
 
@@ -16,5 +17,6 @@ router.use("/preview", previewRoutes);
 router.use("/auth", authRoutes);
 router.use("/health", healthRoutes);
 router.use("/admin", adminRoutes);
+router.use("/integration", integrationRoutes);
 
 export default router;

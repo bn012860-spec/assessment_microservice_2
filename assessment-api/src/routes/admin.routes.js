@@ -94,13 +94,18 @@ router.get("/system-stats", verifyToken, authorizeRoles("admin", "superadmin"), 
 
     // 2. Queue Monitoring
     let queueLength = 0;
+    let dlqLength = 0;
     const channel = getChannel();
     if (channel) {
       try {
         const queueInfo = await channel.checkQueue(process.env.SUBMISSION_QUEUE || "submission_queue");
         queueLength = queueInfo.messageCount;
+        
+        // Check DLQ as well
+        const dlqInfo = await channel.checkQueue("submission_dead_letters");
+        dlqLength = dlqInfo.messageCount;
       } catch (err) {
-        console.error("Failed to check queue:", err.message);
+        console.error("Failed to check queues:", err.message);
       }
     }
 
@@ -154,6 +159,7 @@ router.get("/system-stats", verifyToken, authorizeRoles("admin", "superadmin"), 
         acceptedToday
       },
       queueLength,
+      dlqLength,
       judgeStats,
       health,
       recentSubmissions

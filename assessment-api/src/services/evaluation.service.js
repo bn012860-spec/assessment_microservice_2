@@ -3,17 +3,56 @@ import { getChannel } from "../config/rabbit.js";
 import { env } from "../config/env.js";
 
 const QUEUE_NAME = "submission_queue";
+const DLX_NAME = "submission_dlx";
+const DLQ_NAME = "submission_dead_letters";
+
+const MAX_QUEUE_DEPTH = 5000;
 
 export async function publishSubmissionMessage(messageBody) {
-  const existingChannel = getChannel();
-  const connection = existingChannel ? null : await amqp.connect(env.RABBITMQ_URI);
-  const channel = existingChannel || await connection.createChannel();
+  let connection;
+  let channel;
+  let existingChannel = getChannel();
 
-  await channel.assertQueue(QUEUE_NAME, { durable: true });
-  channel.sendToQueue(QUEUE_NAME, Buffer.from(JSON.stringify(messageBody)), { persistent: true });
+  try {
+    connection = existingChannel ? null : await amqp.connect(env.RABBITMQ_URI);
+    channel = existingChannel || await connection.createChannel();
 
-  if (!existingChannel) {
-    await channel.close();
-    await connection.close();
+    // Setup DLQ
+    await channel.assertExchange(DLX_NAME, "direct", { durable: true });
+    await channel.assertQueue(DLQ_NAME, { durable: true });
+    await channel.bindQueue(DLQ_NAME, DLX_NAME, "");
+
+    const q = await channel.assertQueue(QUEUE_NAME, { 
+      durable: true,
+      arguments: {
+        "x-dead-letter-exchange": DLX_NAME
+      }
+    });
+
+    // Backpressure Protection
+    if (q.messageCount >= MAX_QUEUE_DEPTH) {
+      if (!existingChannel) {
+        await channel.close();
+        await connection.close();
+      }
+      const error = new Error("Service Overloaded: Too many pending submissions");
+      error.status = 503;
+      error.body = { msg: "System overloaded with pending submissions. Please try again in a few moments.", retryAfter: 60 };
+      throw error;
+    }
+
+    channel.sendToQueue(QUEUE_NAME, Buffer.from(JSON.stringify(messageBody)), { persistent: true });
+
+    if (!existingChannel) {
+      await channel.close();
+      await connection.close();
+    }
+  } catch (err) {
+    if (err.status === 503) throw err; // Pass backpressure error through
+    console.error("RabbitMQ Publish Error:", err);
+    const error = new Error("Queue Service Unavailable");
+    error.status = 503;
+    error.body = { msg: "Submission queue is temporarily unavailable. Please try again.", retryAfter: 30 };
+    throw error;
   }
 }

@@ -25,4 +25,7 @@ const AssessmentSchema = new Schema(
   { timestamps: true }
 );
 
+AssessmentSchema.index({ createdBy: 1 });
+AssessmentSchema.index({ status: 1 });
+
 export default mongoose.model("Assessment", AssessmentSchema);

@@ -3,6 +3,7 @@ import { MongoClient, ServerApiVersion } from "mongodb";
 import { env } from "./env.js";
 
 const client = new MongoClient(env.MONGO_URI, {
+  serverSelectionTimeoutMS: 3000,
   serverApi: {
     version: ServerApiVersion.v1,
     strict: true,
@@ -17,7 +18,7 @@ export default async function connectDB() {
 
   await mongoose.connect(env.MONGO_URI, {
     dbName: "assessment_db",
-    serverSelectionTimeoutMS: 20000
+    serverSelectionTimeoutMS: 3000
   });
   console.log("✅ Connected to MongoDB via Mongoose");
 }

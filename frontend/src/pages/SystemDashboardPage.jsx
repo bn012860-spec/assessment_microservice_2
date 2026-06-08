@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, Server, Database, Users, Code2, RefreshCw, AlertCircle, BookOpen, History } from 'lucide-react';
-import api, { admin } from '../api';
+import { Activity, Server, Database, Users, Code2, RefreshCw, AlertCircle, BookOpen, History, Target, TrendingUp, Trophy, AlertTriangle } from 'lucide-react';
+import api, { admin, submissions } from '../api';
 
-const SystemDashboardPage = () => {
+const SystemDashboardPage = ({ user }) => {
   const [stats, setStats] = useState(null);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -11,16 +11,21 @@ const SystemDashboardPage = () => {
 
   const fetchStats = async () => {
     try {
-      const [statsRes, logsRes] = await Promise.all([
-        admin.getSystemStats(),
-        admin.getAuditLogs({ limit: 20 })
-      ]);
-      setStats(statsRes.data);
-      setLogs(logsRes.data);
+      if (user?.role === 'student') {
+        const res = await submissions.getAnalytics();
+        setStats(res.data);
+      } else {
+        const [statsRes, logsRes] = await Promise.all([
+          admin.getSystemStats(),
+          admin.getAuditLogs({ limit: 20 })
+        ]);
+        setStats(statsRes.data);
+        setLogs(logsRes.data);
+      }
       setError(null);
     } catch (err) {
-      console.error('Failed to fetch system stats', err);
-      setError(err.response?.data?.error || 'Failed to fetch system stats');
+      console.error('Failed to fetch stats', err);
+      setError(err.response?.data?.error || err.response?.data?.msg || 'Failed to fetch dashboard data');
     } finally {
       setLoading(false);
     }
@@ -85,7 +90,102 @@ const SystemDashboardPage = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-6 mb-8" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
+      {user?.role === 'student' ? (
+        // STUDENT ANALYTICS VIEW
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {/* Overview Cards */}
+          <div className="grid grid-cols-4 gap-6" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+            <div className="problem-card" style={{ textAlign: 'center' }}>
+              <div className="text-muted mb-2 flex-center gap-2" style={{ fontSize: '0.8rem', textTransform: 'uppercase', fontWeight: '700' }}>
+                <Code2 size={14} /> Problems Attempted
+              </div>
+              <div style={{ fontSize: '2rem', fontWeight: '800' }}>{stats?.totalAttempted || 0}</div>
+            </div>
+            <div className="problem-card" style={{ textAlign: 'center' }}>
+              <div className="text-muted mb-2 flex-center gap-2" style={{ fontSize: '0.8rem', textTransform: 'uppercase', fontWeight: '700' }}>
+                <CheckCircle size={14} color="var(--success)" /> Problems Solved
+              </div>
+              <div style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--success)' }}>{stats?.totalSolved || 0}</div>
+            </div>
+            <div className="problem-card" style={{ textAlign: 'center' }}>
+              <div className="text-muted mb-2 flex-center gap-2" style={{ fontSize: '0.8rem', textTransform: 'uppercase', fontWeight: '700' }}>
+                <Target size={14} /> Overall Success
+              </div>
+              <div style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--primary)' }}>
+                {stats?.totalAttempted > 0 ? Math.round((stats.totalSolved / stats.totalAttempted) * 100) : 0}%
+              </div>
+            </div>
+            <div className="problem-card" style={{ textAlign: 'center' }}>
+              <div className="text-muted mb-2 flex-center gap-2" style={{ fontSize: '0.8rem', textTransform: 'uppercase', fontWeight: '700' }}>
+                <TrendingUp size={14} /> Avg. Difficulty
+              </div>
+              <div style={{ fontSize: '2rem', fontWeight: '800' }} className={`text-difficulty-${stats?.averageDifficulty?.toLowerCase() || 'medium'}`}>
+                {stats?.averageDifficulty || 'Medium'}
+              </div>
+            </div>
+          </div>
+
+          {/* Strong / Weak Areas */}
+          <div className="grid grid-cols-2 gap-6" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+            <div className="problem-card" style={{ borderLeft: '4px solid var(--success)' }}>
+              <h3 className="mb-4 flex-center gap-2" style={{ justifyContent: 'flex-start', margin: 0 }}>
+                <Trophy size={20} color="var(--success)" /> Strong Areas
+              </h3>
+              <p className="text-muted mb-6" style={{ fontSize: '0.85rem' }}>Topics where you consistently succeed.</p>
+              
+              {stats?.strongAreas && stats.strongAreas.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {stats.strongAreas.map(area => (
+                    <div key={area.tag}>
+                      <div className="flex-between mb-2">
+                        <span style={{ fontWeight: '600' }}>{area.tag}</span>
+                        <span style={{ color: 'var(--success)', fontWeight: '700' }}>{area.successRate}%</span>
+                      </div>
+                      <div style={{ width: '100%', height: '8px', background: 'var(--bg)', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div style={{ width: `${area.successRate}%`, height: '100%', background: 'var(--success)' }}></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-muted" style={{ background: 'var(--bg)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border)' }}>
+                  Keep practicing to identify your strong areas!
+                </div>
+              )}
+            </div>
+
+            <div className="problem-card" style={{ borderLeft: '4px solid var(--error)' }}>
+              <h3 className="mb-4 flex-center gap-2" style={{ justifyContent: 'flex-start', margin: 0 }}>
+                <AlertTriangle size={20} color="var(--error)" /> Areas to Improve
+              </h3>
+              <p className="text-muted mb-6" style={{ fontSize: '0.85rem' }}>Topics that need more focus and practice.</p>
+
+              {stats?.weakAreas && stats.weakAreas.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {stats.weakAreas.map(area => (
+                    <div key={area.tag}>
+                      <div className="flex-between mb-2">
+                        <span style={{ fontWeight: '600' }}>{area.tag}</span>
+                        <span style={{ color: 'var(--error)', fontWeight: '700' }}>{area.successRate}%</span>
+                      </div>
+                      <div style={{ width: '100%', height: '8px', background: 'var(--bg)', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div style={{ width: `${area.successRate}%`, height: '100%', background: 'var(--error)' }}></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-muted" style={{ background: 'var(--bg)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border)' }}>
+                  You don't have enough data for weak areas yet. Great job!
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : (
+        // ADMIN / FACULTY DASHBOARD VIEW
+        <>
+        <div className="grid grid-cols-2 gap-6 mb-8" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
         {/* Left Column: Health & Logs */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <div className="problem-card">
@@ -240,17 +340,19 @@ const SystemDashboardPage = () => {
                   </td>
                 </tr>
               )) || <tr><td colSpan="5" className="text-center py-8">No recent activity</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      
-      <style>{`
-        .spin { animation: spin 1s linear infinite; }
-        @keyframes spin { 100% { transform: rotate(360deg); } }
-      `}</style>
-    </div>
-  );
-};
+              </tbody>
+              </table>
+              </div>
+              </div>
+        </>
+      )}
 
-export default SystemDashboardPage;
+              <style>{`
+              .spin { animation: spin 1s linear infinite; }
+              @keyframes spin { 100% { transform: rotate(360deg); } }
+              `}</style>
+              </div>
+              );
+              };
+
+              export default SystemDashboardPage;

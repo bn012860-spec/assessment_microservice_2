@@ -22,6 +22,12 @@ Welcome to the Placement Assessment Platform. This folder contains comprehensive
 - Using the IDE and running/submitting code.
 - Managing time and auto-submission.
 
+### 4. [🔌 Integration Guide](./INTEGRATION_GUIDE.md)
+**Best for:** Developers connecting external testing platforms.
+- Service-to-service authentication.
+- Integration API reference.
+- Shared JWT trust setup.
+
 ---
 
 ## 🛠️ Operational Readiness

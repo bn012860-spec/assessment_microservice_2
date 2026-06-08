@@ -94,7 +94,7 @@ export async function getAssessmentAttemptById(req, res, next) {
 
 export async function listAssessmentAttempts(req, res, next) {
   try {
-    const attempts = await assessmentsService.listAssessmentAttempts(req.params._id, req.user);
+    const attempts = await assessmentsService.listAssessmentAttempts(req.params._id, req.user, req.query);
     res.json(attempts);
   } catch (err) {
     next(err);
@@ -112,7 +112,7 @@ export async function getAssessmentAttendance(req, res, next) {
 
 export async function getAttemptSubmissions(req, res, next) {
   try {
-    const submissions = await assessmentsService.getAttemptSubmissions(req.params.attemptId, req.user);
+    const submissions = await assessmentsService.getAttemptSubmissions(req.params.attemptId, req.user, req.query);
     res.json(submissions);
   } catch (err) {
     next(err);
