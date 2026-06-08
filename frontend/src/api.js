@@ -105,6 +105,7 @@ export const admin = {
 
 export const questions = {
   list: (params) => api.get("/api/questions", { params }),
+  tags: () => api.get("/api/questions/tags"),
   get: (id) => api.get(`/api/questions/${id}`),
   create: (data) => api.post("/api/questions", data),
   update: (id, data) => api.put(`/api/questions/${id}`, data),

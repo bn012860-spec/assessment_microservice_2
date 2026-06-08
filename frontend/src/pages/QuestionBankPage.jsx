@@ -49,8 +49,22 @@ const QuestionBankPage = ({ user }) => {
     }
   };
 
-  // derive tags from current list
-  const availableTags = Array.from(new Set(list.flatMap(q => q.tags || [])));
+  const [availableTags, setAvailableTags] = useState([]);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadTags = async () => {
+      try {
+        const res = await questions.tags();
+        if (mounted) setAvailableTags(res.data || []);
+      } catch (err) {
+        // fallback to current-page derived tags
+        setAvailableTags(Array.from(new Set(list.flatMap(q => q.tags || []))));
+      }
+    };
+    loadTags();
+    return () => { mounted = false; };
+  }, [user]);
 
   return (
     <div className="container fade-in">
