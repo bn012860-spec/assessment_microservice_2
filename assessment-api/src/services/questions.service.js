@@ -31,7 +31,15 @@ function buildFilter(query = {}, user = null) {
 export async function listQuestions(query = {}, user = null) {
   const filter = buildFilter(query, user);
   const options = parsePagination(query);
-  return questionsRepo.findAll(filter, options);
+  const [questions, total] = await Promise.all([
+    questionsRepo.findAll(filter, options),
+    questionsRepo.count(filter)
+  ]);
+
+  const page = Math.max(1, Number(query.page || 1));
+  const totalPages = Math.max(1, Math.ceil(total / options.limit));
+
+  return { questions, total, page, totalPages };
 }
 
 export async function getQuestionById(id, user = null) {

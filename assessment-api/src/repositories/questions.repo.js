@@ -4,6 +4,10 @@ export async function findAll(filter = {}, options = {}) {
   return Question.find(filter, null, options);
 }
 
+export async function count(filter = {}) {
+  return Question.countDocuments(filter);
+}
+
 export async function findById(id) {
   return Question.findById(id);
 }
