@@ -280,6 +280,21 @@ function authHeaders(token) {
 }
 
 async function registerOrLogin() {
+  // Try login first (registration endpoint may be protected in deployments)
+  try {
+    const loggedIn = await request("/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: HARNESS_EMAIL, password: HARNESS_PASSWORD })
+    });
+    return loggedIn;
+  } catch (err) {
+    // If login failed because user doesn't exist, attempt to register (some dev envs allow it)
+    if (err.status && err.status !== 401 && err.status !== 404) {
+      throw err;
+    }
+  }
+
   const payload = {
     name: HARNESS_NAME,
     email: HARNESS_EMAIL,
