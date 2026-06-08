@@ -7,6 +7,7 @@ import authRoutes from "./auth.routes.js";
 import healthRoutes from "./health.routes.js";
 import adminRoutes from "./admin.routes.js";
 import integrationRoutes from "./integration.routes.js";
+import questionsRoutes from "./questions.routes.js";
 
 const router = express.Router();
 
@@ -18,5 +19,6 @@ router.use("/auth", authRoutes);
 router.use("/health", healthRoutes);
 router.use("/admin", adminRoutes);
 router.use("/integration", integrationRoutes);
+router.use("/questions", questionsRoutes);
 
 export default router;
