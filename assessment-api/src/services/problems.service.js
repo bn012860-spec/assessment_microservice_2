@@ -311,6 +311,7 @@ export async function runProblem(id, payload) {
     code: code,
     functionName: problem.functionName,
     compareMode: problem.compareConfig?.mode || "STRUCTURAL",
+    compareConfig: problem.compareConfig || {},
     tests: customTests || [] // Pass custom tests if provided
   };
 
