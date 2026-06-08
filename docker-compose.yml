@@ -145,6 +145,16 @@ services:
     networks:
       - assessment-net
 
+  judge-cpp:
+    build:
+      context: ./judge-service-go/environments/cpp
+      dockerfile: Dockerfile
+    image: judge-cpp-env
+    pull_policy: build
+    container_name: judge_cpp_env
+    networks:
+      - assessment-net
+
   judge-csharp:
     build:
       context: ./judge-service-go/environments/csharp
