@@ -19,7 +19,8 @@ const ParameterSchema = new Schema({
 const CompareConfigSchema = new Schema({
   mode: { type: String, enum: ['EXACT', 'STRUCTURAL'], default: 'EXACT' },
   floatTolerance: { type: Number, default: 0 },
-  orderInsensitive: { type: Boolean, default: false }
+  orderInsensitive: { type: Boolean, default: false },
+  requireDeepCopy: { type: Boolean, default: false }
 }, { _id: false });
 
 const ProblemSchema = new Schema({
