@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Route, Routes, Link, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { Code2, BookOpen, Settings, PlusCircle, LogIn, Database, LogOut, LayoutDashboard, Users } from 'lucide-react';
 import ProblemListPage from './pages/ProblemListPage';
 import AssessmentListPage from './pages/AssessmentListPage';
@@ -98,7 +98,7 @@ function AppContent() {
                 </h1>
                 <nav>
                     <NavLink to="/" icon={BookOpen}>Problems</NavLink>
-                    <NavLink to="/assessments" icon={LayoutDashboard}>Assessments</NavLink>
+                    {user && <NavLink to="/assessments" icon={LayoutDashboard}>Assessments</NavLink>}
                     {canCreateProblem && (
                         <NavLink to="/admin/assessments" icon={Settings}>Manage</NavLink>
                     )}
@@ -127,7 +127,7 @@ function AppContent() {
             </div>
             <Routes>
                 <Route path="/" element={<ProblemListPage user={user} />} />
-                <Route path="/assessments" element={<AssessmentListPage user={user} />} />
+                <Route path="/assessments" element={user ? <AssessmentListPage user={user} /> : <Navigate to="/login" replace />} />
                 <Route path="/assessments/:id" element={<AssessmentDetailsPage user={user} />} />
                 <Route path="/assessment-attempt/:attemptId" element={<AssessmentWorkspace user={user} />} />
                 <Route path="/assessment-attempt/:attemptId/result" element={<AssessmentResultPage user={user} />} />
