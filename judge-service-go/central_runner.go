@@ -204,11 +204,12 @@ func runSubmissionCentralPerTest(ctx context.Context, exec *executor.Executor, p
 			continue
 		}
 
-		out, parseErr := parseSingleTestOutput(stdoutTrimmed)
+		out, remainingStdout, parseErr := parseSingleTestOutput(stdoutTrimmed)
 		if parseErr != nil {
 			markTestFailed(&tr, models.SubmissionStatusRuntimeError)
 			result.InternalError = models.InternalErrorJudge
 			tr.TimeMs = time.Since(testStart).Milliseconds()
+			tr.Stdout = stdoutForResult
 			tr.Traceback = stdoutForResult
 			if tr.Traceback == "" && stderrForLog != "" {
 				tr.Traceback = stderrForLog
@@ -218,6 +219,7 @@ func runSubmissionCentralPerTest(ctx context.Context, exec *executor.Executor, p
 			continue
 		}
 
+		tr.Stdout = remainingStdout
 		if out.Error != "" {
 			reason := models.SubmissionStatusRuntimeError
 			if strings.Contains(strings.ToLower(out.Error), "outofmemory") || strings.Contains(strings.ToLower(out.Traceback), "outofmemory") {

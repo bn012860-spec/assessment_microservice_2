@@ -181,7 +181,7 @@ const UserManagementPage = () => {
       {activeTab === 'list' && (
         <div className="fade-in">
           {/* Filters */}
-          <div className="flex-between gap-4 mb-6" style={{ background: 'var(--surface)', padding: '16px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)' }}>
+          <div className="responsive-flex mb-6" style={{ background: 'var(--surface)', padding: '16px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)' }}>
             <div style={{ flex: 1, position: 'relative' }}>
               <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input 
@@ -189,7 +189,7 @@ const UserManagementPage = () => {
                 placeholder="Search by name or email..." 
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                style={{ paddingLeft: '40px', background: 'var(--bg)' }}
+                style={{ paddingLeft: '40px', background: 'var(--bg)', width: '100%' }}
               />
             </div>
             <div className="flex-center gap-3">
@@ -275,7 +275,7 @@ const UserManagementPage = () => {
       )}
 
       {activeTab === 'bulk' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '32px' }} className="fade-in">
+        <div className="grid-2-col fade-in">
           {/* Import Form */}
           <div className="problem-card">
             <h3 className="mb-6 flex-center gap-2" style={{ justifyContent: 'flex-start' }}>

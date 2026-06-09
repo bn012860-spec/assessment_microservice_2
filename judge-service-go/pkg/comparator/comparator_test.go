@@ -46,3 +46,22 @@ func TestCompare_OrderInsensitiveSlices(t *testing.T) {
 		t.Fatalf("expected slices to match ignoring order")
 	}
 }
+
+func TestCompare_NilAndEmptySlice(t *testing.T) {
+	cfg := models.CompareConfig{}
+	
+	if !Compare(nil, []interface{}{}, cfg) {
+		t.Fatalf("expected nil and empty slice to match")
+	}
+	
+	if !Compare([]interface{}{}, nil, cfg) {
+		t.Fatalf("expected empty slice and nil to match")
+	}
+	
+	// Test nested
+	expected := map[string]interface{}{"data": []interface{}{}}
+	actual := map[string]interface{}{"data": nil}
+	if !Compare(expected, actual, cfg) {
+		t.Fatalf("expected nested nil and empty slice to match")
+	}
+}

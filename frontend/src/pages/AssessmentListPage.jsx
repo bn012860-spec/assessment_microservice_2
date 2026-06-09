@@ -57,7 +57,7 @@ const AssessmentListPage = () => {
           {assessment.description}
         </p>
 
-        <div className="grid grid-cols-2 gap-4 mb-6" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+        <div className="grid-2-col-equal mb-6">
           <div className="flex-center gap-2 text-muted" style={{ fontSize: '0.8rem', justifyContent: 'flex-start' }}>
             <Calendar size={14} />
             <span>{new Date(assessment.startTime).toLocaleDateString()}</span>

@@ -58,8 +58,8 @@ function ProblemListPage({ user }) {
         )}
       </div>
 
-      <div className="flex-between gap-4 mb-8" style={{ background: 'var(--surface)', padding: 'var(--sp-4)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)' }}>
-        <div style={{ flex: 1, position: 'relative' }}>
+      <div className="responsive-flex mb-8" style={{ background: 'var(--surface)', padding: 'var(--sp-4)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)' }}>
+        <div style={{ flex: 1, position: 'relative', width: '100%' }}>
           <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input 
             type="text" 
@@ -67,11 +67,11 @@ function ProblemListPage({ user }) {
             placeholder="Search problems..." 
             value={filters.search} 
             onChange={handleFilterChange}
-            style={{ paddingLeft: '40px' }}
+            style={{ paddingLeft: '40px', width: '100%' }}
           />
         </div>
         <div style={{ width: '180px' }}>
-          <select name="difficulty" value={filters.difficulty} onChange={handleFilterChange}>
+          <select name="difficulty" value={filters.difficulty} onChange={handleFilterChange} style={{ width: '100%' }}>
             <option value="">All Difficulties</option>
             <option value="Easy">Easy</option>
             <option value="Medium">Medium</option>
@@ -85,6 +85,7 @@ function ProblemListPage({ user }) {
             placeholder="Filter by tag..." 
             value={filters.tag} 
             onChange={handleFilterChange}
+            style={{ width: '100%' }}
           />
         </div>
       </div>

@@ -388,7 +388,16 @@ const ProblemPage = ({ user }) => {
               scrollBeyondLastLine: false,
               automaticLayout: true,
               padding: { top: 20, bottom: 20 },
-              renderLineHighlight: 'all'
+              renderLineHighlight: 'all',
+              mouseWheelZoom: false,
+              mouseWheelScrollSensitivity: 1,
+              scrollbar: {
+                vertical: 'visible',
+                horizontal: 'visible',
+                verticalScrollbarSize: 10,
+                horizontalScrollbarSize: 10,
+                alwaysConsumeMouseWheel: false
+              }
             }}
           />
         </div>

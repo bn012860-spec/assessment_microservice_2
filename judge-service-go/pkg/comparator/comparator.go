@@ -17,7 +17,22 @@ func Compare(expected, actual interface{}, cfg models.CompareConfig) bool {
 
 func compareValue(expected, actual interface{}, tolerance float64, orderInsensitive bool) bool {
 	if expected == nil || actual == nil {
-		return expected == nil && actual == nil
+		if expected == nil && actual == nil {
+			return true
+		}
+		// If one is nil and the other is an empty slice, treat them as equal.
+		// This handles the case where empty linked lists/trees/arrays are serialized as null vs [].
+		if expected == nil {
+			if as, ok := toSlice(actual); ok && len(as) == 0 {
+				return true
+			}
+		}
+		if actual == nil {
+			if es, ok := toSlice(expected); ok && len(es) == 0 {
+				return true
+			}
+		}
+		return false
 	}
 
 	if en, ok := asFloat64(expected); ok {

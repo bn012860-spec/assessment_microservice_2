@@ -60,7 +60,7 @@ export default function buildTemplate(language, functionName, parameters = [], r
     return defs;
   }
 
-  if ((language || '').toLowerCase() === 'javascript' || (language || '').toLowerCase() === 'typescript') {
+  if ((language || '').toLowerCase() === 'javascript') {
     let defs = '';
     if (usesList) defs += `class ListNode {\n  constructor(val=0, next=null) { this.val = val; this.next = next; }\n}\n\n`;
     if (usesTree) defs += `class TreeNode {\n  constructor(val=0, left=null, right=null) { this.val = val; this.left = left; this.right = right; }\n}\n\n`;
@@ -69,9 +69,21 @@ export default function buildTemplate(language, functionName, parameters = [], r
     return defs;
   }
 
+  if ((language || '').toLowerCase() === 'typescript') {
+    const tsReturnType = mapType('typescript', returnType) || 'any';
+    const tsParams = (parameters || []).map(p => `${p.name}: ${mapType('typescript', p.type) || 'any'}`).join(', ');
+    
+    let defs = '';
+    if (usesList) defs += `class ListNode {\n  val: number;\n  next: ListNode | null;\n  constructor(val=0, next=null) { this.val = val; this.next = next; }\n}\n\n`;
+    if (usesTree) defs += `class TreeNode {\n  val: number;\n  left: TreeNode | null;\n  right: TreeNode | null;\n  constructor(val=0, left=null, right=null) { this.val = val; this.left = left; this.right = right; }\n}\n\n`;
+    if (usesGraph) defs += `class Node {\n  val: number;\n  neighbors: Node[];\n  constructor(val=0, neighbors: Node[] = []) { this.val = val; this.neighbors = neighbors; }\n}\n\n`;
+    defs += `function ${functionName}(${tsParams}): ${tsReturnType} {\n  // your code here\n}`;
+    return defs;
+  }
+
   if ((language || '').toLowerCase() === 'java') {
-    // keep similar behavior to previous implementation
-    const javaParams = (parameters || []).map(p => `${p.type || 'int'} ${p.name || 'arg'}`).join(', ');
+    const javaReturnType = mapType('java', returnType) || 'int';
+    const javaParams = (parameters || []).map(p => `${mapType('java', p.type) || 'int'} ${p.name || 'arg'}`).join(', ');
     let defs = 'import java.util.*;\n\n';
     if (usesList) {
       defs += `/*\nclass ListNode {\n    int val;\n    ListNode next;\n    ListNode() { val = 0; next = null; }\n    ListNode(int val) { this.val = val; next = null; }\n    ListNode(int val, ListNode next) { this.val = val; this.next = next; }\n}\n*/\n\n`;
@@ -82,27 +94,52 @@ export default function buildTemplate(language, functionName, parameters = [], r
     if (usesGraph) {
       defs += `/*\nclass Node {\n    public int val;\n    public List<Node> neighbors;\n    public Node() { val = 0; neighbors = new ArrayList<>(); }\n    public Node(int val) { this.val = val; neighbors = new ArrayList<>(); }\n    public Node(int val, List<Node> neighbors) { this.val = val; this.neighbors = neighbors; }\n}\n*/\n\n`;
     }
-    defs += `class Solution {\n    public ${returnType || 'int'} ${functionName}(${javaParams}) {\n        // your code here\n    }\n}`;
+    defs += `class Solution {\n    public ${javaReturnType} ${functionName}(${javaParams}) {\n        // your code here\n    }\n}`;
     return defs;
   }
   const lang = (language || '').toLowerCase();
 
   if (lang === 'cpp') {
     const cppReturn = mapType('cpp', returnType) || 'int';
-    const cppParams = (parameters || []).map(p => `${mapType('cpp', p.type)} ${p.name}`).join(', ');
-    return `#include <bits/stdc++.h>\nusing namespace std;\n\nclass Solution {\npublic:\n    ${cppReturn} ${functionName}(${cppParams}) {\n        // your code here\n    }\n};`;
+    const cppParams = (parameters || []).map(p => {
+      const type = mapType('cpp', p.type);
+      const isComplex = type.startsWith('vector') || type === 'string';
+      return `${type}${isComplex ? '&' : ''} ${p.name}`;
+    }).join(', ');
+    
+    let template = `#include <iostream>\n#include <vector>\n#include <string>\n#include <algorithm>\n\nusing namespace std;\n\n`;
+    if (usesList) {
+      template += `/*\nstruct ListNode {\n    int val;\n    ListNode *next;\n    ListNode(int x) : val(x), next(nullptr) {}\n};\n*/\n\n`;
+    }
+    if (usesTree) {
+      template += `/*\nstruct TreeNode {\n    int val;\n    TreeNode *left;\n    TreeNode *right;\n    TreeNode(int x) : val(x), left(nullptr), right(nullptr) {}\n};\n*/\n\n`;
+    }
+    template += `class Solution {\npublic:\n    ${cppReturn} ${functionName}(${cppParams}) {\n        // your code here\n    }\n};`;
+    return template;
   }
 
   if (lang === 'csharp') {
     const csReturn = mapType('csharp', returnType) || 'int';
     const csParams = (parameters || []).map(p => `${mapType('csharp', p.type)} ${p.name}`).join(', ');
-    return `using System;\nusing System.Collections.Generic;\n\npublic class Solution {\n    public ${csReturn} ${functionName}(${csParams}) {\n        // your code here\n    }\n}`;
+    let defsCS = `using System;\nusing System.Collections.Generic;\n\n`;
+    // Show as comments to avoid duplicate type definitions at compile time
+    if (usesList) defsCS += `/*\npublic class ListNode { public int val; public ListNode next; public ListNode(int x=0) { val = x; next = null; } }\n*/\n\n`;
+    if (usesTree) defsCS += `/*\npublic class TreeNode { public int val; public TreeNode left; public TreeNode right; public TreeNode(int x=0) { val = x; left = right = null; } }\n*/\n\n`;
+    if (usesGraph) defsCS += `/*\npublic class Node { public int val; public List<Node> neighbors; public Node() { neighbors = new List<Node>(); } public Node(int v) { val = v; neighbors = new List<Node>(); } }\n*/\n\n`;
+    defsCS += `public class Solution {\n    public ${csReturn} ${functionName}(${csParams}) {\n        // your code here\n    }\n}`;
+    return defsCS;
   }
 
   if (lang === 'go') {
     const goReturn = mapType('go', returnType) || '';
     const goParams = (parameters || []).map(p => `${p.name} ${mapType('go', p.type)}`).join(', ');
-    return `func ${functionName}(${goParams}) ${goReturn} {\n    // your code here\n}`;
+    let defsGo = `package main\n\n`;
+    // Show type definitions as comments to avoid duplicate type names when wrapper also defines helpers
+    if (usesList) defsGo += `/*\ntype ListNode struct { Val int; Next *ListNode }\n*/\n\n`;
+    if (usesTree) defsGo += `/*\ntype TreeNode struct { Val int; Left *TreeNode; Right *TreeNode }\n*/\n\n`;
+    if (usesGraph) defsGo += `/*\ntype Node struct { Val int; Neighbors []*Node }\n*/\n\n`;
+    defsGo += `func ${functionName}(${goParams}) ${goReturn} {\n    // your code here\n    return ${goReturn === 'string' ? '""' : goReturn === 'bool' ? 'false' : goReturn.includes('[]') ? 'nil' : '0'}\n}`;
+    return defsGo;
   }
 
   if (lang === 'c') {

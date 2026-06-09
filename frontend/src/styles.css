@@ -127,6 +127,13 @@ a {
   height: 100%;
 }
 
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6);
+  height: 100%;
+}
+
 .header nav a {
   color: var(--text-secondary);
   font-size: 0.9rem;
@@ -347,12 +354,36 @@ input:focus, textarea:focus, select:focus {
   overflow: hidden;
 }
 
+.workspace-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: 1200;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
 .assessment-workspace .workspace-main,
 .assessment-workspace .workspace-sidebar,
 .assessment-workspace .workspace-description,
 .assessment-workspace .workspace-editor {
   min-height: 0;
 }
+
+@media (max-width: 480px) {
+  .workspace-header {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 12px;
+  }
+}
+
 
 .ide-panel-left {
   width: 420px;
@@ -370,8 +401,24 @@ input:focus, textarea:focus, select:focus {
   background-color: var(--editor-bg);
   box-shadow: inset 1px 1px 4px rgba(0,0,0,0.2);
   min-height: 0;
-  overflow: hidden;
+  overflow: auto;
 }
+
+/* Monaco Editor Scrollbar Transparency */
+.monaco-editor .scrollbar {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.monaco-editor:hover .scrollbar {
+  opacity: 0.4;
+}
+
+.monaco-editor .scrollbar.active,
+.monaco-editor .scrollbar:hover {
+  opacity: 0.8 !important;
+}
+
 
 .ide-tabs {
   display: flex;
@@ -901,6 +948,49 @@ code {
   100% { transform: rotate(360deg); }
 }
 
+/* Responsive Utilities */
+.grid-2-col {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 32px;
+}
+
+.grid-2-col-equal {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.grid-3-col {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.responsive-flex {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sp-4);
+}
+
+.w-full { width: 100% !important; }
+
+@media (max-width: 1024px) {
+  .header h1 span {
+    display: none;
+  }
+  
+  .problem-card-grid {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+
+  .grid-2-col, .grid-2-col-equal, .grid-3-col {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+}
+
 @media (max-width: 992px) {
   .split-layout, .ide-layout {
     flex-direction: column;
@@ -928,7 +1018,7 @@ code {
   }
 
   .workspace-editor, .ide-panel-right {
-    min-height: 600px;
+    min-height: 500px;
   }
 
   .detail-layout {
@@ -945,3 +1035,103 @@ code {
     min-height: 500px;
   }
 }
+
+@media (max-width: 768px) {
+  .header {
+    height: auto;
+    padding: var(--sp-4);
+    flex-direction: column;
+    gap: var(--sp-4);
+    position: relative;
+  }
+
+  .header nav {
+    width: 100%;
+    flex-direction: column;
+    gap: var(--sp-4);
+    height: auto;
+  }
+
+  .nav-links {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: var(--sp-4);
+    height: auto;
+  }
+
+  .logout-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .container {
+    padding: var(--sp-4);
+  }
+
+  .problem-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sp-4);
+  }
+
+  .ide-toolbar {
+    flex-direction: column;
+    height: auto;
+    padding: var(--sp-4);
+    gap: var(--sp-4);
+  }
+
+  .ide-toolbar .flex-center {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .responsive-flex {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .responsive-flex > div {
+    width: 100% !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .header h1 {
+    font-size: 1.1rem;
+  }
+
+  .header nav {
+    gap: var(--sp-2);
+  }
+
+  .button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .modal-content {
+    width: 95%;
+    padding: var(--sp-4);
+  }
+
+  .testcase-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sp-2);
+  }
+
+  .table-container {
+    margin: 0 -16px;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+}
+
+

@@ -4,6 +4,7 @@ import Editor from '@monaco-editor/react';
 import { Clock, CheckCircle2, ChevronRight, Terminal, Play, Send, Info, Code2, AlertCircle, ChevronDown, ChevronUp, Loader2, Trash2 } from 'lucide-react';
 import api, { assessments } from '../api';
 import SubmissionOutput from '../components/SubmissionOutput';
+import buildTemplate from '../utils/buildTemplate';
 import { mapType } from '../utils/typeValidator';
 
 const supportedLanguages = ['python', 'javascript', 'typescript', 'java', 'cpp', 'c', 'csharp', 'go'];
@@ -15,121 +16,6 @@ function loadDraft(attemptId) {
     localStorage.removeItem(`assessment-draft:${attemptId}`);
     return {};
   }
-}
-
-function buildTemplate(language, functionName, parameters, returnType) {
-  const paramNames = (parameters || []).map(p => p.name);
-  const params = paramNames.join(', ');
-
-  const usesTree = (parameters || []).some(p => p.type && p.type.includes('tree')) || (returnType && returnType.includes('tree'));
-  const usesList = (parameters || []).some(p => p.type && p.type.includes('linkedlist')) || (returnType && returnType.includes('linkedlist'));
-  const usesGraph = (parameters || []).some(p => p.type && p.type.includes('graph')) || (returnType && returnType.includes('graph'));
-
-  if (language === 'python') {
-    let defs = '';
-    if (usesList) defs += `class ListNode:\n    def __init__(self, val=0, next=None):\n        self.val = val\n        self.next = next\n\n`;
-    if (usesTree) defs += `class TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\n`;
-    if (usesGraph) defs += `class Node:\n    def __init__(self, val=0, neighbors=None):\n        self.val = val\n        self.neighbors = neighbors if neighbors is not None else []\n\n`;
-    defs += `def ${functionName}(${params}):\n    # your code here\n    pass`;
-    return defs;
-  }
-  if (language === 'javascript') {
-    let defs = '';
-    if (usesList) defs += `class ListNode {\n  constructor(val=0, next=null) { this.val = val; this.next = next; }\n}\n\n`;
-    if (usesTree) defs += `class TreeNode {\n  constructor(val=0, left=null, right=null) { this.val = val; this.left = left; this.right = right; }\n}\n\n`;
-    if (usesGraph) defs += `class Node {\n  constructor(val=0, neighbors=[]) { this.val = val; this.neighbors = neighbors; }\n}\n\n`;
-    defs += `function ${functionName}(${params}) {\n  // your code here\n}`;
-    return defs;
-  }
-  if (language === 'typescript') {
-    let defs = '';
-    if (usesList) defs += `class ListNode {\n  val: number;\n  next: ListNode | null;\n  constructor(val=0, next=null) { this.val = val; this.next = next; }\n}\n\n`;
-    if (usesTree) defs += `class TreeNode {\n  val: number;\n  left: TreeNode | null;\n  right: TreeNode | null;\n  constructor(val=0, left=null, right=null) { this.val = val; this.left = left; this.right = right; }\n}\n\n`;
-    if (usesGraph) defs += `class Node {\n  val: number;\n  neighbors: Node[];\n  constructor(val=0, neighbors: Node[] = []) { this.val = val; this.neighbors = neighbors; }\n}\n\n`;
-    defs += `function ${functionName}(${params}): any {\n  // your code here\n}`;
-    return defs;
-  }
-  
-  if (language === 'java') {
-    const javaReturnType = mapType('java', returnType);
-    const javaParams = (parameters || []).map(p => `${mapType('java', p.type)} ${p.name}`).join(', ');
-
-    const usesTree = (parameters || []).some(p => p.type && p.type.includes('tree')) || (returnType && returnType.includes('tree'));
-    const usesList = (parameters || []).some(p => p.type && p.type.includes('linkedlist')) || (returnType && returnType.includes('linkedlist'));
-    const usesGraph = (parameters || []).some(p => p.type && p.type.includes('graph')) || (returnType && returnType.includes('graph'));
-
-    let defs = 'import java.util.*;\n\n';
-    // Show structure definitions as comments to avoid class name conflicts with wrapper
-    if (usesList) {
-      defs += `/*\nclass ListNode {\n    int val;\n    ListNode next;\n    ListNode() { val = 0; next = null; }\n    ListNode(int val) { this.val = val; next = null; }\n    ListNode(int val, ListNode next) { this.val = val; this.next = next; }\n}\n*/\n\n`;
-    }
-    if (usesTree) {
-      defs += `/*\nclass TreeNode {\n    int val;\n    TreeNode left;\n    TreeNode right;\n    TreeNode() { val = 0; left = right = null; }\n    TreeNode(int val) { this.val = val; left = right = null; }\n    TreeNode(int val, TreeNode left, TreeNode right) { this.val = val; this.left = left; this.right = right; }\n}\n*/\n\n`;
-    }
-    if (usesGraph) {
-      defs += `/*\nclass Node {\n    public int val;\n    public List<Node> neighbors;\n    public Node() { val = 0; neighbors = new ArrayList<>(); }\n    public Node(int val) { this.val = val; neighbors = new ArrayList<>(); }\n    public Node(int val, List<Node> neighbors) { this.val = val; this.neighbors = neighbors; }\n}\n*/\n\n`;
-    }
-
-    defs += `class Solution {\n    public ${javaReturnType} ${functionName}(${javaParams}) {\n        // your code here\n    }\n}`;
-    return defs;
-  }
-
-  if (language === 'cpp') {
-    const cppReturnType = mapType('cpp', returnType);
-    const cppParams = (parameters || []).map(p => {
-      const type = mapType('cpp', p.type);
-      const isComplex = type.startsWith('vector') || type === 'string';
-      return `${type}${isComplex ? '&' : ''} ${p.name}`;
-    }).join(', ');
-    
-    let template = `#include <iostream>\n#include <vector>\n#include <string>\n#include <algorithm>\n\nusing namespace std;\n\n`;
-    
-    const usesTree = (parameters || []).some(p => p.type.includes('tree')) || returnType.includes('tree');
-    const usesList = (parameters || []).some(p => p.type.includes('linkedlist')) || returnType.includes('linkedlist');
-    
-    if (usesList) {
-      template += `/**\n * struct ListNode {\n *     int val;\n *     ListNode *next;\n *     ListNode(int x) : val(x), next(nullptr) {}\n * };\n */\n\n`;
-    }
-    if (usesTree) {
-      template += `/**\n * struct TreeNode {\n *     int val;\n *     TreeNode *left;\n *     TreeNode *right;\n *     TreeNode(int x) : val(x), left(nullptr), right(nullptr) {}\n * };\n */\n\n`;
-    }
-    
-    template += `class Solution {\npublic:\n    ${cppReturnType} ${functionName}(${cppParams}) {\n        // your code here\n    }\n};`;
-    return template;
-  }
-
-  if (language === 'csharp') {
-    const csReturnType = mapType('csharp', returnType);
-    const csParams = (parameters || []).map(p => `${mapType('csharp', p.type)} ${p.name}`).join(', ');
-    const usesTreeCS = (parameters || []).some(p => p.type && p.type.includes('tree')) || (returnType && returnType.includes('tree'));
-    const usesListCS = (parameters || []).some(p => p.type && p.type.includes('linkedlist')) || (returnType && returnType.includes('linkedlist'));
-    const usesGraphCS = (parameters || []).some(p => p.type && p.type.includes('graph')) || (returnType && returnType.includes('graph'));
-    let defsCS = `using System;\nusing System.Collections.Generic;\n\n`;
-    // Show as comments to avoid duplicate type definitions at compile time
-    if (usesListCS) defsCS += `/*\npublic class ListNode { public int val; public ListNode next; public ListNode(int x=0) { val = x; next = null; } }\n*/\n\n`;
-    if (usesTreeCS) defsCS += `/*\npublic class TreeNode { public int val; public TreeNode left; public TreeNode right; public TreeNode(int x=0) { val = x; left = right = null; } }\n*/\n\n`;
-    if (usesGraphCS) defsCS += `/*\npublic class Node { public int val; public List<Node> neighbors; public Node() { neighbors = new List<Node>(); } public Node(int v) { val = v; neighbors = new List<Node>(); } }\n*/\n\n`;
-    defsCS += `public class Solution {\n    public ${csReturnType} ${functionName}(${csParams}) {\n        // your code here\n    }\n}`;
-    return defsCS;
-  }
-
-  if (language === 'go') {
-    const goReturnType = mapType('go', returnType);
-    const goParams = (parameters || []).map(p => `${p.name} ${mapType('go', p.type)}`).join(', ');
-    const usesTree = (parameters || []).some(p => p.type && p.type.includes('tree')) || (returnType && returnType.includes('tree'));
-    const usesList = (parameters || []).some(p => p.type && p.type.includes('linkedlist')) || (returnType && returnType.includes('linkedlist'));
-    const usesGraph = (parameters || []).some(p => p.type && p.type.includes('graph')) || (returnType && returnType.includes('graph'));
-    let defsGo = `package main\n\n`;
-    // Show type definitions as comments to avoid duplicate type names when wrapper also defines helpers
-    if (usesList) defsGo += `/*\ntype ListNode struct { Val int; Next *ListNode }\n*/\n\n`;
-    if (usesTree) defsGo += `/*\ntype TreeNode struct { Val int; Left *TreeNode; Right *TreeNode }\n*/\n\n`;
-    if (usesGraph) defsGo += `/*\ntype Node struct { Val int; Neighbors []*Node }\n*/\n\n`;
-    defsGo += `func ${functionName}(${goParams}) ${goReturnType} {\n    // your code here\n    return ${goReturnType === 'string' ? '""' : goReturnType === 'bool' ? 'false' : goReturnType.includes('[]') ? 'nil' : '0'}\n}`;
-    return defsGo;
-  }
-
-  if (language === 'c') return `long ${functionName}(long *args, int argc) {\n    // your code here\n    return 0;\n}`;
-  return `public class UserSolution {\n    public object ${functionName}(${paramNames.map((p) => `object ${p}`).join(', ')}) {\n        // your code here\n        return null;\n    }\n}`;
 }
 
 const AssessmentWorkspace = () => {
@@ -603,7 +489,7 @@ const AssessmentWorkspace = () => {
   return (
     <div className="ide-layout assessment-workspace fade-in">
       <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', minHeight: 0, minWidth: 0, flex: 1 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', padding: '12px 20px', borderBottom: '1px solid var(--border)', background: 'var(--surface)', position: 'sticky', top: 0, zIndex: 1200, flexWrap: 'wrap', flexShrink: 0 }}>
+        <div className="workspace-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flexWrap: 'wrap' }}>
             <div style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{assessment?.title || 'Assessment'}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
@@ -675,7 +561,7 @@ const AssessmentWorkspace = () => {
             </div>
           </div>
 
-          <div className="workspace-main" style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
+          <div className="workspace-main" style={{ display: 'flex', flex: 1, overflow: 'auto', minHeight: 0 }}>
             {/* Problem Description */}
             <div className="workspace-description" style={{ width: '420px', minWidth: '320px', overflowY: 'auto', padding: '32px', borderRight: '1px solid var(--border)', background: 'var(--bg)', minHeight: 0 }}>
               <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1rem' }}>{currentProblem.title}</h2>
@@ -741,7 +627,16 @@ const AssessmentWorkspace = () => {
                     scrollBeyondLastLine: false,
                     automaticLayout: true,
                     padding: { top: 20, bottom: 20 },
-                    renderLineHighlight: 'all'
+                    renderLineHighlight: 'all',
+                    mouseWheelZoom: false,
+                    mouseWheelScrollSensitivity: 1,
+                    scrollbar: {
+                      vertical: 'visible',
+                      horizontal: 'visible',
+                      verticalScrollbarSize: 10,
+                      horizontalScrollbarSize: 10,
+                      alwaysConsumeMouseWheel: false
+                    }
                   }}
                 />
               </div>

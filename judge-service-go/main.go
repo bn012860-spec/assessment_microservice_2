@@ -86,14 +86,16 @@ func truncateString(s string, maxBytes int) (string, bool) {
 	return s[:maxBytes], true
 }
 
-func parseSingleTestOutput(rawStdout string) (singleTestExecOutput, error) {
+func parseSingleTestOutput(rawStdout string) (singleTestExecOutput, string, error) {
 	var out singleTestExecOutput
 	trimmed := strings.TrimSpace(rawStdout)
 	if trimmed == "" {
-		return out, fmt.Errorf("empty wrapper output")
+		return out, "", fmt.Errorf("empty wrapper output")
 	}
+
+	// Try parsing the whole thing as JSON first (common case)
 	if err := json.Unmarshal([]byte(trimmed), &out); err == nil {
-		return out, nil
+		return out, "", nil
 	}
 
 	// If user prints extra lines, try parsing the last non-empty line as JSON.
@@ -104,11 +106,13 @@ func parseSingleTestOutput(rawStdout string) (singleTestExecOutput, error) {
 			continue
 		}
 		if err := json.Unmarshal([]byte(line), &out); err == nil {
-			return out, nil
+			// Found the JSON line. The rest is user stdout.
+			remainingStdout := strings.Join(lines[:i], "\n")
+			return out, remainingStdout, nil
 		}
 		break
 	}
-	return out, fmt.Errorf("wrapper output is not valid JSON")
+	return out, rawStdout, fmt.Errorf("wrapper output is not valid JSON")
 }
 
 func perTestTimeout(problem models.Problem) time.Duration {

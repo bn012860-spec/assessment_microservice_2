@@ -108,6 +108,7 @@ const SubmissionOutput = ({ output }) => {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                         {normalizedDetails.map((detail, idx) => {
                             const passed = detail.passed ?? detail.ok ?? false;
+                            const isHidden = detail.isHidden === true;
                             const testNumber = detail.test ?? detail.testIndex ?? idx + 1;
                             
                             return (
@@ -115,13 +116,18 @@ const SubmissionOutput = ({ output }) => {
                                     <div className={`testcase-header ${passed ? 'passed' : 'failed'}`} style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: passed ? 'rgba(34, 197, 94, 0.05)' : 'rgba(239, 68, 68, 0.05)' }}>
                                         <div className="flex-center gap-2" style={{ fontWeight: '600', color: passed ? 'var(--success)' : 'var(--error)' }}>
                                             {passed ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
-                                            <span>Case {testNumber}</span>
+                                            <span>{isHidden ? `Hidden Case` : `Case ${testNumber}`}</span>
                                         </div>
                                         <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                                             {detail.timeMs ? `${detail.timeMs} ms` : (detail.time ? `${detail.time} ms` : '')}
                                         </span>
                                     </div>
                                     <div className="testcase-body" style={{ padding: '16px' }}>
+                                        {isHidden && (
+                                            <div style={{ marginBottom: '12px', padding: '8px 12px', background: 'rgba(0,0,0,0.1)', borderRadius: '6px', fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <AlertTriangle size={14} /> Test case details are hidden.
+                                            </div>
+                                        )}
                                         {detail.error && (
                                             <div className="testcase-field mb-4">
                                                 <span className="label" style={{ display: 'block', fontSize: '0.75rem', color: 'var(--error)', fontWeight: '600', marginBottom: '4px' }}>Error</span>

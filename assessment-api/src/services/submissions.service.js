@@ -107,7 +107,10 @@ function sanitizeResultDetails(details = [], testCases = []) {
 
     return {
       test: detail.test,
-      ok: detail.ok
+      ok: detail.ok,
+      isHidden: true,
+      stdout: detail.stdout,
+      stderr: detail.stderr
     };
   });
 }

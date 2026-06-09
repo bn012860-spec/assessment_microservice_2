@@ -111,30 +111,32 @@ function AppContent() {
                 </h1>
                 {!isAssessmentRoute && (
                 <nav>
-                    <NavLink to="/" icon={BookOpen}>Problems</NavLink>
-                    {user && <NavLink to="/assessments" icon={LayoutDashboard}>Assessments</NavLink>}
-                    {canCreateProblem && (
-                        <NavLink to="/admin/assessments" icon={Settings}>Manage</NavLink>
-                    )}
-                    {canCreateProblem && (
-                        <NavLink to="/admin/users" icon={Users}>Users</NavLink>
-                    )}
-                    {isSuperAdmin && (
-                        <NavLink to="/admin/system" icon={Database}>System</NavLink>
-                    )}
-                    {canCreateProblem && (
-                        <NavLink to="/add-problem" icon={PlusCircle}>Add Problem</NavLink>
-                    )}
-                    {!user && (
-                        <NavLink to="/login" icon={LogIn}>Login</NavLink>
-                    )}
+                    <div className="nav-links">
+                        <NavLink to="/" icon={BookOpen}>Problems</NavLink>
+                        {user && <NavLink to="/assessments" icon={LayoutDashboard}>Assessments</NavLink>}
+                        {canCreateProblem && (
+                            <NavLink to="/admin/assessments" icon={Settings}>Manage</NavLink>
+                        )}
+                        {canCreateProblem && (
+                            <NavLink to="/admin/users" icon={Users}>Users</NavLink>
+                        )}
+                        {isSuperAdmin && (
+                            <NavLink to="/admin/system" icon={Database}>System</NavLink>
+                        )}
+                        {canCreateProblem && (
+                            <NavLink to="/add-problem" icon={PlusCircle}>Add Problem</NavLink>
+                        )}
+                        {!user && (
+                            <NavLink to="/login" icon={LogIn}>Login</NavLink>
+                        )}
+                        {user && (
+                            <NavLink to="/my-submissions" icon={Code2}>My Submissions</NavLink>
+                        )}
+                    </div>
                     {user && (
-                        <NavLink to="/my-submissions" icon={Code2}>My Submissions</NavLink>
-                    )}
-                    {user && (
-                        <button className="button button-outline" onClick={handleLogout} style={{ padding: '6px 12px', fontSize: '0.85rem' }}>
+                        <button className="button button-outline logout-btn" onClick={handleLogout} style={{ padding: '6px 12px', fontSize: '0.85rem' }}>
                             <LogOut size={16} />
-                            Logout
+                            <span>Logout</span>
                         </button>
                     )}
                 </nav>
