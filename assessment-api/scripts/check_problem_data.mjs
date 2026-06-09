@@ -1,17 +1,22 @@
-import 'dotenv/config';
 import mongoose from 'mongoose';
-import Problem from './models/Problem.mjs'; // Import the official model
+import Problem from '../models/Problem.mjs'; // Import the official model
 import dotenv from 'dotenv';
-dotenv.config({ path: 'assessment-api/.env' });
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-const dbURI = process.env.MONGO_URI;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+
+const dbURI = process.env.MONGO_URI || 'mongodb://localhost:27017/assessment_db';
 
 async function checkProblemData() {
     try {
         await mongoose.connect(dbURI, { dbName: 'assessment_db' });
         console.log('✅ Connected to MongoDB');
 
-        const problem = await Problem.findOne({ title: 'Sum of Even Numbers' });
+        const problem = await Problem.findOne({ title: 'Two Sum' });
         if (!problem) {
             console.error('❌ Problem not found');
             return;

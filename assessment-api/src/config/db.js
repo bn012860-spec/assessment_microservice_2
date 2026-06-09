@@ -17,7 +17,7 @@ export default async function connectDB() {
   console.log("✅ Connected to MongoDB via MongoClient");
 
   await mongoose.connect(env.MONGO_URI, {
-    dbName: "assessment_db",
+    dbName: env.MONGO_DB_NAME || "assessment_db",
     serverSelectionTimeoutMS: 3000
   });
   console.log("✅ Connected to MongoDB via Mongoose");

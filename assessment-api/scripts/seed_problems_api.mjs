@@ -1,5 +1,13 @@
 import mongoose from "mongoose";
 import Problem from "../models/Problem.mjs";
+import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 const MONGO_URI = process.env.MONGO_URI || "mongodb://mongo:27017/assessment_db";
 const DB_NAME = process.env.MONGO_DB_NAME || "assessment_db";
