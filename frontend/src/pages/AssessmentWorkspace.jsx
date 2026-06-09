@@ -139,6 +139,13 @@ const AssessmentWorkspace = (props) => {
   const [timeLeft, setTimeLeft] = useState(null);
   const [showConsole, setShowConsole] = useState(false);
   const [consoleTab, setConsoleTab] = useState('testcases');
+  const [tabSwitchCount, setTabSwitchCount] = useState(0);
+  const [copyCount, setCopyCount] = useState(0);
+  const [pasteCount, setPasteCount] = useState(0);
+  const [showTabWarning, setShowTabWarning] = useState(false);
+  const [fsExitWarning, setFsExitWarning] = useState(false);
+  const [fsWarningTimeLeft, setFsWarningTimeLeft] = useState(0);
+  const fsIntervalRef = useRef(null);
 
   const [testCasesMap, setTestCasesMap] = useState({});
   const [activeTestCaseIdxMap, setActiveTestCaseIdxMap] = useState({});
@@ -203,22 +210,53 @@ const AssessmentWorkspace = (props) => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
         assessments.logEvent(attemptId, 'TAB_SWITCH').catch(() => {});
+        setTabSwitchCount(prev => prev + 1);
+        setShowTabWarning(true);
+        window.setTimeout(() => setShowTabWarning(false), 5000);
       }
     };
 
     // Anti-cheating: Copy/Paste
     const handleCopy = () => {
       assessments.logEvent(attemptId, 'COPY').catch(() => {});
+      setCopyCount(prev => prev + 1);
+      setShowTabWarning(true);
+      window.setTimeout(() => setShowTabWarning(false), 5000);
     };
 
     const handlePaste = () => {
       assessments.logEvent(attemptId, 'PASTE').catch(() => {});
+      setPasteCount(prev => prev + 1);
+      setShowTabWarning(true);
+      window.setTimeout(() => setShowTabWarning(false), 5000);
     };
 
     // Anti-cheating: Fullscreen
     const handleFullscreenChange = () => {
       if (!document.fullscreenElement) {
         assessments.logEvent(attemptId, 'FULLSCREEN_EXIT').catch(() => {});
+        // show a 20s warning and auto-submit on expiry
+        setFsExitWarning(true);
+        setFsWarningTimeLeft(20);
+        if (fsIntervalRef.current) clearInterval(fsIntervalRef.current);
+        fsIntervalRef.current = setInterval(() => {
+          setFsWarningTimeLeft(prev => {
+            if (prev <= 1) {
+              clearInterval(fsIntervalRef.current);
+              fsIntervalRef.current = null;
+              // auto-submit and navigate
+              assessments.submitAttempt(attemptId).catch(() => {});
+              navigate(`/assessment-attempt/${attemptId}/result`);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      } else {
+        // returned to fullscreen: clear warning
+        setFsExitWarning(false);
+        setFsWarningTimeLeft(0);
+        if (fsIntervalRef.current) { clearInterval(fsIntervalRef.current); fsIntervalRef.current = null; }
       }
     };
 
@@ -243,6 +281,7 @@ const AssessmentWorkspace = (props) => {
       document.removeEventListener('paste', handlePaste);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       document.removeEventListener('click', enterFS);
+      if (fsIntervalRef.current) { clearInterval(fsIntervalRef.current); fsIntervalRef.current = null; }
     };
   }, [attemptId, timeLeft]);
 
@@ -452,6 +491,18 @@ const AssessmentWorkspace = (props) => {
             {formatTime(timeLeft)}
           </div>
         </div>
+        {/* Security status */}
+        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>Security</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{tabSwitchCount + copyCount + pasteCount} events</div>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '8px', fontSize: '0.85rem' }}>
+            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '6px 8px', borderRadius: '8px' }}>Tabs: <strong style={{ marginLeft: '6px' }}>{tabSwitchCount}</strong></div>
+            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '6px 8px', borderRadius: '8px' }}>Copy: <strong style={{ marginLeft: '6px' }}>{copyCount}</strong></div>
+            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '6px 8px', borderRadius: '8px' }}>Paste: <strong style={{ marginLeft: '6px' }}>{pasteCount}</strong></div>
+          </div>
+        </div>
         
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
           <h4 style={{ margin: '0 0 16px', fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Problems</h4>
@@ -489,6 +540,27 @@ const AssessmentWorkspace = (props) => {
           </button>
         </div>
       </div>
+
+      {/* Transient warning banner for tab/copy/paste events */}
+      {showTabWarning && (
+        <div style={{ position: 'fixed', top: 96, right: 24, background: 'var(--warning)', color: 'black', padding: '10px 14px', borderRadius: '8px', zIndex: 1300 }}>
+          Security event recorded. This has been logged.
+        </div>
+      )}
+
+      {/* Fullscreen exit warning modal */}
+      {fsExitWarning && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1400 }}>
+          <div style={{ width: '520px', maxWidth: '94%', background: 'var(--surface)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border)', textAlign: 'center' }}>
+            <h3 style={{ marginTop: 0 }}>You left fullscreen</h3>
+            <p style={{ color: 'var(--text-secondary)' }}>Re-enter fullscreen within <strong>{fsWarningTimeLeft}</strong> seconds or your attempt will be submitted automatically.</p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '16px' }}>
+              <button className="button" onClick={async () => { try { await document.documentElement.requestFullscreen(); } catch(e) {} }}>Return to Fullscreen</button>
+              <button className="button button-outline" onClick={async () => { if (fsIntervalRef.current) { clearInterval(fsIntervalRef.current); fsIntervalRef.current = null; } await assessments.submitAttempt(attemptId); navigate(`/assessment-attempt/${attemptId}/result`); }}>Submit Now</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main IDE Area */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>

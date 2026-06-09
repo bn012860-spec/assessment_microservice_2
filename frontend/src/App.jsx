@@ -92,6 +92,8 @@ function AppContent() {
         );
     };
 
+    const isAssessmentRoute = location.pathname.startsWith('/assessment-attempt/');
+
     return (
         <>
             <div className="header">
@@ -99,6 +101,7 @@ function AppContent() {
                     <Code2 size={28} />
                     <span>Placement Assessment</span>
                 </h1>
+                {!isAssessmentRoute && (
                 <nav>
                     <NavLink to="/" icon={BookOpen}>Problems</NavLink>
                     {user && <NavLink to="/assessments" icon={LayoutDashboard}>Assessments</NavLink>}
@@ -127,6 +130,7 @@ function AppContent() {
                         </button>
                     )}
                 </nav>
+                )}
             </div>
             <Routes>
                 <Route path="/" element={<ProblemListPage user={user} />} />

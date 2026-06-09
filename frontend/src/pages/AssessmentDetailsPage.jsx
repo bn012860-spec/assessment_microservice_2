@@ -10,6 +10,9 @@ const AssessmentDetailsPage = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [starting, setStarting] = useState(false);
+  const [showInstructions, setShowInstructions] = useState(false);
+  const [showFsPrompt, setShowFsPrompt] = useState(false);
+  const [fsPending, setFsPending] = useState(false);
 
   useEffect(() => {
     const fetchAssessment = async () => {
@@ -25,11 +28,7 @@ const AssessmentDetailsPage = ({ user }) => {
     fetchAssessment();
   }, [id]);
 
-  const handleStart = async () => {
-    if (!window.confirm('Are you sure you want to start this assessment? The timer will begin immediately.')) {
-      return;
-    }
-
+  const startAttempt = async () => {
     setStarting(true);
     try {
       const res = await assessments.start(id);
@@ -39,6 +38,54 @@ const AssessmentDetailsPage = ({ user }) => {
       alert(err.response?.data?.msg || 'Failed to start assessment');
     } finally {
       setStarting(false);
+    }
+  };
+
+  const handleStart = () => {
+    // show instructions modal first
+    setShowInstructions(true);
+  };
+
+  const handleBeginAfterInstructions = () => {
+    // prompt for fullscreen next
+    setShowInstructions(false);
+    setShowFsPrompt(true);
+  };
+
+  const enterFullscreenAndStart = async (allowWithoutFs = false) => {
+    setFsPending(true);
+    const onFsChange = async () => {
+      if (document.fullscreenElement) {
+        document.removeEventListener('fullscreenchange', onFsChange);
+        setShowFsPrompt(false);
+        await startAttempt();
+      }
+    };
+
+    try {
+      // request fullscreen; some browsers require user gesture and may reject
+      const el = document.documentElement;
+      if (el.requestFullscreen) {
+        document.addEventListener('fullscreenchange', onFsChange);
+        await el.requestFullscreen();
+        // if requestFullscreen resolves but event not yet fired, handler will trigger
+      } else if (allowWithoutFs) {
+        setShowFsPrompt(false);
+        await startAttempt();
+      } else {
+        alert('Fullscreen API not supported by your browser. Please allow fullscreen or start without fullscreen.');
+      }
+    } catch (err) {
+      // user likely denied or request failed
+      document.removeEventListener('fullscreenchange', onFsChange);
+      if (allowWithoutFs) {
+        setShowFsPrompt(false);
+        await startAttempt();
+      } else {
+        alert('Unable to enter fullscreen. You can try again or start without fullscreen (not recommended).');
+      }
+    } finally {
+      setFsPending(false);
     }
   };
 
@@ -56,6 +103,7 @@ const AssessmentDetailsPage = ({ user }) => {
   const availableForUser = isAvailable && isStudent;
 
   return (
+    <>
     <div className="container fade-in">
       <div className="mb-8">
         <Link to="/assessments" className="text-muted flex-center gap-2 mb-6" style={{ width: 'fit-content', fontSize: '0.9rem', justifyContent: 'flex-start' }}>
@@ -178,6 +226,43 @@ const AssessmentDetailsPage = ({ user }) => {
         }
       `}</style>
     </div>
+
+      {/* Instructions Modal */}
+      {showInstructions && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200 }}>
+          <div style={{ width: '720px', maxWidth: '94%', background: 'var(--surface)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+            <h3 style={{ marginTop: 0 }}>Assessment Instructions</h3>
+            <div style={{ color: 'var(--text-secondary)', marginBottom: '16px' }}>
+              <p>Please read the instructions carefully before starting. The assessment will run in fullscreen mode and the timer will begin only after you enter fullscreen.</p>
+              <ul style={{ marginLeft: '1.2rem' }}>
+                <li>Do not leave fullscreen during the assessment.</li>
+                <li>Switching tabs, copy/paste, or leaving fullscreen will be logged and may trigger warnings.</li>
+                <li>Your work is auto-submitted on a critical violation or if the fullscreen exit countdown expires.</li>
+              </ul>
+            </div>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button className="button button-outline" onClick={() => setShowInstructions(false)}>Cancel</button>
+              <button className="button" onClick={handleBeginAfterInstructions}>I Understand & Continue</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fullscreen Prompt Modal */}
+      {showFsPrompt && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200 }}>
+          <div style={{ width: '560px', maxWidth: '94%', background: 'var(--surface)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+            <h3 style={{ marginTop: 0 }}>Enter Fullscreen to Start</h3>
+            <p style={{ color: 'var(--text-secondary)' }}>For best security, please enter fullscreen now. The assessment timer will begin once fullscreen is active.</p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button className="button button-outline" onClick={() => { setShowFsPrompt(false); }}>Cancel</button>
+              <button className="button" onClick={() => enterFullscreenAndStart(false)} disabled={fsPending}>{fsPending ? 'Entering Fullscreen...' : 'Enter Fullscreen and Start'}</button>
+              <button className="button button-ghost" onClick={() => enterFullscreenAndStart(true)} disabled={fsPending}>Start Without Fullscreen</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 
