@@ -116,6 +116,9 @@ function buildTemplate(language, functionName, parameters, returnType) {
   if (language === 'go') {
     const goReturnType = mapType('go', returnType);
     const goParams = (parameters || []).map(p => `${p.name} ${mapType('go', p.type)}`).join(', ');
+    const usesTree = (parameters || []).some(p => p.type && p.type.includes('tree')) || (returnType && returnType.includes('tree'));
+    const usesList = (parameters || []).some(p => p.type && p.type.includes('linkedlist')) || (returnType && returnType.includes('linkedlist'));
+    const usesGraph = (parameters || []).some(p => p.type && p.type.includes('graph')) || (returnType && returnType.includes('graph'));
     let defsGo = `package main\n\n`;
     // Show type definitions as comments to avoid duplicate type names when wrapper also defines helpers
     if (usesList) defsGo += `/*\ntype ListNode struct { Val int; Next *ListNode }\n*/\n\n`;
@@ -153,8 +156,10 @@ const AssessmentWorkspace = () => {
   const [copyCount, setCopyCount] = useState(0);
   const [pasteCount, setPasteCount] = useState(0);
   const [showTabWarning, setShowTabWarning] = useState(false);
+  const [securityWarningCount, setSecurityWarningCount] = useState(0);
   const [fsExitWarning, setFsExitWarning] = useState(false);
   const [fsWarningTimeLeft, setFsWarningTimeLeft] = useState(0);
+  const [fsWarningReason, setFsWarningReason] = useState('');
   const fsIntervalRef = useRef(null);
 
   const [testCasesMap, setTestCasesMap] = useState({});
@@ -164,6 +169,9 @@ const AssessmentWorkspace = () => {
     finishStartedRef.current = true;
     try {
       await assessments.submitAttempt(attemptId);
+      if (document.fullscreenElement) {
+        await document.exitFullscreen().catch(() => {});
+      }
       localStorage.removeItem(`assessment-draft:${attemptId}`);
       navigate(`/assessment-attempt/${attemptId}/result`);
     } catch (err) {
@@ -171,6 +179,39 @@ const AssessmentWorkspace = () => {
       setError(err.response?.data?.msg || 'Failed to submit assessment');
     }
   }, [attemptId, navigate]);
+
+  const recordSecurityViolation = useCallback((eventType) => {
+    assessments.logEvent(attemptId, eventType).catch(() => {});
+    setSecurityWarningCount((prev) => prev + 1);
+    setShowTabWarning(true);
+    window.setTimeout(() => setShowTabWarning(false), 5000);
+  }, [attemptId]);
+
+  const startSecurityCountdown = useCallback((reason) => {
+    setFsExitWarning(true);
+    setFsWarningReason(reason);
+    setFsWarningTimeLeft(20);
+    if (fsIntervalRef.current) clearInterval(fsIntervalRef.current);
+    fsIntervalRef.current = setInterval(() => {
+      setFsWarningTimeLeft((prev) => {
+        if (prev <= 1) {
+          if (fsIntervalRef.current) {
+            clearInterval(fsIntervalRef.current);
+            fsIntervalRef.current = null;
+          }
+          finishAttempt();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, [finishAttempt]);
+
+  useEffect(() => {
+    if (securityWarningCount >= 10) {
+      finishAttempt();
+    }
+  }, [securityWarningCount, finishAttempt]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -184,8 +225,8 @@ const AssessmentWorkspace = () => {
           return;
         }
 
-        // getAttempt returns the assessment with the server-shuffled problem order.
-        const assessmentData = attemptData.assessmentId;
+        const assessmentId = attemptData.assessmentId?._id || attemptData.assessmentId;
+        const assessmentData = (await assessments.get(assessmentId)).data;
         setAssessment(assessmentData);
 
         const problemPromises = assessmentData.problems.map(p => api.get(`/api/problems/${p.problemId._id || p.problemId}`));
@@ -252,51 +293,81 @@ const AssessmentWorkspace = () => {
     // Anti-cheating: Tab Switching
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
-        assessments.logEvent(attemptId, 'TAB_SWITCH').catch(() => {});
+        recordSecurityViolation('TAB_SWITCH');
         setTabSwitchCount(prev => prev + 1);
-        setShowTabWarning(true);
-        window.setTimeout(() => setShowTabWarning(false), 5000);
+        startSecurityCountdown('tab switch');
       }
     };
 
     // Anti-cheating: Copy/Paste
-    const handleCopy = () => {
-      assessments.logEvent(attemptId, 'COPY').catch(() => {});
+    const handleCopy = (e) => {
+      e.preventDefault();
+      recordSecurityViolation('COPY');
       setCopyCount(prev => prev + 1);
-      setShowTabWarning(true);
-      window.setTimeout(() => setShowTabWarning(false), 5000);
     };
 
-    const handlePaste = () => {
-      assessments.logEvent(attemptId, 'PASTE').catch(() => {});
+    const handlePaste = (e) => {
+      e.preventDefault();
+      recordSecurityViolation('PASTE');
       setPasteCount(prev => prev + 1);
-      setShowTabWarning(true);
-      window.setTimeout(() => setShowTabWarning(false), 5000);
+    };
+
+    const handleCut = (e) => {
+      e.preventDefault();
+      recordSecurityViolation('COPY');
+      setCopyCount(prev => prev + 1);
+    };
+
+    const handleContextMenu = (e) => {
+      e.preventDefault();
+      recordSecurityViolation('COPY');
+    };
+
+    const handleSelectStart = (e) => {
+      e.preventDefault();
+    };
+
+    const handleKeyDown = (e) => {
+      const key = (e.key || '').toLowerCase();
+      const isDevToolsShortcut =
+        key === 'f12' ||
+        (e.ctrlKey && e.shiftKey && ['i', 'j', 'c'].includes(key)) ||
+        (e.ctrlKey && ['u', 's', 'p'].includes(key));
+
+      if (isDevToolsShortcut) {
+        e.preventDefault();
+        e.stopPropagation();
+        recordSecurityViolation('FULLSCREEN_EXIT');
+        return;
+      }
+
+      if (e.ctrlKey && key === 'c') {
+        e.preventDefault();
+        e.stopPropagation();
+        recordSecurityViolation('COPY');
+        setCopyCount(prev => prev + 1);
+      } else if (e.ctrlKey && key === 'v') {
+        e.preventDefault();
+        e.stopPropagation();
+        recordSecurityViolation('PASTE');
+        setPasteCount(prev => prev + 1);
+      } else if (e.ctrlKey && key === 'x') {
+        e.preventDefault();
+        e.stopPropagation();
+        recordSecurityViolation('COPY');
+        setCopyCount(prev => prev + 1);
+      }
     };
 
     // Anti-cheating: Fullscreen
     const handleFullscreenChange = () => {
       if (!document.fullscreenElement) {
         assessments.logEvent(attemptId, 'FULLSCREEN_EXIT').catch(() => {});
-        // show a 20s warning and auto-submit on expiry
-        setFsExitWarning(true);
-        setFsWarningTimeLeft(20);
-        if (fsIntervalRef.current) clearInterval(fsIntervalRef.current);
-        fsIntervalRef.current = setInterval(() => {
-          setFsWarningTimeLeft(prev => {
-            if (prev <= 1) {
-              clearInterval(fsIntervalRef.current);
-              fsIntervalRef.current = null;
-              // auto-submit and navigate
-              finishAttempt();
-              return 0;
-            }
-            return prev - 1;
-          });
-        }, 1000);
+        startSecurityCountdown('fullscreen exit');
       } else {
         // returned to fullscreen: clear warning
         setFsExitWarning(false);
+        setFsWarningReason('');
         setFsWarningTimeLeft(0);
         if (fsIntervalRef.current) { clearInterval(fsIntervalRef.current); fsIntervalRef.current = null; }
       }
@@ -305,6 +376,10 @@ const AssessmentWorkspace = () => {
     document.addEventListener('visibilitychange', handleVisibilityChange);
     document.addEventListener('copy', handleCopy);
     document.addEventListener('paste', handlePaste);
+    document.addEventListener('cut', handleCut);
+    document.addEventListener('contextmenu', handleContextMenu);
+    document.addEventListener('selectstart', handleSelectStart);
+    document.addEventListener('keydown', handleKeyDown, true);
     document.addEventListener('fullscreenchange', handleFullscreenChange);
 
     // Try to enter fullscreen (user must have interacted first, so we do it on a slight delay or wait for interaction)
@@ -321,11 +396,15 @@ const AssessmentWorkspace = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       document.removeEventListener('copy', handleCopy);
       document.removeEventListener('paste', handlePaste);
+      document.removeEventListener('cut', handleCut);
+      document.removeEventListener('contextmenu', handleContextMenu);
+      document.removeEventListener('selectstart', handleSelectStart);
+      document.removeEventListener('keydown', handleKeyDown, true);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       document.removeEventListener('click', enterFS);
       if (fsIntervalRef.current) { clearInterval(fsIntervalRef.current); fsIntervalRef.current = null; }
     };
-  }, [attemptActive, attemptId, finishAttempt]);
+  }, [attemptActive, attemptId, finishAttempt, recordSecurityViolation]);
 
   useEffect(() => {
     if (!attemptActive) return;
@@ -522,283 +601,270 @@ const AssessmentWorkspace = () => {
   const currentActiveIdx = activeTestCaseIdxMap[currentProblem._id] || 0;
 
   return (
-    <div className="ide-layout fade-in">
-      {/* Sidebar: Navigation & Timer */}
-      <div className="workspace-sidebar" style={{ width: '320px', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
-        <div style={{ padding: '24px', borderBottom: '1px solid var(--border)', textAlign: 'center', background: 'var(--surface)' }}>
-          <div className="flex-center gap-2 mb-2" style={{ color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.1em' }}>
-            <Clock size={14} /> Time Remaining
+    <div className="ide-layout assessment-workspace fade-in">
+      <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', minHeight: 0, minWidth: 0, flex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', padding: '12px 20px', borderBottom: '1px solid var(--border)', background: 'var(--surface)', position: 'sticky', top: 0, zIndex: 1200, flexWrap: 'wrap', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flexWrap: 'wrap' }}>
+            <div style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{assessment?.title || 'Assessment'}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              <span>Security violations: <strong style={{ color: securityWarningCount >= 10 ? 'var(--error)' : 'var(--warning)' }}>{securityWarningCount}</strong>/10</span>
+              <span style={{ color: tabSwitchCount > 0 ? 'var(--error)' : 'var(--text-muted)', fontWeight: 600 }}>Tabs: {tabSwitchCount}</span>
+              <span style={{ color: copyCount > 0 ? 'var(--warning)' : 'var(--text-muted)', fontWeight: 600 }}>Copy: {copyCount}</span>
+              <span style={{ color: pasteCount > 0 ? 'var(--warning)' : 'var(--text-muted)', fontWeight: 600 }}>Paste: {pasteCount}</span>
+            </div>
           </div>
-          <div style={{ fontSize: '2.5rem', fontWeight: '800', color: timeLeft < 300 ? 'var(--error)' : 'var(--primary)', fontFamily: 'monospace' }}>
-            {formatTime(timeLeft)}
-          </div>
-        </div>
-        {/* Security status */}
-        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>Security</div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{tabSwitchCount + copyCount + pasteCount} events</div>
-          </div>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '8px', fontSize: '0.85rem' }}>
-            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '6px 8px', borderRadius: '8px' }}>Tabs: <strong style={{ marginLeft: '6px' }}>{tabSwitchCount}</strong></div>
-            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '6px 8px', borderRadius: '8px' }}>Copy: <strong style={{ marginLeft: '6px' }}>{copyCount}</strong></div>
-            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '6px 8px', borderRadius: '8px' }}>Paste: <strong style={{ marginLeft: '6px' }}>{pasteCount}</strong></div>
+          <div style={{ fontSize: '0.85rem', color: showTabWarning || securityWarningCount > 0 ? 'var(--warning)' : 'var(--text-muted)', whiteSpace: 'nowrap', fontWeight: 700 }}>
+            {showTabWarning || securityWarningCount > 0 ? 'Warning active' : 'Monitoring active'}
           </div>
         </div>
-        
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
-          <h4 style={{ margin: '0 0 16px', fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Problems</h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {problems.map((p, idx) => (
-              <button
-                key={p._id}
-                onClick={() => setCurrentProblemIndex(idx)}
-                className={`button ${currentProblemIndex === idx ? '' : 'button-outline'}`}
-                style={{ 
-                  textAlign: 'left', 
-                  justifyContent: 'flex-start',
-                  padding: '12px 16px',
-                  fontWeight: '600',
-                  fontSize: '0.9rem',
-                  border: currentProblemIndex === idx ? 'none' : '1px solid var(--border)'
-                }}
+        {fsExitWarning && (
+          <div style={{ position: 'sticky', top: '57px', zIndex: 1199, padding: '10px 20px', background: 'rgba(245, 158, 11, 0.15)', borderBottom: '1px solid rgba(245, 158, 11, 0.35)', color: 'var(--warning)', fontWeight: 700, display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', flexShrink: 0 }}>
+            <span>
+              {fsWarningReason === 'fullscreen exit'
+                ? `Fullscreen exited. Return within ${fsWarningTimeLeft} seconds or the assessment will be submitted.`
+                : `Warning: ${fsWarningReason} detected. Return within ${fsWarningTimeLeft} seconds or the assessment will be submitted.`}
+            </span>
+            <span style={{ whiteSpace: 'nowrap' }}>Countdown active</span>
+          </div>
+        )}
+        <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+          {/* Sidebar: Navigation & Timer */}
+          <div className="workspace-sidebar" style={{ width: '320px', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: 'var(--bg)', minHeight: 0 }}>
+            <div style={{ padding: '24px', borderBottom: '1px solid var(--border)', textAlign: 'center', background: 'var(--surface)' }}>
+              <div className="flex-center gap-2 mb-2" style={{ color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.1em' }}>
+                <Clock size={14} /> Time Remaining
+              </div>
+              <div style={{ fontSize: '2.5rem', fontWeight: '800', color: timeLeft < 300 ? 'var(--error)' : 'var(--primary)', fontFamily: 'monospace' }}>
+                {formatTime(timeLeft)}
+              </div>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+              <h4 style={{ margin: '0 0 16px', fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Problems</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {problems.map((p, idx) => (
+                  <button
+                    key={p._id}
+                    onClick={() => setCurrentProblemIndex(idx)}
+                    className={`button ${currentProblemIndex === idx ? '' : 'button-outline'}`}
+                    style={{ 
+                      textAlign: 'left', 
+                      justifyContent: 'flex-start',
+                      padding: '12px 16px',
+                      fontWeight: '600',
+                      fontSize: '0.9rem',
+                      border: currentProblemIndex === idx ? 'none' : '1px solid var(--border)'
+                    }}
+                  >
+                    <span style={{ marginRight: '10px', opacity: 0.6 }}>{idx + 1}.</span>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</span>
+                    {submissionMap[p._id]?.status === 'Success' && <CheckCircle2 size={16} color="var(--success)" style={{ marginLeft: 'auto' }} />}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ padding: '20px', borderTop: '1px solid var(--border)', background: 'var(--surface)' }}>
+              <button 
+                className="button" 
+                style={{ width: '100%', background: 'var(--success)', padding: '14px', fontSize: '1rem', border: 'none', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)' }}
+                onClick={finishAssessment}
               >
-                <span style={{ marginRight: '10px', opacity: 0.6 }}>{idx + 1}.</span>
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</span>
-                {submissionMap[p._id]?.status === 'Success' && <CheckCircle2 size={16} color="var(--success)" style={{ marginLeft: 'auto' }} />}
+                <CheckCircle2 size={20} />
+                Finish Assessment
               </button>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ padding: '20px', borderTop: '1px solid var(--border)', background: 'var(--surface)' }}>
-          <button 
-            className="button" 
-            style={{ width: '100%', background: 'var(--success)', padding: '14px', fontSize: '1rem', border: 'none', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)' }}
-            onClick={finishAssessment}
-          >
-            <CheckCircle2 size={20} />
-            Finish Assessment
-          </button>
-        </div>
-      </div>
-
-      {/* Transient warning banner for tab/copy/paste events */}
-      {showTabWarning && (
-        <div style={{ position: 'fixed', top: 96, right: 24, background: 'var(--warning)', color: 'black', padding: '10px 14px', borderRadius: '8px', zIndex: 1300, minWidth: 260 }}>
-          <div style={{ fontWeight: 700, marginBottom: 6 }}>Security event recorded</div>
-          <div style={{ fontSize: '0.9rem' }}>
-            Tab switches: <strong>{tabSwitchCount}</strong> • Copy: <strong>{copyCount}</strong> • Paste: <strong>{pasteCount}</strong>
-          </div>
-          <div style={{ marginTop: 8, fontSize: '0.85rem', color: 'rgba(0,0,0,0.8)' }}>
-            Warning: {tabSwitchCount + copyCount + pasteCount}/5 — repeated violations may auto-submit your attempt.
-          </div>
-        </div>
-      )}
-
-      {/* Fullscreen exit warning modal */}
-      {fsExitWarning && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1400 }}>
-          <div style={{ width: '520px', maxWidth: '94%', background: 'var(--surface)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border)', textAlign: 'center' }}>
-            <h3 style={{ marginTop: 0 }}>You left fullscreen</h3>
-            <p style={{ color: 'var(--text-secondary)' }}>Re-enter fullscreen within <strong>{fsWarningTimeLeft}</strong> seconds or your attempt will be submitted automatically.</p>
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '16px' }}>
-              <button className="button" onClick={async () => { try { await document.documentElement.requestFullscreen(); } catch { setError('Unable to enter fullscreen'); } }}>Return to Fullscreen</button>
-              <button className="button button-outline" onClick={async () => { if (fsIntervalRef.current) { clearInterval(fsIntervalRef.current); fsIntervalRef.current = null; } await finishAttempt(); }}>Submit Now</button>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Main IDE Area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div className="workspace-main" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-          {/* Problem Description */}
-          <div className="workspace-description" style={{ width: '420px', minWidth: '320px', overflowY: 'auto', padding: '32px', borderRight: '1px solid var(--border)', background: 'var(--bg)' }}>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1rem' }}>{currentProblem.title}</h2>
-            <div className="flex-gap mb-6">
-              <span className={`tag difficulty-${currentProblem.difficulty.toLowerCase()}`}>{currentProblem.difficulty}</span>
-              <span className="tag">Score: {assessment.problems[currentProblemIndex]?.maxScore || 100}</span>
-            </div>
-            
-            <div style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.7', whiteSpace: 'pre-wrap', marginBottom: '2rem' }}>
-              {currentProblem.description}
-            </div>
-            
-            <div style={{ background: 'var(--surface)', padding: '20px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)' }}>
-              <h4 style={{ fontSize: '0.85rem', color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Specs</h4>
-              <div style={{ display: 'grid', gap: '10px', fontSize: '0.9rem' }}>
-                <p><strong>Function:</strong> <code style={{ color: 'var(--primary)', background: 'transparent' }}>{currentProblem.functionName}</code></p>
-                <p><strong>Return:</strong> <code style={{ color: 'var(--success)', background: 'transparent' }}>{currentProblem.returnType}</code></p>
-                <p><strong>Params:</strong> {(currentProblem.parameters || []).map(p => `${p.name} (${p.type})`).join(', ')}</p>
+          <div className="workspace-main" style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
+            {/* Problem Description */}
+            <div className="workspace-description" style={{ width: '420px', minWidth: '320px', overflowY: 'auto', padding: '32px', borderRight: '1px solid var(--border)', background: 'var(--bg)', minHeight: 0 }}>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1rem' }}>{currentProblem.title}</h2>
+              <div className="flex-gap mb-6">
+                <span className={`tag difficulty-${currentProblem.difficulty.toLowerCase()}`}>{currentProblem.difficulty}</span>
+                <span className="tag">Score: {assessment.problems[currentProblemIndex]?.maxScore || 100}</span>
               </div>
-            </div>
-          </div>
-
-          {/* Editor Panel */}
-          <div className="workspace-editor" style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--editor-bg)', boxShadow: 'inset 1px 1px 4px rgba(0,0,0,0.2)' }}>
-            <div className="ide-toolbar">
-              <div className="flex-center gap-4">
-                <div className="flex-center gap-2">
-                  <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Language</span>
-                  <select
-                    value={langMap[currentProblem._id]}
-                    onChange={(e) => handleLanguageChange(currentProblem._id, e.target.value)}
-                    disabled={isJudging}
-                    style={{ width: 'auto', padding: '4px 8px', fontSize: '0.85rem', background: 'var(--bg)' }}
-                  >
-                    {(assessment.allowedLanguages?.length > 0 ? assessment.allowedLanguages : supportedLanguages).map(lang => (
-                      <option key={lang} value={lang}>{lang}</option>
-                    ))}
-                  </select>
+              
+              <div style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.7', whiteSpace: 'pre-wrap', marginBottom: '2rem' }}>
+                {currentProblem.description}
+              </div>
+              
+              <div style={{ background: 'var(--surface)', padding: '20px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)' }}>
+                <h4 style={{ fontSize: '0.85rem', color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Specs</h4>
+                <div style={{ display: 'grid', gap: '10px', fontSize: '0.9rem' }}>
+                  <p><strong>Function:</strong> <code style={{ color: 'var(--primary)', background: 'transparent' }}>{currentProblem.functionName}</code></p>
+                  <p><strong>Return:</strong> <code style={{ color: 'var(--success)', background: 'transparent' }}>{currentProblem.returnType}</code></p>
+                  <p><strong>Params:</strong> {(currentProblem.parameters || []).map(p => `${p.name} (${p.type})`).join(', ')}</p>
                 </div>
               </div>
-              <div className="flex-center gap-2">
-                <button onClick={handleRun} disabled={isRunning || isJudging} className="button button-outline" style={{ height: '36px', padding: '0 16px', fontSize: '0.85rem', borderColor: 'rgba(255,255,255,0.1)' }}>
-                  <Play size={14} /> Run
-                </button>
-                <button onClick={handleSubmit} disabled={isRunning || isJudging} className="button button-primary" style={{ height: '36px', padding: '0 20px', fontSize: '0.85rem' }}>
-                  <Send size={14} /> Submit
-                </button>
-              </div>
             </div>
 
-            <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
-              <Editor
-                height="100%"
-                language={langMap[currentProblem._id] === 'python' ? 'python' : langMap[currentProblem._id] === 'javascript' ? 'javascript' : langMap[currentProblem._id]}
-                theme="modern-dark"
-                value={codeMap[currentProblem._id]}
-                onChange={(val) => handleCodeChange(currentProblem._id, val)}
-                beforeMount={handleEditorWillMount}
-                options={{
-                  fontSize: 15,
-                  fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-                  minimap: { enabled: false },
-                  scrollBeyondLastLine: false,
-                  automaticLayout: true,
-                  padding: { top: 20, bottom: 20 },
-                  renderLineHighlight: 'all'
-                }}
-              />
-            </div>
-
-            {/* Developer Console Drawer */}
-            <div className="console-drawer" style={{ height: showConsole ? '35%' : '44px' }}>
-              <div className="console-header">
-                <div className="console-tabs">
-                  <button 
-                    className={`console-tab ${consoleTab === 'testcases' ? 'active' : ''}`} 
-                    onClick={() => { setConsoleTab('testcases'); setShowConsole(true); }}
-                  >
-                    Testcases
-                  </button>
-                  <button 
-                    className={`console-tab ${consoleTab === 'console' ? 'active' : ''}`} 
-                    onClick={() => { setConsoleTab('console'); setShowConsole(true); }}
-                  >
-                    Console
-                  </button>
-                  <button 
-                    className={`console-tab ${consoleTab === 'result' ? 'active' : ''}`} 
-                    onClick={() => { setConsoleTab('result'); setShowConsole(true); }}
-                  >
-                    Result
-                  </button>
+            {/* Editor Panel */}
+            <div className="workspace-editor" style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--editor-bg)', boxShadow: 'inset 1px 1px 4px rgba(0,0,0,0.2)', minHeight: 0 }}>
+              <div className="ide-toolbar">
+                <div className="flex-center gap-4">
+                  <div className="flex-center gap-2">
+                    <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Language</span>
+                    <select
+                      value={langMap[currentProblem._id]}
+                      onChange={(e) => handleLanguageChange(currentProblem._id, e.target.value)}
+                      disabled={isJudging}
+                      style={{ width: 'auto', padding: '4px 8px', fontSize: '0.85rem', background: 'var(--bg)' }}
+                    >
+                      {(assessment.allowedLanguages?.length > 0 ? assessment.allowedLanguages : supportedLanguages).map(lang => (
+                        <option key={lang} value={lang}>{lang}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 <div className="flex-center gap-2">
-                  <button className="text-muted flex-center" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }} onClick={() => setShowConsole(!showConsole)}>
-                    {showConsole ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+                  <button onClick={handleRun} disabled={isRunning || isJudging} className="button button-outline" style={{ height: '36px', padding: '0 16px', fontSize: '0.85rem', borderColor: 'rgba(255,255,255,0.1)' }}>
+                    <Play size={14} /> Run
+                  </button>
+                  <button onClick={handleSubmit} disabled={isRunning || isJudging} className="button button-primary" style={{ height: '36px', padding: '0 20px', fontSize: '0.85rem' }}>
+                    <Send size={14} /> Submit
                   </button>
                 </div>
               </div>
 
-              {showConsole && (
-                <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
-                  {(isRunning || isJudging) ? (
-                    <div className="flex-center fade-in" style={{ height: '100%', flexDirection: 'column', gap: '16px' }}>
-                      <Loader2 className="spin" size={32} color="var(--primary)" />
-                      <p className="text-muted" style={{ fontWeight: '600', letterSpacing: '0.05em', textTransform: 'uppercase', fontSize: '0.85rem' }}>
-                        {isRunning ? 'Executing Code...' : 'Judging Submission...'}
-                      </p>
-                    </div>
-                  ) : (
-                    <>
-                      {consoleTab === 'testcases' && (
-                        <div className="fade-in">
-                          <div className="flex-between mb-4">
-                            <div className="flex-center gap-2" style={{ overflowX: 'auto', paddingBottom: '4px' }}>
-                              {currentTestCases.map((tc, idx) => (
+              <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
+                <Editor
+                  height="100%"
+                  language={langMap[currentProblem._id] === 'python' ? 'python' : langMap[currentProblem._id] === 'javascript' ? 'javascript' : langMap[currentProblem._id]}
+                  theme="modern-dark"
+                  value={codeMap[currentProblem._id]}
+                  onChange={(val) => handleCodeChange(currentProblem._id, val)}
+                  beforeMount={handleEditorWillMount}
+                  options={{
+                    fontSize: 15,
+                    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                    minimap: { enabled: false },
+                    scrollBeyondLastLine: false,
+                    automaticLayout: true,
+                    padding: { top: 20, bottom: 20 },
+                    renderLineHighlight: 'all'
+                  }}
+                />
+              </div>
+
+              {/* Developer Console Drawer */}
+              <div className="console-drawer" style={{ height: showConsole ? '35%' : '44px' }}>
+                <div className="console-header">
+                  <div className="console-tabs">
+                    <button 
+                      className={`console-tab ${consoleTab === 'testcases' ? 'active' : ''}`} 
+                      onClick={() => { setConsoleTab('testcases'); setShowConsole(true); }}
+                    >
+                      Testcases
+                    </button>
+                    <button 
+                      className={`console-tab ${consoleTab === 'console' ? 'active' : ''}`} 
+                      onClick={() => { setConsoleTab('console'); setShowConsole(true); }}
+                    >
+                      Console
+                    </button>
+                    <button 
+                      className={`console-tab ${consoleTab === 'result' ? 'active' : ''}`} 
+                      onClick={() => { setConsoleTab('result'); setShowConsole(true); }}
+                    >
+                      Result
+                    </button>
+                  </div>
+                  <div className="flex-center gap-2">
+                    <button className="text-muted flex-center" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }} onClick={() => setShowConsole(!showConsole)}>
+                      {showConsole ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+                    </button>
+                  </div>
+                </div>
+
+                {showConsole && (
+                  <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+                    {(isRunning || isJudging) ? (
+                      <div className="flex-center fade-in" style={{ height: '100%', flexDirection: 'column', gap: '16px' }}>
+                        <Loader2 className="spin" size={32} color="var(--primary)" />
+                        <p className="text-muted" style={{ fontWeight: '600', letterSpacing: '0.05em', textTransform: 'uppercase', fontSize: '0.85rem' }}>
+                          {isRunning ? 'Executing Code...' : 'Judging Submission...'}
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        {consoleTab === 'testcases' && (
+                          <div className="fade-in">
+                            <div className="flex-between mb-4">
+                              <div className="flex-center gap-2" style={{ overflowX: 'auto', paddingBottom: '4px' }}>
+                                {currentTestCases.map((tc, idx) => (
+                                  <button 
+                                    key={idx} 
+                                    onClick={() => setActiveTestCaseIdxMap(prev => ({ ...prev, [currentProblem._id]: idx }))} 
+                                    className="button"
+                                    style={{ 
+                                      padding: '4px 12px', 
+                                      fontSize: '0.8rem',
+                                      borderRadius: '100px',
+                                      background: currentActiveIdx === idx ? 'var(--primary-glow)' : 'var(--bg)',
+                                      color: currentActiveIdx === idx ? 'var(--primary)' : 'var(--text-secondary)',
+                                      border: `1px solid ${currentActiveIdx === idx ? 'var(--primary)' : 'var(--border)'}` 
+                                    }}
+                                  >
+                                    Case {idx + 1}
+                                  </button>
+                                ))}
                                 <button 
-                                  key={idx} 
-                                  onClick={() => setActiveTestCaseIdxMap(prev => ({ ...prev, [currentProblem._id]: idx }))} 
+                                  onClick={() => handleAddTestCase(currentProblem._id)} 
                                   className="button"
-                                  style={{ 
-                                    padding: '4px 12px', 
-                                    fontSize: '0.8rem',
-                                    borderRadius: '100px',
-                                    background: currentActiveIdx === idx ? 'var(--primary-glow)' : 'var(--bg)',
-                                    color: currentActiveIdx === idx ? 'var(--primary)' : 'var(--text-secondary)',
-                                    border: `1px solid ${currentActiveIdx === idx ? 'var(--primary)' : 'var(--border)'}` 
-                                  }}
+                                  style={{ padding: '4px 12px', fontSize: '0.8rem', borderRadius: '100px', background: 'var(--bg)', border: '1px dashed var(--border)', color: 'var(--text-secondary)' }}
                                 >
-                                  Case {idx + 1}
+                                  + Add Case
                                 </button>
-                              ))}
-                              <button 
-                                onClick={() => handleAddTestCase(currentProblem._id)} 
-                                className="button"
-                                style={{ padding: '4px 12px', fontSize: '0.8rem', borderRadius: '100px', background: 'var(--bg)', border: '1px dashed var(--border)', color: 'var(--text-secondary)' }}
-                              >
-                                + Add Case
-                              </button>
+                              </div>
+                              {currentTestCases.length > 1 && (
+                                <button onClick={() => handleRemoveTestCase(currentProblem._id, currentActiveIdx)} className="text-muted" style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                                  <Trash2 size={16} />
+                                </button>
+                              )}
                             </div>
-                            {currentTestCases.length > 1 && (
-                              <button onClick={() => handleRemoveTestCase(currentProblem._id, currentActiveIdx)} className="text-muted" style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-                                <Trash2 size={16} />
-                              </button>
+
+                            <div>
+                              <label style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', display: 'block' }}>JSON Input Array</label>
+                              <textarea
+                                value={currentTestCases[currentActiveIdx] || ''}
+                                onChange={(e) => handleTestCaseChange(currentProblem._id, currentActiveIdx, e.target.value)}
+                                placeholder='e.g., [[2,7,11,15], 9]'
+                                style={{ height: '120px', fontSize: '0.9rem', fontFamily: "'JetBrains Mono', monospace", background: 'var(--bg)', width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', color: 'var(--text)' }}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {consoleTab === 'result' && (
+                          <div className="fade-in">
+                            {currentRunResult && <SubmissionOutput output={currentRunResult} />}
+                            {currentSubmission && !currentRunResult && <SubmissionOutput output={currentSubmission.output || { status: currentSubmission.status }} />}
+                            {!currentRunResult && !currentSubmission && (
+                              <div className="flex-center" style={{ height: '100px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                                Run your code to see results here.
+                              </div>
                             )}
                           </div>
+                        )}
 
-                          <div>
-                            <label style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', display: 'block' }}>JSON Input Array</label>
-                            <textarea
-                              value={currentTestCases[currentActiveIdx] || ''}
-                              onChange={(e) => handleTestCaseChange(currentProblem._id, currentActiveIdx, e.target.value)}
-                              placeholder='e.g., [[2,7,11,15], 9]'
-                              style={{ height: '120px', fontSize: '0.9rem', fontFamily: "'JetBrains Mono', monospace", background: 'var(--bg)', width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', color: 'var(--text)' }}
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {consoleTab === 'result' && (
-                        <div className="fade-in">
-                          {currentRunResult && <SubmissionOutput output={currentRunResult} />}
-                          {currentSubmission && !currentRunResult && <SubmissionOutput output={currentSubmission.output || { status: currentSubmission.status }} />}
-                          {!currentRunResult && !currentSubmission && (
+                        {consoleTab === 'console' && (
+                          <div className="fade-in">
                             <div className="flex-center" style={{ height: '100px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                              Run your code to see results here.
+                              Raw stdout logs will appear here during execution.
                             </div>
-                          )}
-                        </div>
-                      )}
-
-                      {consoleTab === 'console' && (
-                        <div className="fade-in">
-                          <div className="flex-center" style={{ height: '100px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                            Raw stdout logs will appear here during execution.
                           </div>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
+      
       </div>
+
     </div>
   );
 };

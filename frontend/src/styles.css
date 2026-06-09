@@ -342,6 +342,18 @@ input:focus, textarea:focus, select:focus {
   background-color: var(--bg);
 }
 
+.assessment-workspace.ide-layout {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.assessment-workspace .workspace-main,
+.assessment-workspace .workspace-sidebar,
+.assessment-workspace .workspace-description,
+.assessment-workspace .workspace-editor {
+  min-height: 0;
+}
+
 .ide-panel-left {
   width: 420px;
   min-width: 320px;
