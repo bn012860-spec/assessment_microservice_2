@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -27,10 +28,13 @@ import (
 	"judge-service-go/pkg/central/adapters"
 	"judge-service-go/pkg/executor"
 	"judge-service-go/pkg/languages"
+	"judge-service-go/pkg/metrics"
 	"judge-service-go/pkg/models"
 	"judge-service-go/pkg/pool"
 	"judge-service-go/pkg/workspace"
 	"judge-service-go/pkg/wrapper"
+
+	docker "github.com/fsouza/go-dockerclient"
 )
 
 const (
@@ -48,6 +52,10 @@ const (
 	maxTestsBytes           = 1 << 20 // 1MB
 	defaultPoolSizePerLang  = 2
 )
+
+// MaxExecutionsPerContainer controls how many times a pooled container may be
+// used before being evicted. Can be changed at startup from env.
+var MaxExecutionsPerContainer int32 = 100
 
 func failOnError(err error, msg string) {
 	if err != nil {
@@ -326,6 +334,98 @@ func looksLikeContainerFailure(message string) bool {
 		strings.Contains(msg, "no such container")
 }
 
+// cleanupOrphanContainers removes containers left from previous runs that
+// were created by this service (labelled with managed-by=judge-service).
+func cleanupOrphanContainers(ctx context.Context, cli *docker.Client) error {
+	filters := map[string][]string{
+		"label": {"managed-by=judge-service"},
+	}
+	opts := docker.ListContainersOptions{
+		All:     true,
+		Filters: filters,
+	}
+	containers, err := cli.ListContainers(opts)
+	if err != nil {
+		return fmt.Errorf("failed to list docker containers: %w", err)
+	}
+
+	removed := 0
+	for _, c := range containers {
+		slog.Info("Removing orphan container", "id", c.ID, "names", c.Names)
+		if err := cli.RemoveContainer(docker.RemoveContainerOptions{ID: c.ID, Force: true}); err != nil {
+			slog.Error("Failed to remove orphan container", "id", c.ID, "error", err)
+			continue
+		}
+		removed++
+	}
+	if removed > 0 {
+		slog.Info("Startup cleanup removed orphan containers", "count", removed)
+	}
+	return nil
+}
+
+// StartPeriodicOrphanGC starts a background goroutine that periodically
+// removes stopped/dead containers labelled as managed-by=judge-service.
+func StartPeriodicOrphanGC(ctx context.Context, cli *docker.Client, interval time.Duration) {
+	if interval <= 0 {
+		return
+	}
+	ticker := time.NewTicker(interval)
+	go func() {
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				filters := map[string][]string{
+					"label":  {"managed-by=judge-service"},
+					"status": {"exited", "dead"},
+				}
+				opts := docker.ListContainersOptions{All: true, Filters: filters}
+				containers, err := cli.ListContainers(opts)
+				if err != nil {
+					slog.Error("periodic GC: failed to list containers", "error", err)
+					continue
+				}
+				removed := 0
+				for _, c := range containers {
+					slog.Info("periodic GC removing container", "id", c.ID, "names", c.Names, "status", c.Status)
+					if err := cli.RemoveContainer(docker.RemoveContainerOptions{ID: c.ID, Force: true}); err != nil {
+						slog.Error("periodic GC: failed to remove container", "id", c.ID, "error", err)
+						continue
+					}
+					removed++
+				}
+				if removed > 0 {
+					slog.Info("periodic GC removed containers", "count", removed)
+				}
+				// Update metrics
+				metrics.SetGCLastRun(time.Now())
+				if removed > 0 {
+					metrics.AddGCRemoved(removed)
+					// Count statuses roughly by scanning container statuses
+					exited := 0
+					dead := 0
+					for _, c := range containers {
+						if strings.Contains(strings.ToLower(c.Status), "exited") {
+							exited++
+						}
+						if strings.Contains(strings.ToLower(c.Status), "dead") {
+							dead++
+						}
+					}
+					if exited > 0 {
+						metrics.AddGCRemovedExited(exited)
+					}
+					if dead > 0 {
+						metrics.AddGCRemovedDead(dead)
+					}
+				}
+			}
+		}
+	}()
+}
 
 func finishWithContainer(containerPool *pool.ContainerPool, container *pool.PooledContainer, discard bool, reason string) {
 	if discard {
@@ -484,7 +584,7 @@ func processSubmission(d amqp.Delivery, ch *amqp.Channel, retryQueueName string,
 	pooledContainer := containerPool.Acquire(acquireCtx, lang.ID)
 	if pooledContainer == nil {
 		slog.Warn("No available containers for language, routing to retry queue", "submissionId", submissionMsg.SubmissionID, "language", lang.ID)
-		
+
 		// To avoid hot-requeue loop, we publish to a retry queue with TTL
 		err := ch.PublishWithContext(ctx, "", retryQueueName, false, false, amqp.Publishing{
 			ContentType:  d.ContentType,
@@ -496,12 +596,19 @@ func processSubmission(d amqp.Delivery, ch *amqp.Channel, retryQueueName string,
 			d.Nack(false, true) // Fallback to basic requeue
 			return
 		}
-		
+
 		d.Ack(false)
 		return
 	}
 	discardContainer := false
 	discardReason := ""
+	// Increment execution count and mark for discard if it exceeded the threshold
+	cnt := atomic.AddInt32(&pooledContainer.ExecutionCount, 1)
+	if cnt >= atomic.LoadInt32(&MaxExecutionsPerContainer) {
+		slog.Info("Container reached max executions; will be discarded after use", "containerId", pooledContainer.ID, "count", cnt)
+		discardContainer = true
+		discardReason = fmt.Sprintf("max executions reached: %d", cnt)
+	}
 	defer func() {
 		finishWithContainer(containerPool, pooledContainer, discardContainer, discardReason)
 	}()
@@ -622,7 +729,14 @@ func startHealthServer(ctx context.Context, containerPool *pool.ContainerPool, p
 
 	mux.HandleFunc("/stats", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(containerPool.GetStats())
+		// Merge pool stats with GC/reconciler metrics
+		stats := containerPool.GetStats()
+		metricsSnapshot := metrics.Snapshot()
+		resp := map[string]interface{}{
+			"pool":    stats,
+			"metrics": metricsSnapshot,
+		}
+		json.NewEncoder(w).Encode(resp)
 	})
 
 	mux.HandleFunc("/run", func(w http.ResponseWriter, r *http.Request) {
@@ -657,13 +771,13 @@ func startHealthServer(ctx context.Context, containerPool *pool.ContainerPool, p
 			if len(msg.Tests) > 0 {
 				slog.Info("Using ephemeral problem definition", "submissionId", msg.SubmissionID)
 				problem = models.Problem{
-					ID:           primitive.NewObjectID(), // Dummy ID
-					Title:        "Ephemeral Problem",
-					Description:  "Temporary problem for validation",
-					TestCases:    msg.Tests,
-					FunctionName: msg.FunctionName,
-					Parameters:   msg.Parameters,
-					ReturnType:   msg.ReturnType,
+					ID:            primitive.NewObjectID(), // Dummy ID
+					Title:         "Ephemeral Problem",
+					Description:   "Temporary problem for validation",
+					TestCases:     msg.Tests,
+					FunctionName:  msg.FunctionName,
+					Parameters:    msg.Parameters,
+					ReturnType:    msg.ReturnType,
 					CompareConfig: msg.CompareConfig,
 				}
 				// Default return type if missing to pass ValidateBasic
@@ -817,6 +931,15 @@ func main() {
 		}
 	}
 
+	// Max executions per pooled container before eviction
+	maxExecs := 100
+	if val := os.Getenv("MAX_EXECUTIONS_PER_CONTAINER"); val != "" {
+		if i, err := fmt.Sscanf(val, "%d", &maxExecs); err == nil && i > 0 {
+			slog.Info("Using configured max executions per container", "maxExecs", maxExecs)
+		}
+	}
+	atomic.StoreInt32(&MaxExecutionsPerContainer, int32(maxExecs))
+
 	// Initialize Docker Executor
 	executor, err := executor.NewExecutor()
 	failOnError(err, "Failed to create Docker executor")
@@ -827,6 +950,11 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	// Startup: remove any orphan containers left from previous runs
+	if err := cleanupOrphanContainers(ctx, executor.Client()); err != nil {
+		slog.Error("startup orphan container cleanup failed", "error", err)
+	}
 
 	workspace.StartSweeper(
 		ctx,
@@ -851,6 +979,12 @@ func main() {
 	slog.Info("Container pool warmed up.")
 
 	containerPool.StartMonitor(ctx, time.Minute)
+
+	// Start periodic GC to remove exited/dead judge-managed containers every 5 minutes
+	StartPeriodicOrphanGC(ctx, executor.Client(), 5*time.Minute)
+
+	// Start pool reconciler to keep pool sizes stable
+	containerPool.StartReconciler(ctx, time.Minute)
 
 	// Connect to MongoDB
 	mongoClient, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))

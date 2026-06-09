@@ -2,6 +2,24 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Activity, Server, Database, Users, Code2, RefreshCw, AlertCircle, BookOpen, History, Target, TrendingUp, Trophy, AlertTriangle } from 'lucide-react';
 import { admin, submissions } from '../api';
 
+function formatTimestamp(ts) {
+  if (!ts) return 'N/A';
+  const d = new Date(ts);
+  if (isNaN(d)) return ts;
+  const localeStr = d.toLocaleString();
+  const diff = Date.now() - d.getTime();
+  const seconds = Math.floor(diff / 1000);
+  try {
+    const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+    if (seconds < 60) return `${localeStr} (${rtf.format(-seconds, 'second')})`;
+    if (seconds < 3600) return `${localeStr} (${rtf.format(-Math.floor(seconds / 60), 'minute')})`;
+    if (seconds < 86400) return `${localeStr} (${rtf.format(-Math.floor(seconds / 3600), 'hour')})`;
+    return `${localeStr} (${rtf.format(-Math.floor(seconds / 86400), 'day')})`;
+  } catch (e) {
+    return localeStr;
+  }
+}
+
 const SystemDashboardPage = ({ user }) => {
   const [stats, setStats] = useState(null);
   const [logs, setLogs] = useState([]);
@@ -82,6 +100,84 @@ const SystemDashboardPage = ({ user }) => {
             {loading ? 'Refreshing...' : 'Refresh'}
           </button>
         </div>
+      </div>
+
+      {/* Judge Service Metrics - Separate Card */}
+      <div className="problem-card judge-card" style={{ marginTop: 16 }}>
+        <h3 className="mb-6 flex-center gap-2" style={{ justifyContent: 'flex-start' }}>
+          <Code2 size={20} color="var(--primary)" /> Judge Service Metrics
+        </h3>
+        {stats?.judgeStats ? (() => {
+          const js = stats?.judgeStats || {};
+          const poolRoot = js.pool || { available: js.available || {}, in_use: js.in_use || {}, expected: js.expected || {} };
+          const poolAvailable = poolRoot.available || {};
+          const poolInUse = poolRoot.in_use || {};
+          const poolExpected = poolRoot.expected || {};
+          const langs = Array.from(new Set([
+            ...Object.keys(poolAvailable),
+            ...Object.keys(poolInUse),
+            ...Object.keys(poolExpected)
+          ]));
+
+          const hasPoolData = langs.length > 0;
+
+          if (!hasPoolData) {
+            return (
+              <div>
+                <p className="text-muted">Judge pool data unavailable.</p>
+                {stats?.status === 401 || stats?.error?.status === 401 ? (
+                  <p className="text-muted">Authorization required — log in as an admin.</p>
+                ) : null}
+              </div>
+            );
+          }
+
+          return (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div className="stat-card">
+                <div className="flex-between mb-2"><span className="text-muted" style={{ fontSize: '0.8rem' }}>Last GC</span><strong>{formatTimestamp(stats.judgeStats.metrics?.last_gc_run)}</strong></div>
+                <div className="flex-between mb-2"><span className="text-muted" style={{ fontSize: '0.8rem' }}>GC Removed</span><strong>{stats.judgeStats.metrics?.gc_removed_total || 0}</strong></div>
+                <div className="flex-between"><span className="text-muted" style={{ fontSize: '0.8rem' }}>GC Exited</span><strong>{stats.judgeStats.metrics?.gc_removed_exited || 0}</strong></div>
+              </div>
+              <div className="stat-card">
+                <div className="flex-between mb-2"><span className="text-muted" style={{ fontSize: '0.8rem' }}>Last Reconcile</span><strong>{formatTimestamp(stats.judgeStats.metrics?.last_reconcile_run)}</strong></div>
+                <div className="flex-between mb-2"><span className="text-muted" style={{ fontSize: '0.8rem' }}>Reconcile Repairs</span><strong>{stats.judgeStats.metrics?.reconcile_repairs_total || 0}</strong></div>
+                <div className="flex-between"><span className="text-muted" style={{ fontSize: '0.8rem' }}>Container Replacements</span><strong>{stats.judgeStats.metrics?.container_replacements_total || 0}</strong></div>
+              </div>
+
+              <div style={{ gridColumn: '1 / -1' }}>
+                <h4 style={{ margin: '8px 0' }}>Pools</h4>
+                <div className="table-container" style={{ border: 'none', background: 'var(--bg)' }}>
+                  <table className="table" style={{ border: 'none' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ background: 'transparent' }}>Lang</th>
+                        <th style={{ background: 'transparent', textAlign: 'center' }}>Available</th>
+                        <th style={{ background: 'transparent', textAlign: 'center' }}>Busy</th>
+                        <th style={{ background: 'transparent', textAlign: 'center' }}>Expected</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {langs.map((lang) => {
+                        const avail = poolAvailable?.[lang] || 0;
+                        const busy = poolInUse?.[lang] || 0;
+                        const expected = poolExpected?.[lang] ?? '-';
+                        return (
+                          <tr key={lang} style={{ background: 'transparent' }}>
+                            <td style={{ textTransform: 'capitalize', fontWeight: '600' }}>{lang}</td>
+                            <td style={{ textAlign: 'center', color: 'var(--success)' }}>{avail}</td>
+                            <td style={{ textAlign: 'center', color: busy > 0 ? 'var(--warning)' : 'var(--text-muted)' }}>{busy}</td>
+                            <td style={{ textAlign: 'center' }}>{expected}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          );
+        })() : <p className="text-muted text-center py-4">Judge stats unavailable</p>}
       </div>
 
       {error && (
@@ -240,7 +336,7 @@ const SystemDashboardPage = ({ user }) => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <div className="problem-card">
             <h3 className="mb-6 flex-center gap-2" style={{ justifyContent: 'flex-start' }}>
-              <Server size={20} color="var(--primary)" /> Queue & Workers
+              <Server size={20} color="var(--primary)" /> Queue Monitoring
             </h3>
             <div style={{ textAlign: 'center', padding: '24px 0', background: 'var(--bg)', borderRadius: 'var(--radius-md)', marginBottom: '20px' }}>
               <div style={{ fontSize: '3.5rem', fontWeight: '800', color: (stats?.queueLength || 0) > 50 ? 'var(--error)' : 'var(--primary)', lineHeight: 1 }}>
@@ -248,39 +344,9 @@ const SystemDashboardPage = ({ user }) => {
               </div>
               <p style={{ color: 'var(--text-muted)', marginTop: '8px', marginBottom: 0, fontWeight: '600', textTransform: 'uppercase', fontSize: '0.75rem' }}>Pending Submissions</p>
             </div>
-            
-            <h4 className="mb-3 text-muted" style={{ fontSize: '0.8rem', textTransform: 'uppercase' }}>Judge Pools</h4>
-            {stats?.judgeStats ? (
-              <div className="table-container" style={{ border: 'none', background: 'var(--bg)' }}>
-                <table className="table" style={{ border: 'none' }}>
-                  <thead>
-                    <tr>
-                      <th style={{ background: 'transparent' }}>Lang</th>
-                      <th style={{ background: 'transparent', textAlign: 'center' }}>Avail</th>
-                      <th style={{ background: 'transparent', textAlign: 'center' }}>Busy</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Array.from(new Set([
-                      ...Object.keys(stats.judgeStats.available || {}),
-                      ...Object.keys(stats.judgeStats.in_use || {})
-                    ])).map((lang) => {
-                      const inUse = stats.judgeStats.in_use?.[lang] || 0;
-                      return (
-                        <tr key={lang} style={{ background: 'transparent' }}>
-                          <td style={{ textTransform: 'capitalize', fontWeight: '600' }}>{lang}</td>
-                          <td style={{ textAlign: 'center', color: 'var(--success)' }}>{stats.judgeStats.available?.[lang] || 0}</td>
-                          <td style={{ textAlign: 'center', color: inUse > 0 ? 'var(--warning)' : 'var(--text-muted)' }}>{inUse}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ) : <p className="text-muted text-center py-4">Stats unavailable</p>}
           </div>
 
-          <div className="problem-card">
+            <div className="problem-card">
             <h3 className="mb-6 flex-center gap-2" style={{ justifyContent: 'flex-start' }}>
               <Database size={20} color="var(--primary)" /> Metrics
             </h3>
@@ -296,10 +362,12 @@ const SystemDashboardPage = ({ user }) => {
                 <div className="flex-between"><span className="text-muted" style={{ fontSize: '0.8rem' }}>Rate</span><strong>{stats?.metrics?.submissionsToday > 0 ? ((stats.metrics.acceptedToday / stats.metrics.submissionsToday) * 100).toFixed(1) : 0}%</strong></div>
               </div>
             </div>
+
             
-            <div style={{ marginTop: '20px', padding: '24px', background: 'linear-gradient(135deg, var(--primary) 0%, #4338ca 100%)', color: 'white', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
-              <div style={{ fontSize: '0.75rem', opacity: 0.9, fontWeight: '700', textTransform: 'uppercase' }}>Submissions (All Time)</div>
-              <div style={{ fontSize: '2.5rem', fontWeight: '800', marginTop: '8px' }}>{stats?.metrics?.totalSubmissions || 0}</div>
+            
+            <div className="submissions-hero" style={{ marginTop: '20px', width: '100%' }}>
+              <div className="label">Submissions (All Time)</div>
+              <div className="value">{stats?.metrics?.totalSubmissions || 0}</div>
             </div>
           </div>
         </div>

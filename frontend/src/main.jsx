@@ -9,3 +9,14 @@ createRoot(document.getElementById('root')).render(
     <App />
   </StrictMode>,
 )
+
+// Prevent accidental changes to focused number inputs or selects via mouse wheel
+document.addEventListener('wheel', (e) => {
+  const active = document.activeElement;
+  if (!active) return;
+  const tag = active.tagName;
+  if ((tag === 'INPUT' && active.type === 'number') || tag === 'SELECT') {
+    // Remove focus so wheel doesn't change the value
+    active.blur();
+  }
+}, { passive: true });

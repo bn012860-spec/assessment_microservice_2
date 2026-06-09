@@ -48,6 +48,18 @@
   --glass-bg: rgba(2, 6, 23, 0.7);
 }
 
+/* Global: prevent accidental mouse-wheel changes to number inputs */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -164,6 +176,27 @@ a {
   background-color: var(--surface-hover);
   transform: translateY(-2px);
   box-shadow: var(--shadow-lg);
+}
+
+/* Prevent inner card/table borders from also highlighting when parent is hovered */
+.problem-card:hover .table-container,
+.problem-card:hover .stat-card,
+.problem-card:hover .report-box,
+.problem-card:hover .testcase-box {
+  border-color: var(--border) !important;
+  box-shadow: none !important;
+  background-color: var(--surface) !important;
+}
+
+/* If an inner interactive element is hovered, disable the outer card hover visuals */
+.problem-card:has(.stat-card:hover),
+.problem-card:has(.table-container:hover),
+.problem-card:has(.report-box:hover),
+.problem-card:has(.testcase-box:hover) {
+  border-color: var(--border) !important;
+  background-color: var(--surface) !important;
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 .problem-card h3 {
@@ -609,6 +642,24 @@ code {
   gap: var(--sp-1);
 }
 
+.submissions-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text);
+  gap: 8px;
+  border: 1px solid var(--border);
+}
+.submissions-hero .value { font-size: 2.25rem; color: var(--primary); font-weight: 800; }
+.submissions-hero .label { font-size: 0.75rem; opacity: 0.85; color: var(--text-muted); }
+
+/* Specific spacing for the judge service metrics card to separate following cards */
+.judge-card { margin-bottom: var(--sp-6); }
+
 .stat-card .label {
   font-size: 0.75rem;
   font-weight: 600;
@@ -656,6 +707,159 @@ code {
   flex-direction: column;
   gap: var(--sp-4);
 }
+
+/* Create Assessment page improvements */
+.assessment-page .problem-card {
+  padding: var(--sp-6);
+  border-radius: calc(var(--radius-lg) + 4px);
+}
+
+.assessment-page .form-group > label {
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: var(--sp-2);
+}
+
+.assessment-page input[type="text"],
+.assessment-page input[type="number"],
+.assessment-page input[type="datetime-local"],
+.assessment-page textarea,
+.assessment-page select {
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.02);
+}
+
+.assessment-page .add-problem-row select { min-width: 100%; }
+
+.assessment-page .button.button-primary { padding: 10px 14px; }
+
+.assessment-page .problem-table thead th {
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.assessment-page .problem-table tbody td { padding: 12px; }
+.assessment-page .problem-table tbody tr:nth-child(odd) { background: rgba(255,255,255,0.01); }
+
+.assessment-page .button-outline { padding: 6px 10px; font-size: 0.9rem; }
+
+.assessment-page .mt-20 { margin-top: 20px; display: flex; justify-content: flex-end; }
+
+/* Allowed languages layout */
+.assessment-page .allowed-langs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-top: 12px;
+}
+.assessment-page .lang-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.01);
+  border: 1px solid rgba(255,255,255,0.02);
+  cursor: pointer;
+  color: var(--text);
+}
+.assessment-page .lang-label input { width: 16px; height: 16px; }
+.assessment-page .lang-text { text-transform: none; font-weight: 600; color: var(--text); }
+
+/* Custom checkbox visuals: hide native box and draw themed box */
+.assessment-page .lang-label input { display: none; }
+.assessment-page .lang-label .lang-text::before {
+  content: '';
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: var(--surface);
+  vertical-align: middle;
+}
+.assessment-page .lang-label input:checked + .lang-text::before {
+  content: '✓';
+  color: white;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+/* Problem select improvements */
+.assessment-page .problem-select {
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+/* Try to theme native option popup where supported */
+.assessment-page select, .assessment-page option {
+  background: var(--surface);
+  color: var(--text);
+}
+.assessment-page option:hover { background: rgba(124,58,237,0.08); }
+
+/* Hide scrollbar in selects on supported browsers to reduce visual noise */
+.assessment-page select::-webkit-scrollbar { width: 8px; height: 8px; }
+.assessment-page select::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 6px; }
+.assessment-page select { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.06) transparent; }
+.assessment-page .add-problem-row { align-items: center; }
+.assessment-page .add-problem-row .form-group { margin-bottom: 0; }
+.assessment-page .add-problem-row .button-primary { margin-left: 8px; height: 40px; align-self: flex-end; }
+
+.assessment-page .problem-table thead th { padding: 12px 18px; }
+.assessment-page .problem-table tbody td { padding: 14px 18px; }
+
+/* Use consistent divider color matching other UI */
+.assessment-page .problem-table thead tr,
+.assessment-page .problem-table tbody tr { border-bottom: 1px solid var(--border); }
+
+/* Heading spacing */
+.assessment-page h2 { margin-bottom: var(--sp-6); }
+
+/* Hide native number input spinners for cleaner UI */
+.assessment-page input[type="number"]::-webkit-outer-spin-button,
+.assessment-page input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.assessment-page input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Ensure total score aligns under Max Score column */
+.assessment-page .problem-table tfoot td:nth-child(2) { text-align: center; font-weight: 700; }
+
+/* Use themed dividers */
+.assessment-page .problem-table thead tr,
+.assessment-page .problem-table tbody tr { border-bottom: 1px solid var(--border); }
+
+/* Reduce visual weight of dividers */
+.assessment-page .problem-table { border-collapse: separate; border-spacing: 0; }
+
+/* Ensure Max Score column is fixed width and centered so Total Score aligns */
+.assessment-page .problem-table th:nth-child(2),
+.assessment-page .problem-table td:nth-child(2) {
+  width: 160px;
+  text-align: center;
+}
+
+.assessment-page .problem-table tfoot td { padding: 16px 18px; }
+.assessment-page .problem-table tfoot td:first-child { text-align: left; font-weight: 700; }
+.assessment-page .problem-table tfoot td:nth-child(2) { text-align: center; font-weight: 700; }
+
 
 .testcase-field {
   display: flex;

@@ -17,7 +17,7 @@ const AddAssessmentPage = () => {
   });
   const [selectedProblemId, setSelectedProblemId] = useState('');
   const [problemScore, setProblemScore] = useState(100);
-  const [setLoadingProblems] = useState(true);
+  const [loadingProblems, setLoadingProblems] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -32,7 +32,7 @@ const AddAssessmentPage = () => {
       }
     };
     fetchProblems();
-  });
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -95,7 +95,7 @@ const AddAssessmentPage = () => {
   const totalScore = formData.problems.reduce((acc, p) => acc + Number(p.maxScore), 0);
 
   return (
-    <div className="container">
+    <div className="container assessment-page">
       <h2>Create New Assessment</h2>
       {error && <div className="error-box">{error}</div>}
 
@@ -126,17 +126,17 @@ const AddAssessmentPage = () => {
           </div>
         </div>
 
-        <div className="problem-card" style={{ marginBottom: '20px' }}>
+          <div className="problem-card" style={{ marginBottom: '20px' }}>
           <h3>Allowed Languages</h3>
-          <div className="flex-gap">
+          <div className="allowed-langs">
             {['python', 'javascript', 'typescript', 'java', 'cpp', 'c', 'csharp', 'go'].map(lang => (
-              <label key={lang} style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
+              <label key={lang} className="lang-label">
                 <input 
                   type="checkbox" 
                   checked={formData.allowedLanguages.includes(lang)} 
                   onChange={() => handleLanguageToggle(lang)}
                 />
-                {lang}
+                <span className="lang-text">{lang}</span>
               </label>
             ))}
           </div>
@@ -144,10 +144,10 @@ const AddAssessmentPage = () => {
 
         <div className="problem-card" style={{ marginBottom: '20px' }}>
           <h3>Problems</h3>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', marginBottom: '20px' }}>
+            <div className="add-problem-row" style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', marginBottom: '20px' }}>
             <div className="form-group" style={{ flex: 2, marginBottom: 0 }}>
               <label>Select Problem:</label>
-              <select value={selectedProblemId} onChange={(e) => setSelectedProblemId(e.target.value)}>
+              <select className="problem-select" value={selectedProblemId} onChange={(e) => setSelectedProblemId(e.target.value)}>
                 <option value="">Choose a problem...</option>
                 {problems.map(p => (
                   <option key={p._id} value={p._id}>{p.title} ({p.difficulty})</option>
@@ -158,32 +158,32 @@ const AddAssessmentPage = () => {
               <label>Marks:</label>
               <input type="number" value={problemScore} onChange={(e) => setProblemScore(e.target.value)} min="1" />
             </div>
-            <button type="button" className="button" onClick={addProblemToAssessment}>Add</button>
+            <button type="button" className="button button-primary" onClick={addProblemToAssessment}>Add</button>
           </div>
 
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="problem-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ textAlign: 'left', borderBottom: '1px solid #eee' }}>
-                <th style={{ padding: '10px' }}>Problem</th>
-                <th style={{ padding: '10px' }}>Max Score</th>
-                <th style={{ padding: '10px' }}>Action</th>
+              <tr style={{ textAlign: 'left' }}>
+                  <th>Problem</th>
+                  <th>Max Score</th>
+                  <th>Action</th>
               </tr>
             </thead>
             <tbody>
               {formData.problems.map((p) => (
-                <tr key={p.problemId} style={{ borderBottom: '1px solid #eee' }}>
-                  <td style={{ padding: '10px' }}>{p.title}</td>
-                  <td style={{ padding: '10px' }}>{p.maxScore}</td>
-                  <td style={{ padding: '10px' }}>
-                    <button type="button" onClick={() => removeProblem(p.problemId)} style={{ color: '#e74c3c', background: 'none', border: 'none', cursor: 'pointer' }}>Remove</button>
+                <tr key={p.problemId}>
+                    <td>{p.title}</td>
+                    <td>{p.maxScore}</td>
+                    <td>
+                    <button type="button" className="button button-outline" onClick={() => removeProblem(p.problemId)} style={{ padding: '6px 10px' }}>Remove</button>
                   </td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
               <tr>
-                <td style={{ padding: '10px' }}><strong>Total Score:</strong></td>
-                <td style={{ padding: '10px' }}><strong>{totalScore}</strong></td>
+                  <td><strong>Total Score:</strong></td>
+                  <td><strong>{totalScore}</strong></td>
                 <td></td>
               </tr>
             </tfoot>
@@ -199,7 +199,7 @@ const AddAssessmentPage = () => {
         </div>
 
         <div className="mt-20">
-          <button type="submit" className="button" style={{ padding: '15px 40px' }}>Save Assessment</button>
+          <button type="submit" className="button button-primary" style={{ padding: '12px 36px' }}>Save Assessment</button>
         </div>
       </form>
     </div>

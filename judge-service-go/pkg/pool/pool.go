@@ -13,15 +13,17 @@ import (
 
 	docker "github.com/fsouza/go-dockerclient"
 
+	"judge-service-go/pkg/metrics"
 	"judge-service-go/pkg/workspace"
 )
 
 // PooledContainer represents a container in the pool.
 type PooledContainer struct {
-	ID       string
-	Language string
-	Busy     bool
-	WorkDir  string
+	ID             string
+	Language       string
+	Busy           bool
+	WorkDir        string
+	ExecutionCount int32
 }
 
 // ContainerPool manages a pool of pre-warmed Docker containers.
@@ -134,6 +136,7 @@ func (p *ContainerPool) Discard(ctx context.Context, container *PooledContainer,
 		slog.Error("Failed to replace discarded container", "language", container.Language, "error", err)
 		return
 	}
+	metrics.AddContainerReplacement(1)
 
 	if ch != nil {
 		select {
@@ -166,9 +169,10 @@ func (p *ContainerPool) WarmUp(ctx context.Context, lang string, image string, c
 			return err
 		}
 		c := &PooledContainer{
-			ID:       id,
-			Language: lang,
-			WorkDir:  workDir,
+			ID:             id,
+			Language:       lang,
+			WorkDir:        workDir,
+			ExecutionCount: 0,
 		}
 		select {
 		case ch <- c:
@@ -262,6 +266,88 @@ func (p *ContainerPool) StartMonitor(ctx context.Context, interval time.Duration
 				return
 			case <-ticker.C:
 				p.checkHealth(ctx)
+			}
+		}
+	}()
+}
+
+// StartReconciler periodically ensures the pool size per language matches maxPerLang.
+func (p *ContainerPool) StartReconciler(ctx context.Context, interval time.Duration) {
+	if interval <= 0 {
+		return
+	}
+	ticker := time.NewTicker(interval)
+	go func() {
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				p.mu.Lock()
+				langs := make([]string, 0, len(p.availChans))
+				for lang := range p.availChans {
+					langs = append(langs, lang)
+				}
+				p.mu.Unlock()
+
+				metrics.SetReconcileLastRun(time.Now())
+
+				for _, lang := range langs {
+					p.mu.Lock()
+					ch := p.availChans[lang]
+					image := p.images[lang]
+					inUseCount := 0
+					for _, c := range p.inUse {
+						if c.Language == lang {
+							inUseCount++
+						}
+					}
+					availCount := 0
+					if ch != nil {
+						availCount = len(ch)
+					}
+					current := inUseCount + availCount
+					target := p.maxPerLang
+					p.mu.Unlock()
+
+					if current < target {
+						// create missing containers
+						missing := target - current
+						for i := 0; i < missing; i++ {
+							repl, err := p.newPooledContainer(ctx, image, lang)
+							if err != nil {
+								slog.Error("reconciler: failed to create replacement", "language", lang, "error", err)
+								break
+							}
+							metrics.AddReconcileRepairs(1)
+							p.mu.Lock()
+							if ch2, ok := p.availChans[lang]; ok {
+								select {
+								case ch2 <- repl:
+								default:
+									p.removeContainer(repl)
+								}
+							} else {
+								p.removeContainer(repl)
+							}
+							p.mu.Unlock()
+						}
+					} else if current > target {
+						// remove excess available containers (prefer idle ones)
+						excess := current - target
+						if excess > 0 && ch != nil {
+							for i := 0; i < excess; i++ {
+								select {
+								case c := <-ch:
+									p.removeContainer(c)
+								default:
+									// no more idle containers to remove
+								}
+							}
+						}
+					}
+				}
 			}
 		}
 	}()
@@ -407,6 +493,13 @@ func (p *ContainerPool) createContainer(ctx context.Context, image string, lang 
 			Cmd:        []string{"tail", "-f", "/dev/null"},
 			WorkingDir: "/app",
 			Tty:        false,
+			Labels: map[string]string{
+				"app":        "code-platform",
+				"service":    "judge",
+				"managed-by": "judge-service",
+				"language":   lang,
+				"pool":       "true",
+			},
 		},
 		HostConfig: hostCfg,
 	}
