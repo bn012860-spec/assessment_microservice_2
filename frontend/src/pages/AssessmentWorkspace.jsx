@@ -283,7 +283,7 @@ const AssessmentWorkspace = (props) => {
       document.removeEventListener('click', enterFS);
       if (fsIntervalRef.current) { clearInterval(fsIntervalRef.current); fsIntervalRef.current = null; }
     };
-  }, [attemptId, timeLeft]);
+  }, [attemptId]);
 
   useEffect(() => {
     if (timeLeft === null || timeLeft <= 0) return;
@@ -543,8 +543,14 @@ const AssessmentWorkspace = (props) => {
 
       {/* Transient warning banner for tab/copy/paste events */}
       {showTabWarning && (
-        <div style={{ position: 'fixed', top: 96, right: 24, background: 'var(--warning)', color: 'black', padding: '10px 14px', borderRadius: '8px', zIndex: 1300 }}>
-          Security event recorded. This has been logged.
+        <div style={{ position: 'fixed', top: 96, right: 24, background: 'var(--warning)', color: 'black', padding: '10px 14px', borderRadius: '8px', zIndex: 1300, minWidth: 260 }}>
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>Security event recorded</div>
+          <div style={{ fontSize: '0.9rem' }}>
+            Tab switches: <strong>{tabSwitchCount}</strong> • Copy: <strong>{copyCount}</strong> • Paste: <strong>{pasteCount}</strong>
+          </div>
+          <div style={{ marginTop: 8, fontSize: '0.85rem', color: 'rgba(0,0,0,0.8)' }}>
+            Warning: {tabSwitchCount + copyCount + pasteCount}/5 — repeated violations may auto-submit your attempt.
+          </div>
         </div>
       )}
 
