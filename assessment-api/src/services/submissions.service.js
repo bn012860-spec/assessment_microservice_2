@@ -1,5 +1,7 @@
 import * as submissionsRepo from "../repositories/submissions.repo.js";
 import * as problemsRepo from "../repositories/problems.repo.js";
+import * as attemptsRepo from "../repositories/assessmentAttempts.repo.js";
+import * as assessmentsRepo from "../repositories/assessments.repo.js";
 import { publishSubmissionMessage } from "./evaluation.service.js";
 import { getCacheJSON, setCacheJSON } from "./cache.service.js";
 import { HttpError } from "../utils/httpError.js";
@@ -31,6 +33,57 @@ function isSampleTestCase(tc = {}) {
   if (typeof tc.isSample === "boolean") return tc.isSample;
   if (typeof tc.isHidden === "boolean") return !tc.isHidden;
   return true;
+}
+
+function getAttemptExpiration(attempt, assessment) {
+  const durationExpiry = new Date(attempt.startedAt).getTime() + assessment.durationMinutes * 60 * 1000;
+  return new Date(Math.min(durationExpiry, new Date(assessment.endTime).getTime()));
+}
+
+async function validateAssessmentSubmission({ problemId, language, userId, assessmentId, attemptId }) {
+  if (!assessmentId && !attemptId) return;
+
+  if (!assessmentId || !attemptId) {
+    throw new HttpError(400, "Assessment submissions require both assessmentId and attemptId");
+  }
+
+  const attempt = await attemptsRepo.findById(attemptId);
+  if (!attempt) throw new HttpError(404, "Attempt not found");
+
+  const studentId = attempt.studentId?._id || attempt.studentId;
+  if (String(studentId) !== String(userId)) {
+    throw new HttpError(403, "Forbidden: You do not own this attempt");
+  }
+
+  const attemptAssessmentId = attempt.assessmentId?._id || attempt.assessmentId;
+  if (String(attemptAssessmentId) !== String(assessmentId)) {
+    throw new HttpError(400, "Attempt does not belong to this assessment");
+  }
+
+  const assessment = await assessmentsRepo.findById(assessmentId);
+  if (!assessment) throw new HttpError(404, "Assessment not found");
+
+  if (attempt.status !== "Active") {
+    throw new HttpError(409, `Attempt is ${attempt.status.toLowerCase()} and no longer accepts submissions`);
+  }
+
+  const expiration = getAttemptExpiration(attempt, assessment);
+  if (Date.now() >= expiration.getTime()) {
+    await attemptsRepo.updateById(attemptId, { status: "TimedOut", submittedAt: expiration });
+    throw new HttpError(409, "Attempt has timed out and no longer accepts submissions");
+  }
+
+  const includesProblem = assessment.problems.some((entry) => {
+    const assessmentProblemId = entry.problemId?._id || entry.problemId;
+    return String(assessmentProblemId) === String(problemId);
+  });
+  if (!includesProblem) {
+    throw new HttpError(400, "Problem is not part of this assessment");
+  }
+
+  if (assessment.allowedLanguages?.length > 0 && !assessment.allowedLanguages.includes(language)) {
+    throw new HttpError(400, "Language is not allowed for this assessment");
+  }
 }
 
 function parseOutputJSON(output) {
@@ -83,6 +136,13 @@ function sanitizeSubmissionForStudent(submission, problem) {
 }
 
 export async function submitSolution({ problemId, code, language, userId, assessmentId = null, attemptId = null, requestId = null }) {
+  await validateAssessmentSubmission({ problemId, language, userId, assessmentId, attemptId });
+
+  const problem = await problemsRepo.findById(problemId);
+  if (!problem) {
+    return { notFound: true };
+  }
+
   const submissionData = {
     problemId,
     code,
@@ -95,11 +155,6 @@ export async function submitSolution({ problemId, code, language, userId, assess
   if (attemptId) submissionData.attemptId = attemptId;
 
   const submission = await submissionsRepo.create(submissionData);
-
-  const problem = await problemsRepo.findById(problemId);
-  if (!problem) {
-    return { notFound: true, submission };
-  }
 
   const tests = problem.testCases.map((tc) => ({
     inputs: tc.inputs,

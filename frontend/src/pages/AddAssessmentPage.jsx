@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api, { assessments } from '../api';
+import { getApiErrorMessage, validateAssessmentForm } from '../utils/assessmentForm';
 
 const AddAssessmentPage = () => {
   const navigate = useNavigate();
@@ -18,6 +19,7 @@ const AddAssessmentPage = () => {
   const [selectedProblemId, setSelectedProblemId] = useState('');
   const [problemScore, setProblemScore] = useState(100);
   const [loadingProblems, setLoadingProblems] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -26,7 +28,7 @@ const AddAssessmentPage = () => {
         const res = await api.get('/api/problems');
         setProblems(res.data);
       } catch (err) {
-        console.error('Failed to fetch problems', err);
+        setError(getApiErrorMessage(err, 'Failed to fetch problems'));
       } finally {
         setLoadingProblems(false);
       }
@@ -54,12 +56,17 @@ const AddAssessmentPage = () => {
     }
 
     const problem = problems.find(p => p._id === selectedProblemId);
+    if (!problem || Number(problemScore) <= 0) {
+      setError('Problem score must be greater than zero');
+      return;
+    }
+    setError(null);
     setFormData({
       ...formData,
       problems: [...formData.problems, { 
         problemId: selectedProblemId, 
         title: problem.title, 
-        maxScore: problemScore 
+        maxScore: Number(problemScore)
       }]
     });
     setSelectedProblemId('');
@@ -74,11 +81,14 @@ const AddAssessmentPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (formData.problems.length === 0) {
-      alert('Please add at least one problem');
+    const validationErrors = validateAssessmentForm(formData);
+    if (validationErrors.length > 0) {
+      setError(validationErrors.join('. '));
       return;
     }
 
+    setSaving(true);
+    setError(null);
     try {
       // API expects problems: [{ problemId: id, maxScore: score }]
       const payload = {
@@ -88,7 +98,9 @@ const AddAssessmentPage = () => {
       await assessments.create(payload);
       navigate('/admin/assessments');
     } catch (err) {
-      setError(err.response?.data?.msg || 'Failed to create assessment');
+      setError(getApiErrorMessage(err, 'Failed to create assessment'));
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -149,7 +161,8 @@ const AddAssessmentPage = () => {
               <label>Select Problem:</label>
               <select className="problem-select" value={selectedProblemId} onChange={(e) => setSelectedProblemId(e.target.value)}>
                 <option value="">Choose a problem...</option>
-                {problems.map(p => (
+                {loadingProblems && <option disabled>Loading problems...</option>}
+                {problems.filter(p => !formData.problems.some(added => added.problemId === p._id)).map(p => (
                   <option key={p._id} value={p._id}>{p.title} ({p.difficulty})</option>
                 ))}
               </select>
@@ -199,7 +212,9 @@ const AddAssessmentPage = () => {
         </div>
 
         <div className="mt-20">
-          <button type="submit" className="button button-primary" style={{ padding: '12px 36px' }}>Save Assessment</button>
+          <button type="submit" className="button button-primary" style={{ padding: '12px 36px' }} disabled={saving}>
+            {saving ? 'Saving...' : 'Save Assessment'}
+          </button>
         </div>
       </form>
     </div>

@@ -66,7 +66,7 @@ const EditProblemPage = () => {
 
         setFormData(transformedData);
         setIsValidated(true); // Initially valid since it's already in the DB
-      } catch (err) {
+      } catch {
         setApiError('Error fetching problem for edit.');
       }
     };

@@ -6,7 +6,7 @@ const formatValue = (val) => {
     if (typeof val === 'object') {
         try {
             return JSON.stringify(val);
-        } catch (e) {
+        } catch {
             return String(val);
         }
     }
@@ -20,7 +20,7 @@ const SubmissionOutput = ({ output }) => {
     if (typeof output === 'string') {
         try {
             parsed = JSON.parse(output);
-        } catch (e) {
+        } catch {
             // If it's not JSON, it might be raw stderr/stdout
             return (
                 <div className="testcase-box border-error">

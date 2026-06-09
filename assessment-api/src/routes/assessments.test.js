@@ -3,6 +3,7 @@ import request from 'supertest';
 import app from '../app.js';
 import Problem from '../../models/Problem.mjs';
 import Assessment from '../../models/Assessment.mjs';
+import * as authService from '../services/auth.service.js';
 
 describe('Assessments API', () => {
   let adminToken;
@@ -12,27 +13,23 @@ describe('Assessments API', () => {
 
   beforeEach(async () => {
     // Create admin user
-    const adminRes = await request(app)
-      .post('/api/auth/register')
-      .send({
-        name: 'Admin User',
-        email: `admin-${Date.now()}@test.com`,
-        password: 'password123',
-        role: 'admin'
-      });
-    adminToken = adminRes.body.token;
-    adminId = adminRes.body.user.id;
+    const admin = await authService.register({
+      name: 'Admin User',
+      email: `admin-${Date.now()}@test.com`,
+      password: 'password123',
+      role: 'admin'
+    });
+    adminToken = admin.token;
+    adminId = admin.user.id;
 
     // Create student user
-    const studentRes = await request(app)
-      .post('/api/auth/register')
-      .send({
-        name: 'Student User',
-        email: `student-${Date.now()}@test.com`,
-        password: 'password123',
-        role: 'student'
-      });
-    studentToken = studentRes.body.token;
+    const student = await authService.register({
+      name: 'Student User',
+      email: `student-${Date.now()}@test.com`,
+      password: 'password123',
+      role: 'student'
+    });
+    studentToken = student.token;
 
     // Seed a problem
     const problem = await Problem.create({
@@ -103,5 +100,27 @@ describe('Assessments API', () => {
     
     expect(res.status).toBe(200);
     expect(res.body.assessmentId).toBe(assessmentId);
+  });
+
+  it('POST /api/assessments should reject invalid scoring and duplicate problems', async () => {
+    const res = await request(app)
+      .post('/api/assessments')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        title: 'Invalid Assessment',
+        problems: [
+          { problemId: problemId.toString(), maxScore: 0 },
+          { problemId: problemId.toString(), maxScore: 100 }
+        ],
+        durationMinutes: 0,
+        startTime: new Date(),
+        endTime: new Date(Date.now() + 86400000),
+        status: 'Draft'
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.errors).toContain('Duration must be greater than zero');
+    expect(res.body.errors).toContain('An assessment cannot contain duplicate problems');
+    expect(res.body.errors).toContain('Every problem max score must be greater than zero');
   });
 });

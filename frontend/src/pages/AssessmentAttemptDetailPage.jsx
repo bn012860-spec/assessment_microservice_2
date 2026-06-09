@@ -61,7 +61,7 @@ const AssessmentAttemptDetailPage = () => {
           </div>
           <div>
             <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: '700', letterSpacing: '0.05em' }}>Status</div>
-            <div style={{ fontSize: '2.5rem', fontWeight: '800', color: attempt.status === 'Completed' ? 'var(--success)' : 'var(--warning)' }}>{attempt.status}</div>
+            <div style={{ fontSize: '2.5rem', fontWeight: '800', color: attempt.status === 'Submitted' ? 'var(--success)' : 'var(--warning)' }}>{attempt.status}</div>
           </div>
         </div>
       </div>

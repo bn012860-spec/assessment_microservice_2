@@ -96,7 +96,7 @@ const AssessmentManagementPage = () => {
                 
                 <div className="flex-center gap-6 text-muted" style={{ fontSize: '0.85rem', justifyContent: 'flex-start' }}>
                   <span className="flex-center gap-2"><Calendar size={14} /> {startTime.toLocaleDateString()} - {endTime.toLocaleDateString()}</span>
-                  <span className="flex-center gap-2"><Users size={14} /> {a.participantCount || 0} participants</span>
+                  <span className="flex-center gap-2"><Users size={14} /> {a.problems?.length || 0} problems</span>
                 </div>
               </div>
 

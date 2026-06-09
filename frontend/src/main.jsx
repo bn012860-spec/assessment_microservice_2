@@ -11,7 +11,7 @@ createRoot(document.getElementById('root')).render(
 )
 
 // Prevent accidental changes to focused number inputs or selects via mouse wheel
-document.addEventListener('wheel', (e) => {
+document.addEventListener('wheel', () => {
   const active = document.activeElement;
   if (!active) return;
   const tag = active.tagName;

@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Clock, Users, BookOpen, ChevronRight, Calendar, AlertCircle } from 'lucide-react';
+import { BookOpen, ChevronRight, Calendar } from 'lucide-react';
 import { assessments } from '../api';
 
-const AssessmentListPage = ({ user }) => {
+const AssessmentListPage = () => {
   const [assessmentList, setAssessmentList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -69,17 +69,16 @@ const AssessmentListPage = ({ user }) => {
         </div>
 
         <div className="flex-between mt-auto pt-4" style={{ borderTop: '1px solid var(--border)' }}>
-          <div className="flex-center gap-2 text-muted" style={{ fontSize: '0.85rem' }}>
-            <Users size={16} />
-            <span>{assessment.participantCount || 0} enrolled</span>
-          </div>
+          <span className="text-muted" style={{ fontSize: '0.8rem' }}>
+            Ends {new Date(assessment.endTime).toLocaleString()}
+          </span>
           
           <Link 
             to={`/assessments/${assessment._id}`} 
             className={`button ${isPast ? 'button-outline' : ''}`}
             style={{ padding: '6px 16px', fontSize: '0.85rem' }}
           >
-            {isPast ? 'View Results' : (isUpcoming ? 'Register' : 'Join Now')}
+            {isActive ? 'Join Now' : 'View Details'}
             <ChevronRight size={16} />
           </Link>
         </div>

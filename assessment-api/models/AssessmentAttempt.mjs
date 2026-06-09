@@ -27,6 +27,6 @@ const AssessmentAttemptSchema = new Schema(
 AssessmentAttemptSchema.index({ assessmentId: 1 });
 AssessmentAttemptSchema.index({ studentId: 1 });
 // Compound index for unique attempts and faster lookups
-AssessmentAttemptSchema.index({ assessmentId: 1, studentId: 1 });
+AssessmentAttemptSchema.index({ assessmentId: 1, studentId: 1 }, { unique: true });
 
 export default mongoose.model("AssessmentAttempt", AssessmentAttemptSchema);

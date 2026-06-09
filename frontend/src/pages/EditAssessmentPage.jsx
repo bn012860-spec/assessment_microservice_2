@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api, { assessments } from '../api';
+import { getApiErrorMessage, validateAssessmentForm } from '../utils/assessmentForm';
 
 const LANGS = ['python', 'javascript', 'typescript', 'java', 'cpp', 'c', 'csharp', 'go'];
 
@@ -12,6 +13,7 @@ const EditAssessmentPage = () => {
   const [selectedProblemId, setSelectedProblemId] = useState('');
   const [problemScore, setProblemScore] = useState(100);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -72,6 +74,11 @@ const EditAssessmentPage = () => {
     }
 
     const problem = problems.find(p => p._id === selectedProblemId);
+    if (!problem || Number(problemScore) <= 0) {
+      setError('Problem score must be greater than zero');
+      return;
+    }
+    setError(null);
     setFormData({
       ...formData,
       problems: [...formData.problems, { 
@@ -99,11 +106,14 @@ const EditAssessmentPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (formData.problems.length === 0) {
-      alert('Please add at least one problem');
+    const validationErrors = validateAssessmentForm(formData);
+    if (validationErrors.length > 0) {
+      setError(validationErrors.join('. '));
       return;
     }
 
+    setSaving(true);
+    setError(null);
     try {
       const payload = {
         ...formData,
@@ -112,12 +122,14 @@ const EditAssessmentPage = () => {
       await assessments.update(id, payload);
       navigate('/admin/assessments');
     } catch (err) {
-      setError(err.response?.data?.msg || 'Failed to update assessment');
+      setError(getApiErrorMessage(err, 'Failed to update assessment'));
+    } finally {
+      setSaving(false);
     }
   };
 
   if (loading) return <div className="container">Loading assessment data...</div>;
-  if (error) return <div className="container error">{error}</div>;
+  if (error && !formData) return <div className="container error-box">{error}</div>;
 
   const totalScore = formData.problems.reduce((acc, p) => acc + Number(p.maxScore), 0);
 
@@ -130,11 +142,14 @@ const EditAssessmentPage = () => {
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
           <button className="button button-outline" onClick={() => navigate('/admin/assessments')}>Cancel</button>
-          <button form="edit-assessment-form" type="submit" className="button button-primary">Save</button>
+          <button form="edit-assessment-form" type="submit" className="button button-primary" disabled={saving}>
+            {saving ? 'Saving...' : 'Save'}
+          </button>
         </div>
       </div>
 
       <form id="edit-assessment-form" onSubmit={handleSubmit}>
+        {error && <div className="error-box mb-6">{error}</div>}
         <div className="problem-card mb-6">
           <h3>Basic Information</h3>
 
@@ -192,7 +207,7 @@ const EditAssessmentPage = () => {
               <label style={{ display: 'block', marginBottom: '6px' }}>Select problem</label>
               <select value={selectedProblemId} onChange={(e) => setSelectedProblemId(e.target.value)} style={{ width: '100%' }}>
                 <option value="">Choose a problem...</option>
-                {problems.map(p => (
+                {problems.filter(p => !formData.problems.some(added => added.problemId === p._id)).map(p => (
                   <option key={p._id} value={p._id}>{p.title} — {p.difficulty}</option>
                 ))}
               </select>
@@ -217,7 +232,7 @@ const EditAssessmentPage = () => {
                     <div className="text-muted" style={{ fontSize: '0.85rem' }}>{/* could show tags/difficulty if available */}</div>
                   </div>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <input type="number" value={p.maxScore} onChange={(e) => updateProblemScore(p.problemId, e.target.value)} style={{ width: 90 }} min={0} />
+                    <input type="number" value={p.maxScore} onChange={(e) => updateProblemScore(p.problemId, e.target.value)} style={{ width: 90 }} min={1} />
                     <button type="button" className="button button-outline" onClick={() => removeProblem(p.problemId)}>Remove</button>
                   </div>
                 </div>

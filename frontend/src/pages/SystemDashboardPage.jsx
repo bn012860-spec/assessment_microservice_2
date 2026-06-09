@@ -15,7 +15,7 @@ function formatTimestamp(ts) {
     if (seconds < 3600) return `${localeStr} (${rtf.format(-Math.floor(seconds / 60), 'minute')})`;
     if (seconds < 86400) return `${localeStr} (${rtf.format(-Math.floor(seconds / 3600), 'hour')})`;
     return `${localeStr} (${rtf.format(-Math.floor(seconds / 86400), 'day')})`;
-  } catch (e) {
+  } catch {
     return localeStr;
   }
 }

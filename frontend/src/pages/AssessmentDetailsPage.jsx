@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Play, Calendar, Clock, Code2, AlertTriangle, ChevronLeft, CheckCircle2 } from 'lucide-react';
+import { Play, Calendar, Clock, Code2, AlertTriangle, ChevronLeft, CheckCircle2, ExternalLink } from 'lucide-react';
 import { assessments } from '../api';
 
 const AssessmentDetailsPage = ({ user }) => {
@@ -13,12 +13,17 @@ const AssessmentDetailsPage = ({ user }) => {
   const [showInstructions, setShowInstructions] = useState(false);
   const [showFsPrompt, setShowFsPrompt] = useState(false);
   const [fsPending, setFsPending] = useState(false);
+  const [myAttempt, setMyAttempt] = useState(null);
 
   useEffect(() => {
     const fetchAssessment = async () => {
       try {
-        const res = await assessments.get(id);
-        setAssessment(res.data);
+        const [assessmentRes, attemptRes] = await Promise.all([
+          assessments.get(id),
+          assessments.getMyAttempt(id).catch(() => ({ data: null }))
+        ]);
+        setAssessment(assessmentRes.data);
+        setMyAttempt(attemptRes.data);
       } catch (err) {
         setError(err.response?.data?.msg || 'Failed to fetch assessment details');
       } finally {
@@ -33,7 +38,11 @@ const AssessmentDetailsPage = ({ user }) => {
     try {
       const res = await assessments.start(id);
       const attempt = res.data;
-      navigate(`/assessment-attempt/${attempt._id}`);
+      navigate(
+        attempt.status === 'Active'
+          ? `/assessment-attempt/${attempt._id}`
+          : `/assessment-attempt/${attempt._id}/result`
+      );
     } catch (err) {
       alert(err.response?.data?.msg || 'Failed to start assessment');
     } finally {
@@ -52,7 +61,7 @@ const AssessmentDetailsPage = ({ user }) => {
     setShowFsPrompt(true);
   };
 
-  const enterFullscreenAndStart = async (allowWithoutFs = false) => {
+  const enterFullscreenAndStart = async () => {
     setFsPending(true);
     const onFsChange = async () => {
       if (document.fullscreenElement) {
@@ -69,21 +78,13 @@ const AssessmentDetailsPage = ({ user }) => {
         document.addEventListener('fullscreenchange', onFsChange);
         await el.requestFullscreen();
         // if requestFullscreen resolves but event not yet fired, handler will trigger
-      } else if (allowWithoutFs) {
-        setShowFsPrompt(false);
-        await startAttempt();
       } else {
-        alert('Fullscreen API not supported by your browser. Please allow fullscreen or start without fullscreen.');
+        alert('Fullscreen API not supported by your browser. Please use a browser that supports fullscreen to start the assessment.');
       }
-    } catch (err) {
+    } catch {
       // user likely denied or request failed
       document.removeEventListener('fullscreenchange', onFsChange);
-      if (allowWithoutFs) {
-        setShowFsPrompt(false);
-        await startAttempt();
-      } else {
-        alert('Unable to enter fullscreen. You can try again or start without fullscreen (not recommended).');
-      }
+      alert('Unable to enter fullscreen. Please try again.');
     } finally {
       setFsPending(false);
     }
@@ -100,7 +101,10 @@ const AssessmentDetailsPage = ({ user }) => {
   const isUpcoming = now < startTime;
 
   const isStudent = user && user.role === 'student';
-  const availableForUser = isAvailable && isStudent;
+  const hasAttempt = Boolean(myAttempt);
+  const attemptFinished = myAttempt && myAttempt.status && myAttempt.status !== 'Active';
+  const attemptActive = myAttempt && myAttempt.status === 'Active';
+  const availableForUser = isAvailable && isStudent && !hasAttempt;
 
   return (
     <>
@@ -163,7 +167,35 @@ const AssessmentDetailsPage = ({ user }) => {
           {/* Action Box */}
           <div className="problem-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '40px 24px', background: isAvailable ? 'var(--surface-hover)' : 'var(--surface)', borderColor: isAvailable ? 'var(--primary)' : 'var(--border)' }}>
             
-            {availableForUser ? (
+            {hasAttempt && attemptFinished ? (
+              <>
+                <AlertTriangle size={48} className="text-muted mb-4" />
+                <h3 className="mb-2 text-muted">Already given assessment</h3>
+                <p className="text-secondary mb-6">You have already submitted this assessment. Review your result and submission history below.</p>
+                <button
+                  className="button"
+                  style={{ padding: '16px 40px', fontSize: '1.05rem', borderRadius: '100px' }}
+                  onClick={() => navigate(`/assessment-attempt/${myAttempt._id}/result`)}
+                >
+                  <ExternalLink size={18} />
+                  See Results
+                </button>
+              </>
+            ) : attemptActive ? (
+              <>
+                <div className="mb-4" style={{ width: '16px', height: '16px', borderRadius: '50%', background: 'var(--warning)', boxShadow: '0 0 16px var(--warning)' }}></div>
+                <h3 className="mb-2" style={{ color: 'var(--warning)' }}>Assessment in progress</h3>
+                <p className="text-secondary mb-6">You already started this assessment. Return to the workspace to continue from where you left off.</p>
+                <button
+                  className="button"
+                  style={{ padding: '16px 40px', fontSize: '1.05rem', borderRadius: '100px' }}
+                  onClick={() => navigate(`/assessment-attempt/${myAttempt._id}`)}
+                >
+                  <ExternalLink size={18} />
+                  Continue Assessment
+                </button>
+              </>
+            ) : availableForUser ? (
               <>
                 <div className="mb-4" style={{ width: '16px', height: '16px', borderRadius: '50%', background: 'var(--success)', boxShadow: '0 0 16px var(--success)', animation: 'pulse 2s infinite' }}></div>
                 <h3 className="mb-2" style={{ color: 'var(--success)' }}>Live Now</h3>
@@ -256,8 +288,7 @@ const AssessmentDetailsPage = ({ user }) => {
             <p style={{ color: 'var(--text-secondary)' }}>For best security, please enter fullscreen now. The assessment timer will begin once fullscreen is active.</p>
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
               <button className="button button-outline" onClick={() => { setShowFsPrompt(false); }}>Cancel</button>
-              <button className="button" onClick={() => enterFullscreenAndStart(false)} disabled={fsPending}>{fsPending ? 'Entering Fullscreen...' : 'Enter Fullscreen and Start'}</button>
-              <button className="button button-ghost" onClick={() => enterFullscreenAndStart(true)} disabled={fsPending}>Start Without Fullscreen</button>
+              <button className="button" onClick={enterFullscreenAndStart} disabled={fsPending}>{fsPending ? 'Entering Fullscreen...' : 'Enter Fullscreen and Start'}</button>
             </div>
           </div>
         </div>

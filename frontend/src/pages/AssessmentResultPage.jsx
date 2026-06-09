@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import api, { assessments } from '../api';
+import { assessments } from '../api';
 
 const AssessmentResultPage = () => {
   const { attemptId } = useParams();
@@ -19,12 +19,8 @@ const AssessmentResultPage = () => {
         const assessmentRes = await assessments.get(attemptRes.data.assessmentId._id || attemptRes.data.assessmentId);
         setAssessment(assessmentRes.data);
 
-        // Fetch all submissions for this attempt
-        // We'll use a filtered list from the general submissions endpoint for now
-        // A dedicated endpoint for attempt submissions would be better in the future
-        const submissionsRes = await api.get('/api/submissions/my');
-        const attemptSubmissions = submissionsRes.data.filter(s => String(s.attemptId) === String(attemptId));
-        setSubmissions(attemptSubmissions);
+        const submissionsRes = await assessments.getAttemptSubmissions(attemptId);
+        setSubmissions(submissionsRes.data);
 
       } catch (err) {
         setError(err.response?.data?.msg || 'Failed to load result');
@@ -66,7 +62,7 @@ const AssessmentResultPage = () => {
           </div>
           <div>
             <h3 style={{ fontSize: '0.9rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Status</h3>
-            <p style={{ fontSize: '1.25rem', fontWeight: '700', color: attempt.status === 'Completed' ? 'var(--success)' : 'var(--warning)' }}>{attempt.status}</p>
+            <p style={{ fontSize: '1.25rem', fontWeight: '700', color: attempt.status === 'Submitted' ? 'var(--success)' : 'var(--warning)' }}>{attempt.status}</p>
           </div>
         </div>
       </div>
@@ -83,11 +79,12 @@ const AssessmentResultPage = () => {
           </thead>
           <tbody>
             {assessment.problems.map((p, idx) => {
-              const verdict = getProblemResult(p.problemId._id || p.problemId);
+              const problemId = p.problemId?._id || p.problemId;
+              const verdict = getProblemResult(problemId);
               const score = verdict === 'Accepted' ? (p.maxScore || 100) : 0;
               return (
-                <tr key={idx}>
-                  <td style={{ fontWeight: '600' }}>{p.problemId.title || `Problem ${idx + 1}`}</td>
+                <tr key={problemId || idx}>
+                  <td style={{ fontWeight: '600' }}>{p.problemId?.title || `Problem ${idx + 1}`}</td>
                   <td>
                     <span className={`tag ${verdict === 'Accepted' ? 'difficulty-easy' : (verdict === 'Failed' ? 'difficulty-hard' : '')}`}>
                       {verdict}

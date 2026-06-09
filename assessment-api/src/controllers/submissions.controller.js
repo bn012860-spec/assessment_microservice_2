@@ -1,5 +1,4 @@
 import * as submissionsService from "../services/submissions.service.js";
-import * as attemptsRepo from "../repositories/assessmentAttempts.repo.js";
 
 export async function submitSolution(req, res, next) {
   const { problemId, code, language, assessmentId, attemptId } = req.body;
@@ -9,18 +8,6 @@ export async function submitSolution(req, res, next) {
   try {
     if (!finalUserId) {
       return res.status(401).json({ msg: "Unauthorized" });
-    }
-
-    // Verify ownership if attemptId is provided
-    if (attemptId) {
-      const attempt = await attemptsRepo.findById(attemptId);
-      if (!attempt) {
-        return res.status(404).json({ msg: "Attempt not found" });
-      }
-      const studentId = attempt.studentId._id || attempt.studentId;
-      if (String(studentId) !== String(finalUserId)) {
-        return res.status(403).json({ msg: "Forbidden: You do not own this attempt" });
-      }
     }
 
     const result = await submissionsService.submitSolution({ 

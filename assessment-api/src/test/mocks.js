@@ -13,7 +13,9 @@ vi.mock('redis', () => ({
 
 vi.mock('amqplib', () => {
   const mockChannel = {
+    assertExchange: vi.fn().mockResolvedValue({}),
     assertQueue: vi.fn().mockResolvedValue({}),
+    bindQueue: vi.fn().mockResolvedValue({}),
     sendToQueue: vi.fn(),
     close: vi.fn(),
     connection: {},

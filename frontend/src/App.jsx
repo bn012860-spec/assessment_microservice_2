@@ -31,7 +31,7 @@ function AppContent() {
         try {
             const raw = localStorage.getItem('user');
             return raw ? JSON.parse(raw) : null;
-        } catch (e) {
+        } catch {
             return null;
         }
     });
@@ -52,21 +52,23 @@ function AppContent() {
                 }
                 
                 setUser(newUser);
-            } catch (e) {
+            } catch {
                 setUser(null);
             }
         };
 
-        window.addEventListener('auth-change', syncAuth);
-        window.addEventListener('storage', (e) => {
+        const handleStorage = (e) => {
             if (e.key === 'user' || e.key === 'token' || e.key === null) {
                 syncAuth();
             }
-        });
+        };
+
+        window.addEventListener('auth-change', syncAuth);
+        window.addEventListener('storage', handleStorage);
 
         return () => {
             window.removeEventListener('auth-change', syncAuth);
-            window.removeEventListener('storage', syncAuth);
+            window.removeEventListener('storage', handleStorage);
         };
     }, [user, navigate]);
 
@@ -92,7 +94,13 @@ function AppContent() {
         );
     };
 
-    const isAssessmentRoute = location.pathname.startsWith('/assessment-attempt/');
+    const isAssessmentRoute = /^\/assessment-attempt\/[^/]+$/.test(location.pathname);
+    const RequireAuth = ({ children }) => user ? children : <Navigate to="/login" replace />;
+    const RequireRole = ({ roles, children }) => user && roles.includes(user.role)
+        ? children
+        : <Navigate to={user ? "/" : "/login"} replace />;
+    const RequireStudent = ({ children }) => <RequireRole roles={['student']}>{children}</RequireRole>;
+    const RequireStaff = ({ children }) => <RequireRole roles={['admin', 'faculty', 'superadmin']}>{children}</RequireRole>;
 
     return (
         <>
@@ -138,25 +146,25 @@ function AppContent() {
                 <Route path="/questions" element={user ? <QuestionBankPage user={user} /> : <Navigate to="/login" replace />} />
                 <Route path="/questions/add" element={user ? <AddQuestionPage user={user} /> : <Navigate to="/login" replace />} />
                 <Route path="/questions/:id/edit" element={user ? <EditQuestionPage user={user} /> : <Navigate to="/login" replace />} />
-                <Route path="/assessments/:id" element={<AssessmentDetailsPage user={user} />} />
-                <Route path="/assessment-attempt/:attemptId" element={<AssessmentWorkspace user={user} />} />
-                <Route path="/assessment-attempt/:attemptId/result" element={<AssessmentResultPage user={user} />} />
+                <Route path="/assessments/:id" element={<RequireAuth><AssessmentDetailsPage user={user} /></RequireAuth>} />
+                <Route path="/assessment-attempt/:attemptId" element={<RequireStudent><AssessmentWorkspace user={user} /></RequireStudent>} />
+                <Route path="/assessment-attempt/:attemptId/result" element={<RequireStudent><AssessmentResultPage user={user} /></RequireStudent>} />
                 
                 {/* Admin/Faculty Routes */}
-                <Route path="/admin/assessments" element={<AssessmentManagementPage />} />
-                <Route path="/admin/assessments/add" element={<AddAssessmentPage />} />
-                <Route path="/admin/assessments/:id/edit" element={<EditAssessmentPage />} />
-                <Route path="/admin/assessments/:id/preview" element={<AssessmentPreviewPage />} />
-                <Route path="/admin/assessments/:id/results" element={<AssessmentResultsPage />} />
-                <Route path="/admin/assessment-attempt/:attemptId" element={<AssessmentAttemptDetailPage />} />
-                <Route path="/admin/system" element={<SystemDashboardPage />} />
-                <Route path="/admin/users" element={<UserManagementPage />} />
+                <Route path="/admin/assessments" element={<RequireStaff><AssessmentManagementPage /></RequireStaff>} />
+                <Route path="/admin/assessments/add" element={<RequireStaff><AddAssessmentPage /></RequireStaff>} />
+                <Route path="/admin/assessments/:id/edit" element={<RequireStaff><EditAssessmentPage /></RequireStaff>} />
+                <Route path="/admin/assessments/:id/preview" element={<RequireStaff><AssessmentPreviewPage /></RequireStaff>} />
+                <Route path="/admin/assessments/:id/results" element={<RequireStaff><AssessmentResultsPage /></RequireStaff>} />
+                <Route path="/admin/assessment-attempt/:attemptId" element={<RequireStaff><AssessmentAttemptDetailPage /></RequireStaff>} />
+                <Route path="/admin/system" element={<RequireRole roles={['superadmin']}><SystemDashboardPage /></RequireRole>} />
+                <Route path="/admin/users" element={<RequireStaff><UserManagementPage /></RequireStaff>} />
 
                 <Route path="/problems/:_id" element={<ProblemPage user={user} />} />
-                <Route path="/add-problem" element={<AddProblemPage />} />
-                <Route path="/problems/:_id/edit" element={<EditProblemPage />} />
+                <Route path="/add-problem" element={<RequireStaff><AddProblemPage /></RequireStaff>} />
+                <Route path="/problems/:_id/edit" element={<RequireStaff><EditProblemPage /></RequireStaff>} />
                 <Route path="/login" element={<LoginPage />} />
-                <Route path="/my-submissions" element={<MySubmissionsPage />} />
+                <Route path="/my-submissions" element={<RequireAuth><MySubmissionsPage /></RequireAuth>} />
             </Routes>
         </>
     );

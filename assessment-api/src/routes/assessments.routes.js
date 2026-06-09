@@ -3,6 +3,7 @@ import { verifyToken, optionalVerifyToken, authorizeRoles } from "../middleware/
 import {
   listAssessments,
   getAssessmentById,
+  getMyAssessmentAttempt,
   createAssessment,
   updateAssessment,
   deleteAssessment,
@@ -19,6 +20,7 @@ const router = express.Router();
 
 router.get("/", optionalVerifyToken, listAssessments);
 router.get("/:_id", verifyToken, getAssessmentById);
+router.get("/:_id/my-attempt", verifyToken, authorizeRoles("student"), getMyAssessmentAttempt);
 router.post("/", verifyToken, authorizeRoles("admin", "faculty", "superadmin"), createAssessment);
 router.put("/:_id", verifyToken, authorizeRoles("admin", "faculty", "superadmin"), updateAssessment);
 router.delete("/:_id", verifyToken, authorizeRoles("admin", "faculty", "superadmin"), deleteAssessment);

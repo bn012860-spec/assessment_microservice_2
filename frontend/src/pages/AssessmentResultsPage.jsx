@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Download, Users, CheckCircle, Clock, AlertCircle, Search, RefreshCw, BarChart3, ChevronRight, FileSpreadsheet, MonitorOff, Copy, ClipboardPaste, Maximize, AlertTriangle, Trophy } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -15,7 +15,7 @@ const AssessmentResultsPage = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [riskFilter, setRiskFilter] = useState('');
 
-  const fetchData = async (isRefresh = false) => {
+  const fetchData = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     
@@ -32,13 +32,13 @@ const AssessmentResultsPage = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [id]);
 
   useEffect(() => {
     fetchData();
     const interval = setInterval(() => fetchData(true), 30000);
     return () => clearInterval(interval);
-  }, [id]);
+  }, [fetchData]);
 
   const calculateRiskLevel = (a) => {
     let score = 0;
@@ -100,18 +100,19 @@ const AssessmentResultsPage = () => {
   });
 
   const activeOrCompleted = attendance.filter(a => a.status !== 'Not Started');
+  const completedAttempts = attendance.filter(a => a.status === 'Submitted' || a.status === 'TimedOut');
   
   const maxPossibleScore = assessment.problems?.reduce((acc, p) => acc + (p.maxScore || 100), 0) || 100;
   
   const stats = {
     total: attendance.length,
     started: activeOrCompleted.length,
-    submitted: attendance.filter(a => a.status === 'Submitted' || a.status === 'TimedOut').length,
-    avgScore: activeOrCompleted.length > 0 
-      ? (activeOrCompleted.reduce((acc, a) => acc + (a.score || 0), 0) / activeOrCompleted.length).toFixed(1) 
+    submitted: completedAttempts.length,
+    avgScore: completedAttempts.length > 0
+      ? (completedAttempts.reduce((acc, a) => acc + (a.score || 0), 0) / completedAttempts.length).toFixed(1)
       : 0,
-    passRate: activeOrCompleted.length > 0
-      ? ((activeOrCompleted.filter(a => (a.score || 0) >= (maxPossibleScore * 0.4)).length / activeOrCompleted.length) * 100).toFixed(0)
+    passRate: completedAttempts.length > 0
+      ? ((completedAttempts.filter(a => (a.score || 0) >= (maxPossibleScore * 0.4)).length / completedAttempts.length) * 100).toFixed(0)
       : 0,
     highRisk: attendance.filter(a => calculateRiskLevel(a) === 'High').length
   };
@@ -146,7 +147,9 @@ const AssessmentResultsPage = () => {
       <div className="flex-between mb-8">
         <div>
           <div className="flex-center gap-2 mb-2" style={{ justifyContent: 'flex-start' }}>
-            <span className="tag" style={{ background: 'var(--primary-glow)', color: 'var(--primary)', fontWeight: '700' }}>LIVE MONITORING</span>
+            <span className="tag" style={{ background: 'var(--primary-glow)', color: 'var(--primary)', fontWeight: '700' }}>
+              {new Date() <= new Date(assessment.endTime) ? 'LIVE MONITORING' : 'FINAL RESULTS'}
+            </span>
             <h1 style={{ margin: 0 }}>{assessment.title}</h1>
           </div>
           <p className="text-muted">Real-time attendance and performance tracking.</p>
@@ -355,7 +358,7 @@ const AssessmentResultsPage = () => {
               ))}
               {filteredAttendance.length === 0 && (
                 <tr>
-                  <td colSpan="6" style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>
                     No students match the current filters.
                   </td>
                 </tr>

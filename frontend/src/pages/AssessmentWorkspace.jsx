@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import { Clock, CheckCircle2, ChevronRight, Terminal, Play, Send, Info, Code2, AlertCircle, ChevronDown, ChevronUp, Loader2, Trash2 } from 'lucide-react';
@@ -7,6 +7,15 @@ import SubmissionOutput from '../components/SubmissionOutput';
 import { mapType } from '../utils/typeValidator';
 
 const supportedLanguages = ['python', 'javascript', 'typescript', 'java', 'cpp', 'c', 'csharp', 'go'];
+
+function loadDraft(attemptId) {
+  try {
+    return JSON.parse(localStorage.getItem(`assessment-draft:${attemptId}`) || '{}');
+  } catch {
+    localStorage.removeItem(`assessment-draft:${attemptId}`);
+    return {};
+  }
+}
 
 function buildTemplate(language, functionName, parameters, returnType) {
   const paramNames = (parameters || []).map(p => p.name);
@@ -120,7 +129,7 @@ function buildTemplate(language, functionName, parameters, returnType) {
   return `public class UserSolution {\n    public object ${functionName}(${paramNames.map((p) => `object ${p}`).join(', ')}) {\n        // your code here\n        return null;\n    }\n}`;
 }
 
-const AssessmentWorkspace = (props) => {
+const AssessmentWorkspace = () => {
   const { attemptId } = useParams();
   const navigate = useNavigate();
   
@@ -135,6 +144,7 @@ const AssessmentWorkspace = (props) => {
   const [langMap, setLangMap] = useState({}); // problemId -> language
   const [submissionMap, setSubmissionMap] = useState({}); // problemId -> submission object
   const intervalRefs = useRef({}); // problemId -> intervalId
+  const finishStartedRef = useRef(false);
 
   const [timeLeft, setTimeLeft] = useState(null);
   const [showConsole, setShowConsole] = useState(false);
@@ -149,6 +159,18 @@ const AssessmentWorkspace = (props) => {
 
   const [testCasesMap, setTestCasesMap] = useState({});
   const [activeTestCaseIdxMap, setActiveTestCaseIdxMap] = useState({});
+  const finishAttempt = useCallback(async () => {
+    if (finishStartedRef.current) return;
+    finishStartedRef.current = true;
+    try {
+      await assessments.submitAttempt(attemptId);
+      localStorage.removeItem(`assessment-draft:${attemptId}`);
+      navigate(`/assessment-attempt/${attemptId}/result`);
+    } catch (err) {
+      finishStartedRef.current = false;
+      setError(err.response?.data?.msg || 'Failed to submit assessment');
+    }
+  }, [attemptId, navigate]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -157,8 +179,13 @@ const AssessmentWorkspace = (props) => {
         const attemptData = attemptRes.data;
         setAttempt(attemptData);
 
-        const assessmentRes = await assessments.get(attemptData.assessmentId._id || attemptData.assessmentId);
-        const assessmentData = assessmentRes.data;
+        if (attemptData.status !== 'Active') {
+          navigate(`/assessment-attempt/${attemptId}/result`, { replace: true });
+          return;
+        }
+
+        // getAttempt returns the assessment with the server-shuffled problem order.
+        const assessmentData = attemptData.assessmentId;
         setAssessment(assessmentData);
 
         const problemPromises = assessmentData.problems.map(p => api.get(`/api/problems/${p.problemId._id || p.problemId}`));
@@ -166,15 +193,17 @@ const AssessmentWorkspace = (props) => {
         const fullProblems = problemResponses.map(r => r.data);
         setProblems(fullProblems);
 
-        const initialCodeMap = {};
-        const initialLangMap = {};
+        const savedDraft = loadDraft(attemptId);
+        const initialCodeMap = { ...(savedDraft.codeMap || {}) };
+        const initialLangMap = { ...(savedDraft.langMap || {}) };
         const initialTestCasesMap = {};
         const initialActiveIdxMap = {};
 
         fullProblems.forEach(p => {
           const lang = assessmentData.allowedLanguages?.[0] || 'python';
-          initialLangMap[p._id] = lang;
-          initialCodeMap[p._id] = buildTemplate(lang, p.functionName, p.parameters, p.returnType);
+          initialLangMap[p._id] = initialLangMap[p._id] || lang;
+          initialCodeMap[p._id] = initialCodeMap[p._id]
+            || buildTemplate(initialLangMap[p._id], p.functionName, p.parameters, p.returnType);
 
           const samples = (p.testCases || []).filter(tc => tc.isSample);
           initialTestCasesMap[p._id] = samples.length > 0 
@@ -187,10 +216,13 @@ const AssessmentWorkspace = (props) => {
         setLangMap(initialLangMap);
         setTestCasesMap(initialTestCasesMap);
         setActiveTestCaseIdxMap(initialActiveIdxMap);
+        setTabSwitchCount(attemptData.tabSwitchCount || 0);
+        setCopyCount(attemptData.copyCount || 0);
+        setPasteCount(attemptData.pasteCount || 0);
 
         const startTime = new Date(attemptData.startedAt).getTime();
         const durationMs = assessmentData.durationMinutes * 60 * 1000;
-        const endTime = startTime + durationMs;
+        const endTime = Math.min(startTime + durationMs, new Date(assessmentData.endTime).getTime());
         const remaining = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
         setTimeLeft(remaining);
 
@@ -201,10 +233,21 @@ const AssessmentWorkspace = (props) => {
       }
     };
     fetchData();
-  }, [attemptId]);
+  }, [attemptId, navigate]);
 
   useEffect(() => {
-    if (timeLeft === null || timeLeft <= 0) return;
+    if (loading || Object.keys(codeMap).length === 0) return;
+    localStorage.setItem(`assessment-draft:${attemptId}`, JSON.stringify({ codeMap, langMap }));
+  }, [attemptId, codeMap, langMap, loading]);
+
+  useEffect(() => () => {
+    Object.values(intervalRefs.current).forEach(clearInterval);
+  }, []);
+
+  const attemptActive = timeLeft !== null && timeLeft > 0;
+
+  useEffect(() => {
+    if (!attemptActive) return;
 
     // Anti-cheating: Tab Switching
     const handleVisibilityChange = () => {
@@ -245,8 +288,7 @@ const AssessmentWorkspace = (props) => {
               clearInterval(fsIntervalRef.current);
               fsIntervalRef.current = null;
               // auto-submit and navigate
-              assessments.submitAttempt(attemptId).catch(() => {});
-              navigate(`/assessment-attempt/${attemptId}/result`);
+              finishAttempt();
               return 0;
             }
             return prev - 1;
@@ -283,16 +325,16 @@ const AssessmentWorkspace = (props) => {
       document.removeEventListener('click', enterFS);
       if (fsIntervalRef.current) { clearInterval(fsIntervalRef.current); fsIntervalRef.current = null; }
     };
-  }, [attemptId]);
+  }, [attemptActive, attemptId, finishAttempt]);
 
   useEffect(() => {
-    if (timeLeft === null || timeLeft <= 0) return;
+    if (!attemptActive) return;
 
     const timer = setInterval(() => {
       setTimeLeft(prev => {
         if (prev <= 1) {
           clearInterval(timer);
-          navigate(`/assessment-attempt/${attemptId}/result`);
+          finishAttempt();
           return 0;
         }
         return prev - 1;
@@ -300,7 +342,7 @@ const AssessmentWorkspace = (props) => {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [timeLeft, attemptId, navigate]);
+  }, [attemptActive, finishAttempt]);
 
   const currentProblem = problems[currentProblemIndex];
 
@@ -431,7 +473,13 @@ const AssessmentWorkspace = (props) => {
       intervalRefs.current[problemId] = setInterval(() => checkStatus(newSubmission._id, problemId), 2000);
     } catch (err) {
       console.error(err);
-      setSubmissionMap(prev => ({ ...prev, [problemId]: { status: 'Error', error: 'Submission failed' } }));
+      setSubmissionMap(prev => ({
+        ...prev,
+        [problemId]: {
+          status: 'Error',
+          error: err.response?.data?.msg || 'Submission failed'
+        }
+      }));
     }
   };
 
@@ -444,13 +492,7 @@ const AssessmentWorkspace = (props) => {
 
   const finishAssessment = async () => {
     if (window.confirm('Are you sure you want to finish the assessment?')) {
-      try {
-        await assessments.submitAttempt(attemptId);
-        navigate(`/assessment-attempt/${attemptId}/result`);
-      } catch (err) {
-        console.error(err);
-        alert('Failed to finish assessment. Please try again.');
-      }
+      await finishAttempt();
     }
   };
 
@@ -561,8 +603,8 @@ const AssessmentWorkspace = (props) => {
             <h3 style={{ marginTop: 0 }}>You left fullscreen</h3>
             <p style={{ color: 'var(--text-secondary)' }}>Re-enter fullscreen within <strong>{fsWarningTimeLeft}</strong> seconds or your attempt will be submitted automatically.</p>
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '16px' }}>
-              <button className="button" onClick={async () => { try { await document.documentElement.requestFullscreen(); } catch(e) {} }}>Return to Fullscreen</button>
-              <button className="button button-outline" onClick={async () => { if (fsIntervalRef.current) { clearInterval(fsIntervalRef.current); fsIntervalRef.current = null; } await assessments.submitAttempt(attemptId); navigate(`/assessment-attempt/${attemptId}/result`); }}>Submit Now</button>
+              <button className="button" onClick={async () => { try { await document.documentElement.requestFullscreen(); } catch { setError('Unable to enter fullscreen'); } }}>Return to Fullscreen</button>
+              <button className="button button-outline" onClick={async () => { if (fsIntervalRef.current) { clearInterval(fsIntervalRef.current); fsIntervalRef.current = null; } await finishAttempt(); }}>Submit Now</button>
             </div>
           </div>
         </div>

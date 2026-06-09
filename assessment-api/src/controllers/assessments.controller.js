@@ -26,6 +26,15 @@ export async function getAssessmentById(req, res, next) {
   }
 }
 
+export async function getMyAssessmentAttempt(req, res, next) {
+  try {
+    const attempt = await assessmentsService.getMyAssessmentAttempt(req.params._id, req.user._id);
+    res.json(attempt || null);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function createAssessment(req, res, next) {
   try {
     const assessment = await assessmentsService.createAssessment(req.body, req.user._id);

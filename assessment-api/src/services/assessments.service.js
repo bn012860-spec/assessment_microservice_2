@@ -36,6 +36,10 @@ export async function getAssessmentById(id, user) {
   return assessment;
 }
 
+export async function getMyAssessmentAttempt(assessmentId, userId) {
+  return attemptsRepo.findOne({ assessmentId, studentId: userId });
+}
+
 export async function createAssessment(payload, userId) {
   validateAssessmentPayload(payload);
   const data = {
@@ -71,13 +75,21 @@ export async function startAssessment(assessmentId, userId, auditInfo = {}) {
   const problemIds = assessment.problems.map(p => p.problemId._id || p.problemId);
   const shuffledOrder = [...problemIds].sort(() => Math.random() - 0.5);
 
-  attempt = await attemptsRepo.create({
-    assessmentId,
-    studentId: userId,
-    startedAt: now,
-    status: 'Active',
-    problemOrder: shuffledOrder
-  });
+  try {
+    attempt = await attemptsRepo.create({
+      assessmentId,
+      studentId: userId,
+      startedAt: now,
+      status: 'Active',
+      problemOrder: shuffledOrder
+    });
+  } catch (error) {
+    // The unique attempt index makes concurrent start requests idempotent.
+    if (error?.code === 11000) {
+      return attemptsRepo.findOne({ assessmentId, studentId: userId });
+    }
+    throw error;
+  }
 
   await auditService.logEvent({
     event: "ASSESSMENT_STARTED",
@@ -342,12 +354,23 @@ function validateAssessmentPayload(payload) {
   if (!payload.title) errors.push("Title is required");
   if (!payload.startTime) errors.push("Start time is required");
   if (!payload.endTime) errors.push("End time is required");
-  if (!payload.durationMinutes) errors.push("Duration is required");
+  if (!Number.isFinite(Number(payload.durationMinutes)) || Number(payload.durationMinutes) <= 0) {
+    errors.push("Duration must be greater than zero");
+  }
   if (payload.startTime && payload.endTime && new Date(payload.startTime) >= new Date(payload.endTime)) {
     errors.push("End time must be after start time");
   }
   if (!Array.isArray(payload.problems) || payload.problems.length === 0) {
     errors.push("At least one problem is required");
+  } else {
+    const problemIds = payload.problems.map((problem) => String(problem.problemId));
+    if (new Set(problemIds).size !== problemIds.length) {
+      errors.push("An assessment cannot contain duplicate problems");
+    }
+    if (payload.problems.some((problem) => problem.maxScore !== undefined
+      && (!Number.isFinite(Number(problem.maxScore)) || Number(problem.maxScore) <= 0))) {
+      errors.push("Every problem max score must be greater than zero");
+    }
   }
 
   if (errors.length > 0) {

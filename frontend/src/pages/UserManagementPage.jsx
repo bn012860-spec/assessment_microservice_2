@@ -87,7 +87,7 @@ const UserManagementPage = () => {
       let usersToImport;
       try {
         usersToImport = JSON.parse(usersJson);
-      } catch (err) {
+      } catch {
         const lines = usersJson.split('\n').filter(line => line.trim());
         usersToImport = lines.map(line => {
           const parts = line.split(',').map(p => p.trim());

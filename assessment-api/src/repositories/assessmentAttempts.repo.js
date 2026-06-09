@@ -12,6 +12,12 @@ export async function findOne(filter) {
   return AssessmentAttempt.findOne(filter);
 }
 
+export async function findOnePopulated(filter) {
+  return AssessmentAttempt.findOne(filter)
+    .populate("studentId", "name email")
+    .populate("assessmentId");
+}
+
 export async function create(data) {
   const attempt = new AssessmentAttempt(data);
   return attempt.save();

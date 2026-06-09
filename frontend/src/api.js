@@ -37,7 +37,7 @@ export function isTokenExpired(token) {
     );
     const { exp } = JSON.parse(jsonPayload);
     return Date.now() >= exp * 1000;
-  } catch (e) {
+  } catch {
     return true;
   }
 }
@@ -71,6 +71,7 @@ if (storedToken) {
 export const assessments = {
   list: (params) => api.get("/api/assessments", { params }),
   get: (id) => api.get(`/api/assessments/${id}`),
+  getMyAttempt: (id) => api.get(`/api/assessments/${id}/my-attempt`),
   create: (data) => api.post("/api/assessments", data),
   update: (id, data) => api.put(`/api/assessments/${id}`, data),
   delete: (id) => api.delete(`/api/assessments/${id}`),

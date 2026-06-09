@@ -4,8 +4,7 @@ import Editor from '@monaco-editor/react';
 import { Play, Send, ChevronLeft, Info, History, Settings2, Terminal, AlertCircle, ChevronDown, ChevronUp, Loader2, Trash2, CheckCircle2, X, Edit2 } from 'lucide-react';
 import api, { problems } from '../api';
 import SubmissionOutput from '../components/SubmissionOutput';
-import { mapType } from '../utils/typeValidator';
-import buildTemplate, { getDefinitionsSnippet, detectUses } from '../utils/buildTemplate';
+import buildTemplate, { getDefinitionsSnippet } from '../utils/buildTemplate';
 
 const supportedLanguages = ['python', 'javascript', 'java', 'cpp', 'c', 'csharp', 'go'];
 
