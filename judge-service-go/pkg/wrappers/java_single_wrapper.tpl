@@ -255,12 +255,12 @@ public class Main {
             } else {
                 result.add("output", GSON.toJsonTree(output));
             }
-            System.out.println(GSON.toJson(result));
+            System.err.println(GSON.toJson(result));
         } catch (InvocationTargetException err) {
             Throwable cause = err.getCause() != null ? err.getCause() : err;
-            System.out.println(errorPayload(cause));
+            System.err.println(errorPayload(cause));
         } catch (Throwable err) {
-            System.out.println(errorPayload(err));
+            System.err.println(errorPayload(err));
         }
     }
 

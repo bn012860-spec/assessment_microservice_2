@@ -325,7 +325,7 @@ func buildCppCall(p models.Problem, funcName string) string {
 		sb.WriteString(");\n")
 		sb.WriteString("        result[\"output\"] = output;\n")
 	}
-	sb.WriteString("        std::cout << result.dump() << std::endl;")
+	sb.WriteString("        std::cerr << result.dump() << std::endl;")
 	return sb.String()
 }
 
@@ -402,6 +402,6 @@ func buildGoCall(p models.Problem, funcName string) string {
 	}
 
 	sb.WriteString("\tjsonRes, _ := json.Marshal(result)\n")
-	sb.WriteString("\tfmt.Println(string(jsonRes))\n")
+	sb.WriteString("\tfmt.Fprintln(os.Stderr, string(jsonRes))\n")
 	return sb.String()
 }

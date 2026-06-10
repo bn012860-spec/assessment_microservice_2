@@ -13,7 +13,7 @@ static void make_error_and_print(const char *msg) {
     struct json_object *out = json_object_new_object();
     json_object_object_add(out, "status", json_object_new_string("error"));
     json_object_object_add(out, "message", json_object_new_string(msg));
-    printf("%s\n", json_object_to_json_string(out));
+    fprintf(stderr, "%s\n", json_object_to_json_string(out));
     json_object_put(out);
 }
 
@@ -150,7 +150,7 @@ int main(void) {
     json_object_object_add(result, "details", details);
 
     // Print final JSON (single well-formed object)
-    printf("%s\n", json_object_to_json_string(result));
+    fprintf(stderr, "%s\n", json_object_to_json_string(result));
 
     // Clean up
     json_object_put(parsed_json);

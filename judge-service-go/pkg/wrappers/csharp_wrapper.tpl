@@ -247,7 +247,7 @@ public static class Harness
         var method = solverType.GetMethod(funcName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.NonPublic);
         
         if (method == null) {
-            Console.WriteLine("{\"error\": \"Method " + funcName + " not found in Solution class\"}");
+            Console.Error.WriteLine("{\"error\": \"Method " + funcName + " not found in Solution class\"}");
             return;
         }
 
@@ -268,7 +268,7 @@ public static class Harness
                 {"message", ex.InnerException?.Message ?? ex.Message},
                 {"traceback", ex.InnerException?.StackTrace ?? ex.StackTrace}
             };
-            Console.WriteLine(JsonSerializer.Serialize(res));
+            Console.Error.WriteLine(JsonSerializer.Serialize(res));
             return;
         } catch (Exception ex) {
             var res = new Dictionary<string, object> {
@@ -276,7 +276,7 @@ public static class Harness
                 {"message", ex.Message},
                 {"traceback", ex.StackTrace}
             };
-            Console.WriteLine(JsonSerializer.Serialize(res));
+            Console.Error.WriteLine(JsonSerializer.Serialize(res));
             return;
         }
 
@@ -287,7 +287,7 @@ public static class Harness
             outputMap["output"] = Serialize(result, returnTypeStr);
         }
 
-        Console.WriteLine(JsonSerializer.Serialize(outputMap));
+        Console.Error.WriteLine(JsonSerializer.Serialize(outputMap));
     }
 
     static string GetTypeStr(int index) {

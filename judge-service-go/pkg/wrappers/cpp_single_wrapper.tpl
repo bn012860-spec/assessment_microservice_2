@@ -198,7 +198,7 @@ int main(int argc, char** argv) {
         json err;
         err["error"] = "Runtime Error";
         err["message"] = e.what();
-        std::cout << err.dump() << std::endl;
+        std::cerr << err.dump() << std::endl;
     }
     return 0;
 }

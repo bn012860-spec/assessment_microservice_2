@@ -197,7 +197,7 @@ func main() {
 	defer func() {
 		if r := recover(); r != nil {
 			result.Error = "Runtime Error"
-			fmt.Printf("{\"error\": \"Runtime Error\", \"message\": \"%v\"}\n", r)
+			fmt.Fprintf(os.Stderr, "{\"error\": \"Runtime Error\", \"message\": \"%v\"}\n", r)
 			os.Exit(0)
 		}
 	}()

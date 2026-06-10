@@ -148,13 +148,13 @@ int main(int argc, char** argv) {
             } catch (const std::exception& e) {
                 result["error"] = "Runtime Error";
                 result["message"] = e.what();
-                std::cout << result.dump() << std::endl;
+                std::cerr << result.dump() << std::endl;
             }
         }
     } catch (const std::exception& e) {
         json fatal;
         fatal["fatal"] = e.what();
-        std::cout << fatal.dump() << std::endl;
+        std::cerr << fatal.dump() << std::endl;
     }
     return 0;
 }

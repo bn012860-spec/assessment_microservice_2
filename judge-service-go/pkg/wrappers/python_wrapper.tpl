@@ -193,8 +193,8 @@ def run_tests():
         "total": len(results),
         "details": results
     }
-    print(json.dumps(summary))
-    sys.stdout.flush()
+    print(json.dumps(summary), file=sys.stderr)
+    sys.stderr.flush()
 
 if __name__ == "__main__":
     run_tests()
