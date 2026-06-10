@@ -86,33 +86,35 @@ func truncateString(s string, maxBytes int) (string, bool) {
 	return s[:maxBytes], true
 }
 
-func parseSingleTestOutput(rawStdout string) (singleTestExecOutput, string, error) {
+func parseSingleTestOutput(stdout string, stderr string) (singleTestExecOutput, string, error) {
 	var out singleTestExecOutput
-	trimmed := strings.TrimSpace(rawStdout)
-	if trimmed == "" {
-		return out, "", fmt.Errorf("empty wrapper output")
+
+	// Judge result is now in stderr
+	trimmedStderr := strings.TrimSpace(stderr)
+	if trimmedStderr == "" {
+		// If stderr is empty, maybe there's a runtime error that went to stdout?
+		// But ideally judge metadata is always in stderr.
+		return out, strings.TrimSpace(stdout), fmt.Errorf("missing judge metadata in stderr")
 	}
 
-	// Try parsing the whole thing as JSON first (common case)
-	if err := json.Unmarshal([]byte(trimmed), &out); err == nil {
-		return out, "", nil
-	}
-
-	// If user prints extra lines, try parsing the last non-empty line as JSON.
-	lines := strings.Split(trimmed, "\n")
+	// Try to find the last JSON object in stderr (in case there are multiple lines or non-JSON noise)
+	lines := strings.Split(trimmedStderr, "\n")
 	for i := len(lines) - 1; i >= 0; i-- {
 		line := strings.TrimSpace(lines[i])
 		if line == "" {
 			continue
 		}
-		if err := json.Unmarshal([]byte(line), &out); err == nil {
-			// Found the JSON line. The rest is user stdout.
-			remainingStdout := strings.Join(lines[:i], "\n")
-			return out, remainingStdout, nil
+		if strings.HasPrefix(line, "{") && strings.HasSuffix(line, "}") {
+			if err := json.Unmarshal([]byte(line), &out); err == nil {
+				// Found the JSON result.
+				// Any other noise in stderr could be user error output, we might want to include it?
+				// For now, let's keep it simple: stdout is user logs, stderr is judge result.
+				return out, strings.TrimSpace(stdout), nil
+			}
 		}
-		break
 	}
-	return out, rawStdout, fmt.Errorf("wrapper output is not valid JSON")
+
+	return out, strings.TrimSpace(stdout), fmt.Errorf("failed to parse judge metadata from stderr: %s", stderr)
 }
 
 func perTestTimeout(problem models.Problem) time.Duration {

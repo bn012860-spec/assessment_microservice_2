@@ -29,10 +29,13 @@ function isPrivilegedRole(role) {
   return role === "admin" || role === "faculty" || role === "superadmin";
 }
 
-function isSampleTestCase(tc = {}) {
+export function isSampleTestCase(tc = {}) {
   if (typeof tc.isSample === "boolean") return tc.isSample;
+  // If isSample is not explicitly set, we rely on isHidden.
+  // A test case is a sample if it's NOT hidden.
   if (typeof tc.isHidden === "boolean") return !tc.isHidden;
-  return true;
+  // Default to false for safety: if we don't know, it's hidden.
+  return false;
 }
 
 function getAttemptExpiration(attempt, assessment) {
@@ -95,43 +98,68 @@ function parseOutputJSON(output) {
   }
 }
 
-function sanitizeResultDetails(details = [], testCases = []) {
+export function sanitizeResultDetails(details = [], testCases = [], isAssessment = false) {
   return details.map((detail, idx) => {
-    const testIndexFromPayload = Number.isInteger(detail.test) ? detail.test - 1 : idx;
+    const testNum = detail.test ?? detail.Test;
+    const testIndexFromPayload = Number.isInteger(testNum) ? testNum - 1 : idx;
     const tc = testCases[testIndexFromPayload];
     const hidden = tc ? !isSampleTestCase(tc) : false;
 
     if (!hidden) {
-      return detail;
+      // For sample test cases, ensure all fields are present and correctly named for the frontend.
+      // We check for both lowercase and capitalized versions as the judge might return either depending on BSON tags.
+      return {
+        ...detail,
+        inputs: detail.inputs ?? detail.input ?? detail.Input,
+        expected: detail.expected ?? detail.Expected,
+        output: detail.output ?? detail.Output,
+        passed: detail.passed ?? detail.ok ?? detail.Passed ?? detail.Ok ?? false,
+        ok: detail.passed ?? detail.ok ?? detail.Passed ?? detail.Ok ?? false,
+        stdout: detail.stdout ?? detail.Stdout,
+        stderr: detail.stderr ?? detail.Stderr,
+        traceback: detail.traceback ?? detail.Traceback,
+        timeMs: detail.timeMs ?? detail.TimeMs,
+      };
     }
 
-    return {
-      test: detail.test,
-      ok: detail.ok,
+    // For hidden test cases
+    const sanitized = {
+      test: detail.test ?? detail.Test,
+      passed: detail.passed ?? detail.ok ?? detail.Passed ?? detail.Ok ?? false,
+      ok: detail.passed ?? detail.ok ?? detail.Passed ?? detail.Ok ?? false,
       isHidden: true,
-      stdout: detail.stdout,
-      stderr: detail.stderr
+      timeMs: detail.timeMs ?? detail.TimeMs
     };
+
+    // Requirement: For Practice Problems, show Console Logs. For Assessments, hide them.
+    if (!isAssessment) {
+      sanitized.stdout = detail.stdout ?? detail.Stdout;
+      sanitized.stderr = detail.stderr ?? detail.Stderr;
+      sanitized.traceback = detail.traceback ?? detail.Traceback;
+    }
+
+    return sanitized;
   });
 }
 
-function sanitizeSubmissionForStudent(submission, problem) {
+export function sanitizeSubmissionForStudent(submission, problem) {
   if (!submission || !problem || !Array.isArray(problem.testCases)) {
     return submission;
   }
 
   const normalized = typeof submission.toObject === "function" ? submission.toObject() : { ...submission };
+  const isAssessment = !!normalized.assessmentId;
   const parsedOutput = parseOutputJSON(normalized.output);
 
   if (parsedOutput && Array.isArray(parsedOutput.details)) {
-    parsedOutput.details = sanitizeResultDetails(parsedOutput.details, problem.testCases);
+    parsedOutput.details = sanitizeResultDetails(parsedOutput.details, problem.testCases, isAssessment);
     normalized.output = JSON.stringify(parsedOutput);
   }
 
   if (normalized.testResult && Array.isArray(normalized.testResult.details)) {
     normalized.testResult = {
       ...normalized.testResult,
-      details: sanitizeResultDetails(normalized.testResult.details, problem.testCases)
+      details: sanitizeResultDetails(normalized.testResult.details, problem.testCases, isAssessment)
     };
   }
 

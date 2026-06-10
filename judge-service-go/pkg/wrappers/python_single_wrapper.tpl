@@ -239,12 +239,12 @@ def run_one():
         else:
             converted_out = convert_output(out, return_type)
 
-        print(json.dumps({"output": converted_out}))
-        sys.stdout.flush()
+        print(json.dumps({"output": converted_out}), file=sys.stderr)
+        sys.stderr.flush()
     except Exception as e:
         tb = traceback.format_exc()
-        print(json.dumps({"error": str(e), "traceback": tb}))
-        sys.stdout.flush()
+        print(json.dumps({"error": str(e), "traceback": tb}), file=sys.stderr)
+        sys.stderr.flush()
 
 if __name__ == "__main__":
     run_one()

@@ -204,22 +204,24 @@ func runSubmissionCentralPerTest(ctx context.Context, exec *executor.Executor, p
 			continue
 		}
 
-		out, remainingStdout, parseErr := parseSingleTestOutput(stdoutTrimmed)
+		out, userLogs, parseErr := parseSingleTestOutput(stdoutTrimmed, stderrTrimmed)
 		if parseErr != nil {
 			markTestFailed(&tr, models.SubmissionStatusRuntimeError)
 			result.InternalError = models.InternalErrorJudge
 			tr.TimeMs = time.Since(testStart).Milliseconds()
-			tr.Stdout = stdoutForResult
-			tr.Traceback = stdoutForResult
+			tr.Stdout = userLogs
+			tr.Traceback = userLogs
 			if tr.Traceback == "" && stderrForLog != "" {
 				tr.Traceback = stderrForLog
 			}
-			slog.Error("invalid wrapper output", "submissionId", submissionMsg.SubmissionID, "test", i+1, "error", parseErr, "stdout", stdoutForResult)
+			slog.Error("invalid wrapper output", "submissionId", submissionMsg.SubmissionID, "test", i+1, "error", parseErr, "stdout", stdoutForResult, "stderr", stderrForLog)
 			result.AddTestResult(tr)
 			continue
 		}
 
-		tr.Stdout = remainingStdout
+		tr.Stdout = userLogs
+		tr.Stderr = "" // Clear stderr since it contains internal judge metadata if parsing succeeded
+		
 		if out.Error != "" {
 			reason := models.SubmissionStatusRuntimeError
 			if strings.Contains(strings.ToLower(out.Error), "outofmemory") || strings.Contains(strings.ToLower(out.Traceback), "outofmemory") {
@@ -307,11 +309,16 @@ func runSubmissionCentralBatched(ctx context.Context, exec *executor.Executor, p
 		_ = stream.Stderr.Close()
 	}()
 
-	processed, parseErr := appendBatchedResults(result, stream.Stdout, problem)
+	processed, parseErr := appendBatchedResults(result, stream.Stdout, &stderrBuf, problem)
 	_ = stream.Stdout.Close()
 
 	exitCode, waitErr := stream.Wait()
 	<-stderrDone
+
+	// If metadata parsing failed, check if there's error info in stderr
+	if parseErr != nil {
+		result.Stderr = stderrBuf.String()
+	}
 
 	var runErr error
 	switch {
@@ -364,34 +371,41 @@ func runSubmissionCentralBatched(ctx context.Context, exec *executor.Executor, p
 	return result, nil
 }
 
-func appendBatchedResults(result *models.SubmissionResult, stdout io.Reader, problem models.Problem) (int, error) {
-	reader := bufio.NewReader(stdout)
+func appendBatchedResults(result *models.SubmissionResult, stdout io.Reader, stderr io.Reader, problem models.Problem) (int, error) {
+	stdoutFull, err := io.ReadAll(stdout)
+	if err != nil {
+		return 0, err
+	}
+	stderrFull, err := io.ReadAll(stderr)
+	if err != nil {
+		return 0, err
+	}
+
+	rawStdout := string(stdoutFull)
+	rawStderr := string(stderrFull)
 	processed := 0
 
-	for {
-		line, err := readBoundedLine(reader, maxTestOutputBytes)
-		if err == io.EOF {
-			return processed, nil
-		}
-		if err != nil {
-			return processed, err
-		}
-
-		line = bytes.TrimSpace(line)
-		if len(line) == 0 {
+	// User prints go to stdout. Judge metadata goes to stderr as JSON lines.
+	// We'll parse stderr line by line for JSON objects.
+	lines := strings.Split(rawStderr, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || !strings.HasPrefix(line, "{") {
 			continue
 		}
 
 		var out batchedTestExecOutput
-		if err := json.Unmarshal(line, &out); err != nil {
-			return processed, fmt.Errorf("invalid batched wrapper output: %w", err)
+		if err := json.Unmarshal([]byte(line), &out); err != nil {
+			continue
 		}
+
 		if out.Fatal != "" {
 			return processed, fmt.Errorf("wrapper fatal error: %s", out.Fatal)
 		}
 		if out.Test <= 0 || out.Test > len(problem.TestCases) {
-			return processed, fmt.Errorf("batched wrapper returned invalid test index %d", out.Test)
+			continue
 		}
+
 		tc := problem.TestCases[out.Test-1]
 		testStart := time.Now()
 		tr := models.TestResult{
@@ -399,13 +413,23 @@ func appendBatchedResults(result *models.SubmissionResult, stdout io.Reader, pro
 			Input:    tc.Input,
 			Expected: tc.Expected,
 			Output:   out.Output,
+			// In batch mode, correlating per-test stdout is harder if it's all in one stream.
+			// However, usually we can just put the whole stdout in if needed, 
+			// or assume students don't print in batch mode.
+			// For now, let's just use the raw stdout if it's the only test, 
+			// or leave it as is if we can't easily split it.
+			Stdout: rawStdout,
 		}
+
 		if out.Error != "" {
 			reason := models.SubmissionStatusRuntimeError
 			if strings.Contains(strings.ToLower(out.Error), "outofmemory") {
 				reason = models.SubmissionStatusMemoryLimitExceeded
 			}
 			markTestFailed(&tr, reason)
+			if out.Traceback != "" {
+				tr.Traceback = out.Traceback
+			}
 		} else {
 			tr.Passed = comparator.Compare(tc.Expected, out.Output, problem.CompareConfig)
 			tr.Ok = tr.Passed
@@ -417,6 +441,8 @@ func appendBatchedResults(result *models.SubmissionResult, stdout io.Reader, pro
 		result.AddTestResult(tr)
 		processed++
 	}
+
+	return processed, nil
 }
 
 func appendMissingBatchedResults(result *models.SubmissionResult, problem models.Problem, processed int, reason string) {

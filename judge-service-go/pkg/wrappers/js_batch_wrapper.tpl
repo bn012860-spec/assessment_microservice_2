@@ -174,7 +174,7 @@ function convertOutput(val, typeStr) {
 // USER_CODE_MARKER
 
 function emit(payload) {
-  process.stdout.write(JSON.stringify(payload) + "\n");
+  process.stderr.write(JSON.stringify(payload) + "\n");
 }
 
 async function runAll() {

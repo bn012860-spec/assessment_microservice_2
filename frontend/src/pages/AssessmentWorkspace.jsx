@@ -733,7 +733,7 @@ const AssessmentWorkspace = () => {
                         {consoleTab === 'result' && (
                           <div className="fade-in">
                             {currentRunResult && <SubmissionOutput output={currentRunResult} />}
-                            {currentSubmission && !currentRunResult && <SubmissionOutput output={currentSubmission.output || { status: currentSubmission.status }} />}
+                            {currentSubmission && !currentRunResult && <SubmissionOutput output={currentSubmission} />}
                             {!currentRunResult && !currentSubmission && (
                               <div className="flex-center" style={{ height: '100px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                                 Run your code to see results here.

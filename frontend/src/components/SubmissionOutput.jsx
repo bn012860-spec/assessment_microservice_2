@@ -17,6 +17,8 @@ const SubmissionOutput = ({ output }) => {
     if (!output) return null;
 
     let parsed = output;
+    
+    // If output is a string, it might be the JSON string from the judge
     if (typeof output === 'string') {
         try {
             parsed = JSON.parse(output);
@@ -35,6 +37,15 @@ const SubmissionOutput = ({ output }) => {
         }
     }
 
+    // Handle the case where we receive a full submission object instead of just the output
+    // A submission object typically has status at the top level, and either output (string) or testResult (object)
+    if (parsed.testResult && typeof parsed.testResult === 'object') {
+        parsed = {
+            ...parsed,
+            ...parsed.testResult
+        };
+    }
+
     const isSuccess = parsed.status === 'Success' || parsed.status === 'Accepted';
     const isError = ['Fail', 'Error', 'Wrong Answer', 'Runtime Error', 'Compilation Error', 'Time Limit Exceeded', 'Memory Limit Exceeded'].includes(parsed.status);
     
@@ -49,8 +60,18 @@ const SubmissionOutput = ({ output }) => {
         VerdictIcon = XCircle;
     }
 
-    const normalizedDetails = Array.isArray(parsed.details) ? parsed.details : [];
-    const passedTests = parsed.passedCount ?? parsed.passed ?? normalizedDetails.filter(d => d.passed || d.ok).length;
+    const rawDetails = Array.isArray(parsed.details) ? parsed.details : [];
+    
+    // Normalize details to ensure 'inputs' exists (fail-safe if API sanitization was bypassed)
+    const normalizedDetails = rawDetails.map(detail => ({
+        ...detail,
+        inputs: detail.inputs ?? detail.input ?? detail.Input,
+        expected: detail.expected ?? detail.Expected,
+        output: detail.output ?? detail.Output,
+        passed: detail.passed ?? detail.ok ?? detail.Passed ?? detail.Ok ?? false,
+    }));
+
+    const passedTests = parsed.passedCount ?? parsed.passed ?? normalizedDetails.filter(d => d.passed).length;
     const totalTests = parsed.totalCount ?? parsed.total ?? Math.max(normalizedDetails.length, passedTests);
     
     const timeNum = Number(parsed.maxTimeMs || parsed.elapsedMs || parsed.time);
@@ -145,14 +166,14 @@ const SubmissionOutput = ({ output }) => {
                                         )}
 
                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                                            {detail.inputs !== undefined && (
+                                            {detail.inputs !== undefined && !isHidden && (
                                                 <div className="testcase-field">
                                                     <span className="label" style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Input</span>
                                                     <pre style={{ background: 'var(--bg)', padding: '8px 12px', borderRadius: '6px', fontSize: '0.85rem' }}>{formatValue(detail.inputs)}</pre>
                                                 </div>
                                             )}
                                             
-                                            {detail.expected !== undefined && (
+                                            {detail.expected !== undefined && !isHidden && (
                                                 <div className="testcase-field">
                                                     <span className="label" style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Expected Output</span>
                                                     <pre style={{ background: 'var(--bg)', padding: '8px 12px', borderRadius: '6px', fontSize: '0.85rem' }}>{formatValue(detail.expected)}</pre>
@@ -160,7 +181,7 @@ const SubmissionOutput = ({ output }) => {
                                             )}
                                         </div>
                                         
-                                        {detail.output !== undefined && (
+                                        {detail.output !== undefined && !isHidden && (
                                             <div className="testcase-field mt-4">
                                                 <span className="label" style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Your Output</span>
                                                 <pre style={{ 

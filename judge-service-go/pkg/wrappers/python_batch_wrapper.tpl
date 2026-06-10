@@ -146,7 +146,8 @@ def convert_output(val, type_str):
 # USER_CODE_MARKER
 
 def emit(payload):
-    print(json.dumps(payload), flush=True)
+    print(json.dumps(payload), file=sys.stderr)
+    sys.stderr.flush()
 
 def run_all():
     if len(sys.argv) < 2:

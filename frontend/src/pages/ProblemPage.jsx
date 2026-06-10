@@ -494,7 +494,7 @@ const ProblemPage = ({ user }) => {
                   {consoleTab === 'result' && (
                     <div className="fade-in">
                       {runResult && <SubmissionOutput output={runResult} />}
-                      {submission && !runResult && <SubmissionOutput output={submission.output || { status: submission.status }} />}
+                      {submission && !runResult && <SubmissionOutput output={submission} />}
                       {!runResult && !submission && (
                         <div className="flex-center" style={{ height: '100px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                           Run your code to see results here.

@@ -257,7 +257,7 @@ function runOne() {
             } else {
               convertedOut = convertOutput(resolvedOut, returnType);
             }
-            process.stdout.write(JSON.stringify({ output: convertedOut }));
+            process.stderr.write(JSON.stringify({ output: convertedOut }));
         }).catch(err => {
             emitError(err);
         });
@@ -282,7 +282,7 @@ function runOne() {
         } else {
           convertedOut = convertOutput(out, returnType);
         }
-        process.stdout.write(JSON.stringify({ output: convertedOut }));
+        process.stderr.write(JSON.stringify({ output: convertedOut }));
     }
   } catch (err) {
     emitError(err);
@@ -290,7 +290,7 @@ function runOne() {
 }
 
 function emitError(err) {
-    process.stdout.write(
+    process.stderr.write(
       JSON.stringify({
         error: err && err.message ? String(err.message) : String(err),
         traceback: err && err.stack ? String(err.stack) : "",

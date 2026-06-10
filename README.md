@@ -100,7 +100,7 @@ That command uses the `harness` Compose service and targets `http://assessment-a
 # for clean up:
 
 '''
-docker system prune -a --volumes -f
+docker system prune -a -f
 docker builder prune -a -f
 docker rm -f $(docker ps -aq)
 '''
