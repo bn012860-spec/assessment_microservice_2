@@ -14,7 +14,7 @@ import (
 )
 
 func TestParseSingleTestOutput_ValidJSON(t *testing.T) {
-	out, remaining, err := parseSingleTestOutput(`{"output":[1,2]}`)
+	out, remaining, err := parseSingleTestOutput("", `{"output":[1,2]}`)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -27,7 +27,7 @@ func TestParseSingleTestOutput_ValidJSON(t *testing.T) {
 }
 
 func TestParseSingleTestOutput_LastLineFallback(t *testing.T) {
-	out, remaining, err := parseSingleTestOutput("hello\n{\"output\":42}\n")
+	out, remaining, err := parseSingleTestOutput("hello", "{\"output\":42}\n")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -40,7 +40,7 @@ func TestParseSingleTestOutput_LastLineFallback(t *testing.T) {
 }
 
 func TestParseSingleTestOutput_Invalid(t *testing.T) {
-	_, _, err := parseSingleTestOutput("not-json")
+	_, _, err := parseSingleTestOutput("", "not-json")
 	if err == nil {
 		t.Fatalf("expected parse error")
 	}
@@ -324,7 +324,7 @@ func TestAppendBatchedResultsParsesJSONLines(t *testing.T) {
 	}
 
 	stdout := "{\"test\":1,\"output\":3}\n{\"test\":2,\"error\":\"boom\"}\n"
-	processed, err := appendBatchedResults(result, strings.NewReader(stdout), problem)
+	processed, err := appendBatchedResults(result, strings.NewReader(stdout), strings.NewReader(""), problem)
 	if err != nil {
 		t.Fatalf("appendBatchedResults failed: %v", err)
 	}

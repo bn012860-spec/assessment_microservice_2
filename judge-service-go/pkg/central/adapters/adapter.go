@@ -26,6 +26,7 @@ var AdapterRegistry = map[string]LanguageAdapter{
 	"java":       JavaAdapter{},
 	"cpp":        CppAdapter{},
 	"go":         GoAdapter{},
+	"c":          CAdapter{},
 	"csharp":     CSharpAdapter{},
 	"typescript": TypeScriptAdapter{},
 }

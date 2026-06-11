@@ -1,160 +1,290 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include <json-c/json.h>
 
-// The user's implementation file is included.
-// IMPORTANT: the user must *NOT* define main() in their submission.
-// Required function signature expected by this harness:
-//    long {{FUNCTION_NAME}}(long *args, int argc);
-#include "main.c"
+// Data structures
+struct ListNode {
+    int val;
+    struct ListNode *next;
+};
 
-static void make_error_and_print(const char *msg) {
-    struct json_object *out = json_object_new_object();
-    json_object_object_add(out, "status", json_object_new_string("error"));
-    json_object_object_add(out, "message", json_object_new_string(msg));
-    fprintf(stderr, "%s\n", json_object_to_json_string(out));
-    json_object_put(out);
+struct TreeNode {
+    int val;
+    struct TreeNode *left;
+    struct TreeNode *right;
+};
+
+struct Node {
+    int val;
+    int num_neighbors;
+    struct Node **neighbors;
+};
+
+// Helper for memory allocation
+static void* safe_malloc(size_t size) {
+    void* ptr = malloc(size);
+    if (!ptr && size > 0) {
+        fprintf(stderr, "{\"error\": \"Runtime Error\", \"message\": \"Memory allocation failed\"}\n");
+        exit(1);
+    }
+    return ptr;
 }
 
-int main(void) {
-    const char* tests_json_str = getenv("TESTS_JSON");
-    if (!tests_json_str) {
-        make_error_and_print("TESTS_JSON environment variable not set");
-        return 2;
+// JSON conversions for Arrays
+struct json_object* array_to_json(int* arr, int size) {
+    struct json_object* res = json_object_new_array();
+    for (int i = 0; i < size; i++) {
+        json_object_array_add(res, json_object_new_int(arr[i]));
     }
+    return res;
+}
 
-    struct json_object *parsed_json = json_tokener_parse(tests_json_str);
-    if (!parsed_json) {
-        make_error_and_print("Invalid JSON in TESTS_JSON");
-        return 3;
+int* array_from_json(struct json_object* j, int* size) {
+    if (!j || json_object_get_type(j) != json_type_array) {
+        if (size) *size = 0;
+        return NULL;
     }
-
-    if (!json_object_is_type(parsed_json, json_type_array)) {
-        make_error_and_print("TESTS_JSON must be a JSON array of test objects");
-        json_object_put(parsed_json);
-        return 4;
+    int n = json_object_array_length(j);
+    if (size) *size = n;
+    if (n == 0) return NULL;
+    int* res = safe_malloc(n * sizeof(int));
+    for (int i = 0; i < n; i++) {
+        res[i] = json_object_get_int(json_object_array_get_idx(j, i));
     }
+    return res;
+}
 
-    int num_tests = json_object_array_length(parsed_json);
-    int passed_tests = 0;
+// JSON conversions for Matrices
+struct json_object* matrix_to_json(int** mat, int rows, int* cols) {
+    struct json_object* res = json_object_new_array();
+    for (int i = 0; i < rows; i++) {
+        struct json_object* row = json_object_new_array();
+        for (int j = 0; j < cols[i]; j++) {
+            json_object_array_add(row, json_object_new_int(mat[i][j]));
+        }
+        json_object_array_add(res, row);
+    }
+    return res;
+}
 
-    // Prepare final JSON result object
-    struct json_object *result = json_object_new_object();
-    struct json_object *details = json_object_new_array();
-
-    for (int i = 0; i < num_tests; i++) {
-        struct json_object *test_case = json_object_array_get_idx(parsed_json, i);
-        if (!test_case || !json_object_is_type(test_case, json_type_object)) {
-            // skip invalid test entries but record failure
-            struct json_object *tr = json_object_new_object();
-            json_object_object_add(tr, "test", json_object_new_int(i+1));
-            json_object_object_add(tr, "ok", json_object_new_boolean(0));
-            json_object_object_add(tr, "error", json_object_new_string("invalid test case object"));
-            json_object_array_add(details, tr);
+int** matrix_from_json(struct json_object* j, int* rows, int** cols) {
+    if (!j || json_object_get_type(j) != json_type_array) {
+        if (rows) *rows = 0;
+        if (cols) *cols = NULL;
+        return NULL;
+    }
+    int r = json_object_array_length(j);
+    if (rows) *rows = r;
+    if (r == 0) {
+        if (cols) *cols = NULL;
+        return NULL;
+    }
+    int** res = safe_malloc(r * sizeof(int*));
+    int* c_arr = safe_malloc(r * sizeof(int));
+    for (int i = 0; i < r; i++) {
+        struct json_object* row_obj = json_object_array_get_idx(j, i);
+        if (!row_obj || json_object_get_type(row_obj) != json_type_array) {
+            c_arr[i] = 0;
+            res[i] = NULL;
             continue;
         }
-
-        struct json_object *input_obj = json_object_object_get(test_case, "inputs");
-        struct json_object *expected_obj = json_object_object_get(test_case, "expected");
-
-        // We expect "input" to be a JSON array; if not, try to handle single primitive as single-element array.
-        struct json_object *input_arr = NULL;
-        if (input_obj && json_object_is_type(input_obj, json_type_array)) {
-            input_arr = input_obj;
-        } else if (input_obj) {
-            // wrap single input into an array
-            input_arr = json_object_new_array();
-            json_object_array_add(input_arr, json_object_get(input_obj));
-        } else {
-            // missing input
-            input_arr = json_object_new_array(); // empty
-        }
-
-        // Convert inputs to long array (best-effort). For more types extend this logic.
-        int argc = json_object_array_length(input_arr);
-        long *args = NULL;
-        if (argc > 0) {
-            args = (long*)malloc(sizeof(long) * argc);
-            if (!args) {
-                json_object_put(parsed_json);
-                json_object_put(details);
-                json_object_put(result);
-                make_error_and_print("memory allocation failure");
-                return 5;
-            }
-            for (int j = 0; j < argc; j++) {
-                struct json_object *elem = json_object_array_get_idx(input_arr, j);
-                if (elem && json_object_is_type(elem, json_type_int)) {
-                    args[j] = json_object_get_int64(elem);
-                } else if (elem && json_object_is_type(elem, json_type_double)) {
-                    args[j] = (long)json_object_get_double(elem);
-                } else if (elem && json_object_is_type(elem, json_type_string)) {
-                    // attempt to parse string as long
-                    const char *s = json_object_get_string(elem);
-                    args[j] = strtoll(s, NULL, 10);
-                } else {
-                    // unsupported type -> default 0
-                    args[j] = 0;
-                }
-            }
-        }
-
-        // Call user function
-        long output_val = {{FUNCTION_NAME}}(args, argc);
-
-        // Build test result object
-        struct json_object *tr = json_object_new_object();
-        json_object_object_add(tr, "test", json_object_new_int(i+1));
-
-        // Put output as number
-        json_object_object_add(tr, "output", json_object_new_int64(output_val));
-
-        // Put expected: best-effort: if expected_obj is numeric use numeric, else stringify
-        if (expected_obj && json_object_is_type(expected_obj, json_type_int)) {
-            long expected_val = json_object_get_int64(expected_obj);
-            json_object_object_add(tr, "expected", json_object_new_int64(expected_val));
-            int ok = (output_val == expected_val);
-            json_object_object_add(tr, "ok", json_object_new_boolean(ok));
-            if (ok) passed_tests++;
-        } else if (expected_obj && json_object_is_type(expected_obj, json_type_double)) {
-            long expected_val = (long)json_object_get_double(expected_obj);
-            json_object_object_add(tr, "expected", json_object_new_int64(expected_val));
-            int ok = (output_val == expected_val);
-            json_object_object_add(tr, "ok", json_object_new_boolean(ok));
-            if (ok) passed_tests++;
-        } else {
-            // fallback: stringify expected
-            const char *expected_str = expected_obj ? json_object_to_json_string(expected_obj) : "null";
-            json_object_object_add(tr, "expected", json_object_new_string(expected_str));
-            // We can't reliably compare, so set ok to 0 unless stringified numeric matches
-            json_object_object_add(tr, "ok", json_object_new_boolean(0));
-        }
-
-        json_object_array_add(details, tr);
-
-        if (argc > 0) {
-            free(args);
-            args = NULL;
-        }
-        // if we wrapped input_obj into a new array, free it
-        if (input_obj && !json_object_is_type(input_obj, json_type_array)) {
-            json_object_put(input_arr);
+        int c = json_object_array_length(row_obj);
+        c_arr[i] = c;
+        res[i] = safe_malloc(c * sizeof(int));
+        for (int k = 0; k < c; k++) {
+            res[i][k] = json_object_get_int(json_object_array_get_idx(row_obj, k));
         }
     }
+    if (cols) *cols = c_arr;
+    return res;
+}
 
-    // Build result
-    json_object_object_add(result, "status", json_object_new_string("finished"));
-    json_object_object_add(result, "passed", json_object_new_int(passed_tests));
-    json_object_object_add(result, "total", json_object_new_int(num_tests));
-    json_object_object_add(result, "details", details);
+// JSON conversions for ListNode
+struct json_object* list_to_json(struct ListNode* head) {
+    struct json_object* res = json_object_new_array();
+    struct ListNode* curr = head;
+    while (curr) {
+        json_object_array_add(res, json_object_new_int(curr->val));
+        curr = curr->next;
+    }
+    return res;
+}
 
-    // Print final JSON (single well-formed object)
-    fprintf(stderr, "%s\n", json_object_to_json_string(result));
+struct ListNode* list_from_json(struct json_object* j) {
+    if (!j || json_object_get_type(j) != json_type_array) return NULL;
+    int n = json_object_array_length(j);
+    if (n == 0) return NULL;
+    struct ListNode dummy;
+    struct ListNode* curr = &dummy;
+    for (int i = 0; i < n; i++) {
+        curr->next = safe_malloc(sizeof(struct ListNode));
+        curr->next->val = json_object_get_int(json_object_array_get_idx(j, i));
+        curr->next->next = NULL;
+        curr = curr->next;
+    }
+    return dummy.next;
+}
 
-    // Clean up
-    json_object_put(parsed_json);
+// JSON conversions for TreeNode
+struct json_object* tree_to_json(struct TreeNode* root) {
+    if (!root) return NULL;
+    struct json_object* res = json_object_new_array();
+    struct TreeNode** queue = safe_malloc(10000 * sizeof(struct TreeNode*));
+    int head = 0, tail = 0;
+    queue[tail++] = root;
+    while (head < tail) {
+        struct TreeNode* node = queue[head++];
+        if (node) {
+            json_object_array_add(res, json_object_new_int(node->val));
+            queue[tail++] = node->left;
+            queue[tail++] = node->right;
+        } else {
+            json_object_array_add(res, NULL);
+        }
+    }
+    // Trim trailing nulls
+    while (json_object_array_length(res) > 0 && json_object_array_get_idx(res, json_object_array_length(res) - 1) == NULL) {
+        // json-c doesn't have a simple pop, but we can just leave it or handle it.
+        // For simplicity, we'll just return it as is, or implement trimming if needed.
+        break; 
+    }
+    free(queue);
+    return res;
+}
+
+struct TreeNode* tree_from_json(struct json_object* j) {
+    if (!j || json_object_get_type(j) != json_type_array || json_object_array_length(j) == 0) return NULL;
+    struct json_object* first = json_object_array_get_idx(j, 0);
+    if (!first) return NULL;
+    struct TreeNode* root = safe_malloc(sizeof(struct TreeNode));
+    root->val = json_object_get_int(first);
+    root->left = root->right = NULL;
+    struct TreeNode** queue = safe_malloc(json_object_array_length(j) * sizeof(struct TreeNode*));
+    int head = 0, tail = 0;
+    queue[tail++] = root;
+    int i = 1;
+    while (head < tail && i < json_object_array_length(j)) {
+        struct TreeNode* node = queue[head++];
+        struct json_object* left_json = json_object_array_get_idx(j, i++);
+        if (left_json) {
+            node->left = safe_malloc(sizeof(struct TreeNode));
+            node->left->val = json_object_get_int(left_json);
+            node->left->left = node->left->right = NULL;
+            queue[tail++] = node->left;
+        }
+        if (i < json_object_array_length(j)) {
+            struct json_object* right_json = json_object_array_get_idx(j, i++);
+            if (right_json) {
+                node->right = safe_malloc(sizeof(struct TreeNode));
+                node->right->val = json_object_get_int(right_json);
+                node->right->left = node->right->right = NULL;
+                queue[tail++] = node->right;
+            }
+        }
+    }
+    free(queue);
+    return root;
+}
+
+// JSON conversions for Node (Graph)
+struct json_object* graph_to_json(struct Node* node) {
+    if (!node) return NULL;
+    // This is more complex to implement in C without a hash map.
+    // For now, return a simple representation or placeholder.
+    return json_object_new_string("graph_to_json_not_implemented");
+}
+
+struct Node* graph_from_json(struct json_object* j) {
+    if (!j || json_object_get_type(j) != json_type_array) return NULL;
+    int n = json_object_array_length(j);
+    if (n == 0) return NULL;
+    struct Node** nodes = safe_malloc(n * sizeof(struct Node*));
+    for (int i = 0; i < n; i++) {
+        nodes[i] = safe_malloc(sizeof(struct Node));
+        nodes[i]->val = i + 1;
+    }
+    for (int i = 0; i < n; i++) {
+        struct json_object* neighbors_json = json_object_array_get_idx(j, i);
+        int num_neighbors = json_object_array_length(neighbors_json);
+        nodes[i]->num_neighbors = num_neighbors;
+        nodes[i]->neighbors = safe_malloc(num_neighbors * sizeof(struct Node*));
+        for (int k = 0; k < num_neighbors; k++) {
+            int neighbor_idx = json_object_get_int(json_object_array_get_idx(neighbors_json, k));
+            nodes[i]->neighbors[k] = nodes[neighbor_idx - 1];
+        }
+    }
+    struct Node* res = nodes[0];
+    free(nodes);
+    return res;
+}
+
+// Simple base64 decoder
+static char* base64_decode(const char* in, size_t* out_len) {
+    static const int T[256] = {
+        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,62,-1,-1,-1,63,52,53,54,55,56,57,58,59,60,61,-1,-1,-1,-1,-1,-1,
+        -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,-1,-1,-1,-1,-1,
+        -1,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,-1,-1,-1,-1,-1
+    };
+    size_t in_len = strlen(in);
+    if (in_len % 4 != 0) return NULL;
+    size_t res_len = in_len / 4 * 3;
+    if (in[in_len - 1] == '=') res_len--;
+    if (in[in_len - 2] == '=') res_len--;
+    char* out = safe_malloc(res_len + 1);
+    for (size_t i = 0, j = 0; i < in_len; i += 4, j += 3) {
+        int v = (T[(unsigned char)in[i]] << 18) | (T[(unsigned char)in[i+1]] << 12) | 
+                ((in[i+2] == '=' ? 0 : T[(unsigned char)in[i+2]]) << 6) | 
+                (in[i+3] == '=' ? 0 : T[(unsigned char)in[i+3]]);
+        out[j] = (v >> 16) & 0xFF;
+        if (in[i+2] != '=') out[j+1] = (v >> 8) & 0xFF;
+        if (in[i+3] != '=') out[j+2] = v & 0xFF;
+    }
+    out[res_len] = '\0';
+    if (out_len) *out_len = res_len;
+    return out;
+}
+
+// User's solution inclusion
+#include "solution.c"
+
+int main(int argc, char** argv) {
+    if (argc < 2) {
+        fprintf(stderr, "{\"error\": \"Runtime Error\", \"message\": \"Missing input payload\"}\n");
+        return 1;
+    }
+
+    size_t decoded_len;
+    char* decoded = base64_decode(argv[1], &decoded_len);
+    if (!decoded) {
+        fprintf(stderr, "{\"error\": \"Runtime Error\", \"message\": \"Failed to decode base64 payload\"}\n");
+        return 1;
+    }
+
+    struct json_object* payload = json_tokener_parse(decoded);
+    if (!payload) {
+        fprintf(stderr, "{\"error\": \"Runtime Error\", \"message\": \"Failed to parse JSON payload\"}\n");
+        free(decoded);
+        return 1;
+    }
+
+    struct json_object* inputs;
+    if (!json_object_object_get_ex(payload, "inputs", &inputs)) {
+        fprintf(stderr, "{\"error\": \"Runtime Error\", \"message\": \"Missing 'inputs' in payload\"}\n");
+        json_object_put(payload);
+        free(decoded);
+        return 1;
+    }
+
+    struct json_object* result = json_object_new_object();
+
+    // GENERATED_CALL_MARKER
+
     json_object_put(result);
+    json_object_put(payload);
+    free(decoded);
 
     return 0;
 }

@@ -17,22 +17,37 @@ export function getDefinitionsSnippet(language, parameters = [], returnType = ''
   const { tree, list, graph } = detectUses(parameters, returnType);
   if (!tree && !list && !graph) return '';
 
-  // Provide a concise, language-appropriate snippet containing only the structure definitions
+  // Provide a concise, language-appropriate snippet containing only the structure definitions as comments
   switch ((language || '').toLowerCase()) {
     case 'python': {
       let out = '';
-      if (list) out += `class ListNode:\n    def __init__(self, val=0, next=None):\n        self.val = val\n        self.next = next\n\n`;
-      if (tree) out += `class TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\n`;
-      if (graph) out += `class Node:\n    def __init__(self, val=0, neighbors=None):\n        self.val = val\n        self.neighbors = neighbors if neighbors is not None else []\n\n`;
+      if (list) out += `# class ListNode:\n#     def __init__(self, val=0, next=None):\n#         self.val = val\n#         self.next = next\n\n`;
+      if (tree) out += `# class TreeNode:\n#     def __init__(self, val=0, left=None, right=None):\n#         self.val = val\n#         self.left = left\n#         self.right = right\n\n`;
+      if (graph) out += `# class Node:\n#     def __init__(self, val=0, neighbors=None):\n#         self.val = val\n#         self.neighbors = neighbors if neighbors is not None else []\n\n`;
       return out.trim();
     }
     case 'javascript':
     case 'node':
-    case 'js': {
+    case 'js':
+    case 'typescript':
+    case 'ts': {
       let out = '';
-      if (list) out += `class ListNode { constructor(val=0, next=null) { this.val = val; this.next = next; } }\n\n`;
-      if (tree) out += `class TreeNode { constructor(val=0, left=null, right=null) { this.val = val; this.left = left; this.right = right; } }\n\n`;
-      if (graph) out += `class Node { constructor(val=0, neighbors=[]) { this.val = val; this.neighbors = neighbors; } }\n\n`;
+      if (list) out += `/*\nclass ListNode {\n  constructor(val=0, next=null) { this.val = val; this.next = next; }\n}\n*/\n\n`;
+      if (tree) out += `/*\nclass TreeNode {\n  constructor(val=0, left=null, right=null) { this.val = val; this.left = left; this.right = right; }\n}\n*/\n\n`;
+      if (graph) out += `/*\nclass Node {\n  constructor(val=0, neighbors=[]) { this.val = val; this.neighbors = neighbors; }\n}\n*/\n\n`;
+      return out.trim();
+    }
+    case 'go': {
+      let out = '';
+      if (list) out += `/*\ntype ListNode struct { Val int; Next *ListNode }\n*/\n\n`;
+      if (tree) out += `/*\ntype TreeNode struct { Val int; Left *TreeNode; Right *TreeNode }\n*/\n\n`;
+      if (graph) out += `/*\ntype Node struct { Val int; Neighbors []*Node }\n*/\n\n`;
+      return out.trim();
+    }
+    case 'cpp': {
+      let out = '';
+      if (list) out += `/*\nstruct ListNode {\n    int val;\n    ListNode *next;\n    ListNode(int x) : val(x), next(nullptr) {}\n};\n*/\n\n`;
+      if (tree) out += `/*\nstruct TreeNode {\n    int val;\n    TreeNode *left;\n    TreeNode *right;\n    TreeNode(int x) : val(x), left(nullptr), right(nullptr) {}\n};\n*/\n\n`;
       return out.trim();
     }
     default: {
@@ -53,18 +68,18 @@ export default function buildTemplate(language, functionName, parameters = [], r
 
   if ((language || '').toLowerCase() === 'python') {
     let defs = '';
-    if (usesList) defs += `class ListNode:\n    def __init__(self, val=0, next=None):\n        self.val = val\n        self.next = next\n\n`;
-    if (usesTree) defs += `class TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        this.right = right\n\n`.replace('this.', '');
-    if (usesGraph) defs += `class Node:\n    def __init__(self, val=0, neighbors=None):\n        self.val = val\n        self.neighbors = neighbors if neighbors is not None else []\n\n`;
+    if (usesList) defs += `# class ListNode:\n#     def __init__(self, val=0, next=None):\n#         self.val = val\n#         self.next = next\n\n`;
+    if (usesTree) defs += `# class TreeNode:\n#     def __init__(self, val=0, left=None, right=None):\n#         self.val = val\n#         self.left = left\n#         self.right = right\n\n`;
+    if (usesGraph) defs += `# class Node:\n#     def __init__(self, val=0, neighbors=None):\n#         self.val = val\n#         self.neighbors = neighbors if neighbors is not None else []\n\n`;
     defs += `def ${functionName}(${params}):\n    # your code here\n    pass`;
     return defs;
   }
 
   if ((language || '').toLowerCase() === 'javascript') {
     let defs = '';
-    if (usesList) defs += `class ListNode {\n  constructor(val=0, next=null) { this.val = val; this.next = next; }\n}\n\n`;
-    if (usesTree) defs += `class TreeNode {\n  constructor(val=0, left=null, right=null) { this.val = val; this.left = left; this.right = right; }\n}\n\n`;
-    if (usesGraph) defs += `class Node {\n  constructor(val=0, neighbors=[]) { this.val = val; this.neighbors = neighbors; }\n}\n\n`;
+    if (usesList) defs += `/*\nclass ListNode {\n  constructor(val=0, next=null) { this.val = val; this.next = next; }\n}\n*/\n\n`;
+    if (usesTree) defs += `/*\nclass TreeNode {\n  constructor(val=0, left=null, right=null) { this.val = val; this.left = left; this.right = right; }\n}\n*/\n\n`;
+    if (usesGraph) defs += `/*\nclass Node {\n  constructor(val=0, neighbors=[]) { this.val = val; this.neighbors = neighbors; }\n}\n*/\n\n`;
     defs += `function ${functionName}(${params}) {\n  // your code here\n}`;
     return defs;
   }
@@ -74,9 +89,9 @@ export default function buildTemplate(language, functionName, parameters = [], r
     const tsParams = (parameters || []).map(p => `${p.name}: ${mapType('typescript', p.type) || 'any'}`).join(', ');
     
     let defs = '';
-    if (usesList) defs += `class ListNode {\n  val: number;\n  next: ListNode | null;\n  constructor(val=0, next=null) { this.val = val; this.next = next; }\n}\n\n`;
-    if (usesTree) defs += `class TreeNode {\n  val: number;\n  left: TreeNode | null;\n  right: TreeNode | null;\n  constructor(val=0, left=null, right=null) { this.val = val; this.left = left; this.right = right; }\n}\n\n`;
-    if (usesGraph) defs += `class Node {\n  val: number;\n  neighbors: Node[];\n  constructor(val=0, neighbors: Node[] = []) { this.val = val; this.neighbors = neighbors; }\n}\n\n`;
+    if (usesList) defs += `/*\nclass ListNode {\n  val: number;\n  next: ListNode | null;\n  constructor(val=0, next=null) { this.val = val; this.next = next; }\n}\n*/\n\n`;
+    if (usesTree) defs += `/*\nclass TreeNode {\n  val: number;\n  left: TreeNode | null;\n  right: TreeNode | null;\n  constructor(val=0, left=null, right=null) { this.val = val; this.left = left; this.right = right; }\n}\n*/\n\n`;
+    if (usesGraph) defs += `/*\nclass Node {\n  val: number;\n  neighbors: Node[];\n  constructor(val=0, neighbors: Node[] = []) { this.val = val; this.neighbors = neighbors; }\n}\n*/\n\n`;
     defs += `function ${functionName}(${tsParams}): ${tsReturnType} {\n  // your code here\n}`;
     return defs;
   }

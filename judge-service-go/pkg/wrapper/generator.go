@@ -12,6 +12,7 @@ import (
 
 	"judge-service-go/pkg/languages"
 	"judge-service-go/pkg/models"
+	"judge-service-go/pkg/types"
 )
 
 // safe identifier regexp
@@ -89,6 +90,13 @@ func GenerateWrapper(p models.Problem, lang *languages.Language, submissionFuncN
 		tpl = strings.ReplaceAll(tpl, "{{FUNCTION_NAME}}", sanitizedFuncName)
 		cppCall := buildCppCall(p, sanitizedFuncName)
 		tpl = strings.ReplaceAll(tpl, "// GENERATED_CALL_MARKER", cppCall)
+		return tpl, nil
+	}
+
+	if lang.ID == "c" {
+		tpl = strings.ReplaceAll(tpl, "{{FUNCTION_NAME}}", sanitizedFuncName)
+		cCall := buildCCall(p, sanitizedFuncName)
+		tpl = strings.ReplaceAll(tpl, "// GENERATED_CALL_MARKER", cCall)
 		return tpl, nil
 	}
 
@@ -259,24 +267,32 @@ func numericToInt(v interface{}) int64 {
 }
 
 func cppType(t string) string {
-	switch t {
-	case "number":
+	parsed, err := types.ParseType(t)
+	if err != nil {
+		return "auto"
+	}
+	return mapCppType(parsed)
+}
+
+func mapCppType(t types.ParsedType) string {
+	switch t.Kind {
+	case types.NumberKind:
 		return "int"
-	case "string":
+	case types.StringKind:
 		return "std::string"
-	case "boolean":
+	case types.BooleanKind:
 		return "bool"
-	case "void":
+	case types.VoidKind:
 		return "void"
-	case "array<number>":
-		return "std::vector<int>"
-	case "matrix<number>", "array<array<number>>":
-		return "std::vector<std::vector<int>>"
-	case "linkedlist<number>":
+	case types.ArrayKind:
+		return "std::vector<" + mapCppType(*t.Element) + ">"
+	case types.MatrixKind:
+		return "std::vector<std::vector<" + mapCppType(*t.Element) + ">>"
+	case types.LinkedListKind:
 		return "ListNode*"
-	case "tree<number>":
+	case types.TreeKind:
 		return "TreeNode*"
-	case "graph<number>":
+	case types.GraphKind:
 		return "Node*"
 	default:
 		return "auto"
@@ -330,24 +346,32 @@ func buildCppCall(p models.Problem, funcName string) string {
 }
 
 func goType(t string) string {
-	switch t {
-	case "number":
+	parsed, err := types.ParseType(t)
+	if err != nil {
+		return "interface{}"
+	}
+	return mapGoType(parsed)
+}
+
+func mapGoType(t types.ParsedType) string {
+	switch t.Kind {
+	case types.NumberKind:
 		return "int"
-	case "string":
+	case types.StringKind:
 		return "string"
-	case "boolean":
+	case types.BooleanKind:
 		return "bool"
-	case "void":
+	case types.VoidKind:
 		return ""
-	case "array<number>":
-		return "[]int"
-	case "matrix<number>", "array<array<number>>":
-		return "[][]int"
-	case "linkedlist<number>":
+	case types.ArrayKind:
+		return "[]" + mapGoType(*t.Element)
+	case types.MatrixKind:
+		return "[][]" + mapGoType(*t.Element)
+	case types.LinkedListKind:
 		return "*ListNode"
-	case "tree<number>":
+	case types.TreeKind:
 		return "*TreeNode"
-	case "graph<number>":
+	case types.GraphKind:
 		return "*Node"
 	default:
 		return "interface{}"
@@ -405,3 +429,148 @@ func buildGoCall(p models.Problem, funcName string) string {
 	sb.WriteString("\tfmt.Fprintln(os.Stderr, string(jsonRes))\n")
 	return sb.String()
 }
+
+func cType(t string) string {
+	parsed, err := types.ParseType(t)
+	if err != nil {
+		return "int"
+	}
+	return mapCType(parsed)
+}
+
+func mapCType(t types.ParsedType) string {
+	switch t.Kind {
+	case types.NumberKind:
+		return "int"
+	case types.StringKind:
+		return "const char*"
+	case types.BooleanKind:
+		return "bool"
+	case types.VoidKind:
+		return "void"
+	case types.LinkedListKind:
+		return "struct ListNode*"
+	case types.TreeKind:
+		return "struct TreeNode*"
+	case types.GraphKind:
+		return "struct Node*"
+	case types.ArrayKind:
+		return mapCType(*t.Element) + "*"
+	case types.MatrixKind:
+		return mapCType(*t.Element) + "**"
+	default:
+		return "void*"
+	}
+}
+
+func buildCCall(p models.Problem, funcName string) string {
+	var sb strings.Builder
+	for i, param := range p.Parameters {
+		t := cType(param.Type)
+		switch param.Type {
+		case "number":
+			sb.WriteString(fmt.Sprintf("        %s arg%d = json_object_get_int(json_object_array_get_idx(inputs, %d));\n", t, i, i))
+		case "string":
+			sb.WriteString(fmt.Sprintf("        %s arg%d = json_object_get_string(json_object_array_get_idx(inputs, %d));\n", t, i, i))
+		case "boolean":
+			sb.WriteString(fmt.Sprintf("        %s arg%d = json_object_get_boolean(json_object_array_get_idx(inputs, %d));\n", t, i, i))
+		case "linkedlist<number>":
+			sb.WriteString(fmt.Sprintf("        %s arg%d = list_from_json(json_object_array_get_idx(inputs, %d));\n", t, i, i))
+		case "tree<number>":
+			sb.WriteString(fmt.Sprintf("        %s arg%d = tree_from_json(json_object_array_get_idx(inputs, %d));\n", t, i, i))
+		case "graph<number>":
+			sb.WriteString(fmt.Sprintf("        %s arg%d = graph_from_json(json_object_array_get_idx(inputs, %d));\n", t, i, i))
+		case "array<number>":
+			sb.WriteString(fmt.Sprintf("        int arg%d_size;\n", i))
+			sb.WriteString(fmt.Sprintf("        %s arg%d = array_from_json(json_object_array_get_idx(inputs, %d), &arg%d_size);\n", t, i, i, i))
+		case "matrix<number>":
+			sb.WriteString(fmt.Sprintf("        int arg%d_rows;\n", i))
+			sb.WriteString(fmt.Sprintf("        int* arg%d_cols;\n", i))
+			sb.WriteString(fmt.Sprintf("        %s arg%d = matrix_from_json(json_object_array_get_idx(inputs, %d), &arg%d_rows, &arg%d_cols);\n", t, i, i, i, i))
+		default:
+			sb.WriteString(fmt.Sprintf("        %s arg%d = NULL; // Unsupported type\n", t, i))
+		}
+	}
+
+	if p.ReturnType == "void" {
+		sb.WriteString(fmt.Sprintf("        %s(", funcName))
+		for i, param := range p.Parameters {
+			if i > 0 {
+				sb.WriteString(", ")
+			}
+			sb.WriteString(fmt.Sprintf("arg%d", i))
+			if param.Type == "array<number>" {
+				sb.WriteString(fmt.Sprintf(", arg%d_size", i))
+			} else if param.Type == "matrix<number>" {
+				sb.WriteString(fmt.Sprintf(", arg%d_rows, arg%d_cols", i, i))
+			}
+		}
+		sb.WriteString(");\n")
+		jsonAddOutput(&sb, p.ReturnType, "NULL")
+	} else {
+		retType := cType(p.ReturnType)
+		if p.ReturnType == "array<number>" {
+			sb.WriteString("        int output_size = 0;\n")
+		} else if p.ReturnType == "matrix<number>" {
+			sb.WriteString("        int output_rows = 0;\n")
+			sb.WriteString("        int* output_cols = NULL;\n")
+		}
+		sb.WriteString(fmt.Sprintf("        %s output = %s(", retType, funcName))
+
+		for i, param := range p.Parameters {
+			if i > 0 {
+				sb.WriteString(", ")
+			}
+			sb.WriteString(fmt.Sprintf("arg%d", i))
+			if param.Type == "array<number>" {
+				sb.WriteString(fmt.Sprintf(", arg%d_size", i))
+			} else if param.Type == "matrix<number>" {
+				sb.WriteString(fmt.Sprintf(", arg%d_rows, arg%d_cols", i, i))
+			}
+		}
+		if p.ReturnType == "array<number>" {
+			if len(p.Parameters) > 0 {
+				sb.WriteString(", &output_size")
+			} else {
+				sb.WriteString("&output_size")
+			}
+		} else if p.ReturnType == "matrix<number>" {
+			if len(p.Parameters) > 0 {
+				sb.WriteString(", &output_rows, &output_cols")
+			} else {
+				sb.WriteString("&output_rows, &output_cols")
+			}
+		}
+		sb.WriteString(");\n")
+
+		// Add output to result based on type
+		jsonAddOutput(&sb, p.ReturnType, "output")
+	}
+	sb.WriteString("        fprintf(stderr, \"%s\\n\", json_object_to_json_string(result));")
+	return sb.String()
+}
+
+func jsonAddOutput(sb *strings.Builder, returnType string, varName string) {
+	switch returnType {
+	case "number":
+		sb.WriteString(fmt.Sprintf("        json_object_object_add(result, \"output\", json_object_new_int(%s));\n", varName))
+	case "string":
+		sb.WriteString(fmt.Sprintf("        json_object_object_add(result, \"output\", json_object_new_string(%s));\n", varName))
+	case "boolean":
+		sb.WriteString(fmt.Sprintf("        json_object_object_add(result, \"output\", json_object_new_boolean(%s));\n", varName))
+	case "linkedlist<number>":
+		sb.WriteString(fmt.Sprintf("        json_object_object_add(result, \"output\", list_to_json(%s));\n", varName))
+	case "tree<number>":
+		sb.WriteString(fmt.Sprintf("        json_object_object_add(result, \"output\", tree_to_json(%s));\n", varName))
+	case "graph<number>":
+		sb.WriteString(fmt.Sprintf("        json_object_object_add(result, \"output\", graph_to_json(%s));\n", varName))
+	case "array<number>":
+		sb.WriteString(fmt.Sprintf("        json_object_object_add(result, \"output\", array_to_json(%s, output_size));\n", varName))
+	case "matrix<number>":
+		sb.WriteString(fmt.Sprintf("        json_object_object_add(result, \"output\", matrix_to_json(%s, output_rows, output_cols));\n", varName))
+	default:
+		sb.WriteString("        json_object_object_add(result, \"output\", NULL);\n")
+	}
+}
+
+

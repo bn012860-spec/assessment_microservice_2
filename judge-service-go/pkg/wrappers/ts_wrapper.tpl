@@ -168,9 +168,9 @@ async function runOne() {
             convertedOut = convertOutput(out, returnType);
         }
 
-        console.log(JSON.stringify({ output: convertedOut }));
+        process.stderr.write(JSON.stringify({ output: convertedOut }));
     } catch (err: any) {
-        console.log(JSON.stringify({
+        process.stderr.write(JSON.stringify({
             error: err.message || String(err),
             traceback: err.stack
         }));

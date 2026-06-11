@@ -87,7 +87,7 @@ func finalizeExecutionFailure(result *models.SubmissionResult, execErr error) *m
 	return result
 }
 
-func compileCentralSubmission(ctx context.Context, exec *executor.Executor, pooledContainer *pool.PooledContainer, submissionWorkspace *workspace.SubmissionWorkspace, adapter adapters.LanguageAdapter, files []string) error {
+func compileCentralSubmission(ctx context.Context, exec *executor.Executor, pooledContainer *pool.PooledContainer, submissionWorkspace *workspace.SubmissionWorkspace, adapter adapters.LanguageAdapter, files []string, problem models.Problem) error {
 	compilingAdapter, ok := adapter.(adapters.CompilingLanguageAdapter)
 	if !ok {
 		return nil
@@ -101,6 +101,7 @@ func compileCentralSubmission(ctx context.Context, exec *executor.Executor, pool
 		submissionWorkspace.ContainerPath,
 		compilingAdapter.CompileCommand(),
 		60*time.Second,
+		problem.MemoryLimitMb,
 	)
 	if err != nil {
 		msg := err.Error()
@@ -122,7 +123,7 @@ func runSubmissionCentralPerTest(ctx context.Context, exec *executor.Executor, p
 	if err != nil {
 		return nil, err
 	}
-	if err := compileCentralSubmission(ctx, exec, pooledContainer, submissionWorkspace, adapter, baseFiles); err != nil {
+	if err := compileCentralSubmission(ctx, exec, pooledContainer, submissionWorkspace, adapter, baseFiles, problem); err != nil {
 		return finalizeExecutionFailure(result, err), nil
 	}
 
@@ -260,7 +261,7 @@ func runSubmissionCentralBatched(ctx context.Context, exec *executor.Executor, p
 	if err != nil {
 		return nil, err
 	}
-	if err := compileCentralSubmission(ctx, exec, pooledContainer, submissionWorkspace, adapter, baseFiles); err != nil {
+	if err := compileCentralSubmission(ctx, exec, pooledContainer, submissionWorkspace, adapter, baseFiles, problem); err != nil {
 		return finalizeExecutionFailure(result, err), nil
 	}
 

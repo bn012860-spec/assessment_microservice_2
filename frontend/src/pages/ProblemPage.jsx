@@ -4,7 +4,7 @@ import Editor from '@monaco-editor/react';
 import { Play, Send, ChevronLeft, Info, History, Settings2, Terminal, AlertCircle, ChevronDown, ChevronUp, Loader2, Trash2, CheckCircle2, X, Edit2 } from 'lucide-react';
 import api, { problems } from '../api';
 import SubmissionOutput from '../components/SubmissionOutput';
-import buildTemplate, { getDefinitionsSnippet } from '../utils/buildTemplate';
+import buildTemplate from '../utils/buildTemplate';
 
 const supportedLanguages = ['python', 'javascript', 'java', 'cpp', 'c', 'csharp', 'go'];
 
@@ -84,8 +84,6 @@ const ProblemPage = ({ user }) => {
       setCode(buildTemplate(selectedLanguage, problem.functionName || 'solution', problem.parameters, problem.returnType));
     }
   }, [selectedLanguage, problem]);
-
-  const defsSnippet = problem ? getDefinitionsSnippet(selectedLanguage, problem.parameters, problem.returnType) : '';
 
   const checkStatus = async (submissionId) => {
     try {
@@ -245,13 +243,6 @@ const ProblemPage = ({ user }) => {
               <div style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', marginBottom: '2rem' }}>
                 {problem.description}
               </div>
-
-              {defsSnippet && (
-                <div style={{ background: 'var(--surface)', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', marginBottom: '1rem' }}>
-                  <h4 style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Data Structure Definitions</h4>
-                  <pre style={{ whiteSpace: 'pre-wrap', fontSize: '0.85rem', margin: 0 }}>{defsSnippet}</pre>
-                </div>
-              )}
 
               <div style={{ background: 'var(--surface)', padding: '20px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)' }}>
                 <h4 style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '1rem' }}>Problem Specs</h4>

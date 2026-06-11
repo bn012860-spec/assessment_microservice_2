@@ -85,6 +85,8 @@ public static class Harness
         if (innerType == "string") return list.Cast<string>().ToArray();
         if (innerType == "boolean") return list.Cast<bool>().ToArray();
         if (innerType.StartsWith("array<number>")) return list.Cast<int[]>().ToArray();
+        if (innerType.StartsWith("array<string>")) return list.Cast<string[]>().ToArray();
+        if (innerType.StartsWith("array<boolean>")) return list.Cast<bool[]>().ToArray();
 
         return list.ToArray();
     }

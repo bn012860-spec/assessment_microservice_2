@@ -308,6 +308,170 @@ func TestCertificationSuite(t *testing.T) {
 		},
 		{
 			Problem: models.Problem{
+				Title:        "Word Echo",
+				FunctionName: "echo",
+				ReturnType:   "array<string>",
+				Parameters: []models.Parameter{
+					{Name: "words", Type: "array<string>"},
+				},
+				TestCases: []models.TestCase{
+					{
+						Input:    []interface{}{[]interface{}{"hello", "world"}},
+						Expected: []interface{}{"hello", "world"},
+					},
+				},
+			},
+			Solutions: map[string]struct {
+				Correct string
+				Wrong   string
+			}{
+				"python":     {Correct: "def echo(words): return words", Wrong: "def echo(words): return []"},
+				"javascript": {Correct: "function echo(words) { return words; }", Wrong: "function echo(words) { return []; }"},
+				"java": {
+					Correct: "public class Solution { public String[] echo(String[] words) { return words; } }",
+					Wrong:   "public class Solution { public String[] echo(String[] words) { return new String[0]; } }",
+				},
+				"go":  {Correct: "func echo(words []string) []string { return words }", Wrong: "func echo(words []string) []string { return nil }"},
+				"cpp": {Correct: "class Solution { public: std::vector<std::string> echo(std::vector<std::string>& words) { return words; } };", Wrong: "class Solution { public: std::vector<std::string> echo(std::vector<std::string>& words) { return {}; } };"},
+				"csharp": {
+					Correct: "public class Solution { public string[] echo(string[] words) { return words; } }",
+					Wrong:   "public class Solution { public string[] echo(string[] words) { return new string[0]; } }",
+				},
+				"typescript": {
+					Correct: "function echo(words: string[]): string[] { return words; }",
+					Wrong:   "function echo(words: string[]): string[] { return []; }",
+				},
+			},
+		},
+		{
+			Problem: models.Problem{
+				Title:        "Matrix Echo",
+				FunctionName: "matrixEcho",
+				ReturnType:   "matrix<string>",
+				Parameters: []models.Parameter{
+					{Name: "matrix", Type: "matrix<string>"},
+				},
+				TestCases: []models.TestCase{
+					{
+						Input: []interface{}{
+							[]interface{}{
+								[]interface{}{"a", "b"},
+								[]interface{}{"c", "d"},
+							},
+						},
+						Expected: []interface{}{
+							[]interface{}{"a", "b"},
+							[]interface{}{"c", "d"},
+						},
+					},
+				},
+			},
+			Solutions: map[string]struct {
+				Correct string
+				Wrong   string
+			}{
+				"python":     {Correct: "def matrixEcho(matrix): return matrix", Wrong: "def matrixEcho(matrix): return []"},
+				"javascript": {Correct: "function matrixEcho(matrix) { return matrix; }", Wrong: "function matrixEcho(matrix) { return []; }"},
+				"java": {
+					Correct: "public class Solution { public String[][] matrixEcho(String[][] matrix) { return matrix; } }",
+					Wrong:   "public class Solution { public String[][] matrixEcho(String[][] matrix) { return new String[0][0]; } }",
+				},
+				"go":  {Correct: "func matrixEcho(matrix [][]string) [][]string { return matrix }", Wrong: "func matrixEcho(matrix [][]string) [][]string { return nil }"},
+				"cpp": {Correct: "class Solution { public: std::vector<std::vector<std::string>> matrixEcho(std::vector<std::vector<std::string>>& matrix) { return matrix; } };", Wrong: "class Solution { public: std::vector<std::vector<std::string>> matrixEcho(std::vector<std::vector<std::string>>& matrix) { return {}; } };"},
+				"csharp": {
+					Correct: "public class Solution { public string[][] matrixEcho(string[][] matrix) { return matrix; } }",
+					Wrong:   "public class Solution { public string[][] matrixEcho(string[][] matrix) { return new string[0][]; } }",
+				},
+				"typescript": {
+					Correct: "function matrixEcho(matrix: string[][]): string[][] { return matrix; }",
+					Wrong:   "function matrixEcho(matrix: string[][]): string[][] { return []; }",
+				},
+			},
+		},
+		{
+			Problem: models.Problem{
+				Title:        "Boolean Array Echo",
+				FunctionName: "boolEcho",
+				ReturnType:   "array<boolean>",
+				Parameters: []models.Parameter{
+					{Name: "vals", Type: "array<boolean>"},
+				},
+				TestCases: []models.TestCase{
+					{
+						Input:    []interface{}{[]interface{}{true, false, true}},
+						Expected: []interface{}{true, false, true},
+					},
+				},
+			},
+			Solutions: map[string]struct {
+				Correct string
+				Wrong   string
+			}{
+				"python":     {Correct: "def boolEcho(vals): return vals", Wrong: "def boolEcho(vals): return []"},
+				"javascript": {Correct: "function boolEcho(vals) { return vals; }", Wrong: "function boolEcho(vals) { return []; }"},
+				"java": {
+					Correct: "public class Solution { public boolean[] boolEcho(boolean[] vals) { return vals; } }",
+					Wrong:   "public class Solution { public boolean[] boolEcho(boolean[] vals) { return new boolean[0]; } }",
+				},
+				"go":  {Correct: "func boolEcho(vals []bool) []bool { return vals }", Wrong: "func boolEcho(vals []bool) []bool { return nil }"},
+				"cpp": {Correct: "class Solution { public: std::vector<bool> boolEcho(std::vector<bool>& vals) { return vals; } };", Wrong: "class Solution { public: std::vector<bool> boolEcho(std::vector<bool>& vals) { return {}; } };"},
+				"csharp": {
+					Correct: "public class Solution { public bool[] boolEcho(bool[] vals) { return vals; } }",
+					Wrong:   "public class Solution { public bool[] boolEcho(bool[] vals) { return new bool[0]; } }",
+				},
+				"typescript": {
+					Correct: "function boolEcho(vals: boolean[]): boolean[] { return vals; }",
+					Wrong:   "function boolEcho(vals: boolean[]): boolean[] { return []; }",
+				},
+			},
+		},
+		{
+			Problem: models.Problem{
+				Title:        "Boolean Matrix Echo",
+				FunctionName: "boolMatrixEcho",
+				ReturnType:   "matrix<boolean>",
+				Parameters: []models.Parameter{
+					{Name: "matrix", Type: "matrix<boolean>"},
+				},
+				TestCases: []models.TestCase{
+					{
+						Input: []interface{}{
+							[]interface{}{
+								[]interface{}{true, false},
+								[]interface{}{false, true},
+							},
+						},
+						Expected: []interface{}{
+							[]interface{}{true, false},
+							[]interface{}{false, true},
+						},
+					},
+				},
+			},
+			Solutions: map[string]struct {
+				Correct string
+				Wrong   string
+			}{
+				"python":     {Correct: "def boolMatrixEcho(matrix): return matrix", Wrong: "def boolMatrixEcho(matrix): return []"},
+				"javascript": {Correct: "function boolMatrixEcho(matrix) { return matrix; }", Wrong: "function boolMatrixEcho(matrix) { return []; }"},
+				"java": {
+					Correct: "public class Solution { public boolean[][] boolMatrixEcho(boolean[][] matrix) { return matrix; } }",
+					Wrong:   "public class Solution { public boolean[][] boolMatrixEcho(boolean[][] matrix) { return new boolean[0][]; } }",
+				},
+				"go":  {Correct: "func boolMatrixEcho(matrix [][]bool) [][]bool { return matrix }", Wrong: "func boolMatrixEcho(matrix [][]bool) [][]bool { return nil }"},
+				"cpp": {Correct: "class Solution { public: std::vector<std::vector<bool>> boolMatrixEcho(std::vector<std::vector<bool>>& matrix) { return matrix; } };", Wrong: "class Solution { public: std::vector<std::vector<bool>> boolMatrixEcho(std::vector<std::vector<bool>>& matrix) { return {}; } };"},
+				"csharp": {
+					Correct: "public class Solution { public bool[][] boolMatrixEcho(bool[][] matrix) { return matrix; } }",
+					Wrong:   "public class Solution { public bool[][] boolMatrixEcho(bool[][] matrix) { return new bool[0][]; } }",
+				},
+				"typescript": {
+					Correct: "function boolMatrixEcho(matrix: boolean[][]): boolean[][] { return matrix; }",
+					Wrong:   "function boolMatrixEcho(matrix: boolean[][]): boolean[][] { return []; }",
+				},
+			},
+		},
+		{
+			Problem: models.Problem{
 				Title:        "Clone Graph",
 				FunctionName: "cloneGraph",
 				ReturnType:   "graph<number>",

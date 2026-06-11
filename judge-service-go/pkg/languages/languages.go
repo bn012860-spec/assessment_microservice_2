@@ -46,7 +46,7 @@ var Languages = map[string]*Language{
 		Name:            "C",
 		FileExt:         ".c",
 		Image:           "judge-c-env",
-		CompileCmd:      []string{"gcc", "-o", "/app/main", "/app/main.c", "-ljson-c"},
+		CompileCmd:      []string{"gcc", "-o", "/app/main", "/app/main.c", "-ljson-c", "-lm"},
 		RunCmd:          []string{"/app/main"},
 		WrapperTemplate: "c_wrapper.tpl",
 	},
