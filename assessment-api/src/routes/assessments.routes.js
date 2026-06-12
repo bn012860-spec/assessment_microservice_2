@@ -18,13 +18,55 @@ import {
 
 const router = express.Router();
 
+/**
+ * @openapi
+ * /assessments:
+ *   get:
+ *     tags:
+ *       - Assessments
+ *     summary: List assessments
+ *     responses:
+ *       200:
+ *         description: List of assessments
+ */
 router.get("/", optionalVerifyToken, listAssessments);
-router.get("/:_id", verifyToken, getAssessmentById);
-router.get("/:_id/my-attempt", verifyToken, authorizeRoles("student"), getMyAssessmentAttempt);
-router.post("/", verifyToken, authorizeRoles("admin", "faculty", "superadmin"), createAssessment);
-router.put("/:_id", verifyToken, authorizeRoles("admin", "faculty", "superadmin"), updateAssessment);
-router.delete("/:_id", verifyToken, authorizeRoles("admin", "faculty", "superadmin"), deleteAssessment);
 
+/**
+ * @openapi
+ * /assessments/{_id}:
+ *   get:
+ *     tags:
+ *       - Assessments
+ *     summary: Get assessment details
+ *     parameters:
+ *       - in: path
+ *         name: _id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Assessment details
+ */
+router.get("/:_id", verifyToken, getAssessmentById);
+
+/**
+ * @openapi
+ * /assessments/{_id}/start:
+ *   post:
+ *     tags:
+ *       - Assessments
+ *     summary: Start an assessment attempt
+ *     parameters:
+ *       - in: path
+ *         name: _id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Attempt started
+ */
 router.post("/:_id/start", verifyToken, authorizeRoles("student"), startAssessment);
 router.post("/attempts/:attemptId/submit", verifyToken, authorizeRoles("student", "admin", "faculty", "superadmin"), submitAssessment);
 router.post("/attempts/:attemptId/log-event", verifyToken, authorizeRoles("student"), logAntiCheatingEvent);

@@ -439,17 +439,10 @@ func (p *ContainerPool) newPooledContainer(ctx context.Context, image string, la
 
 // createContainer creates a new Docker container with a tmpfs volume mount.
 func (p *ContainerPool) createContainer(ctx context.Context, image string, lang string) (string, string, error) {
-	// Decide user. Prefer numeric UID if set, else do not force "judge" name to avoid missing passwd entry.
-	user := os.Getenv("JUDGE_USER") // e.g., "judge"
-	uid := os.Getenv("JUDGE_UID")   // e.g., "1000"
-	var containerUser string
-	if uid != "" {
-		containerUser = uid
-	} else if user != "" {
-		containerUser = user
-	} else {
-		containerUser = "" // let image default to its default user
-	}
+	// For pooled containers, we run the main process as root.
+	// This ensures that PID 1 (init) and PID 2 (tail) are not owned by the 'judge' user.
+	// Subsequent user-code execution will be done as the 'judge' user via 'docker exec'.
+	containerUser := "root"
 
 	pidsLimit := int64(128)
 	memoryBytes := int64(1024 * 1024 * 1024) // Increase to 1GB
@@ -476,11 +469,13 @@ func (p *ContainerPool) createContainer(ctx context.Context, image string, lang 
 		ReadonlyRootfs: true,
 		SecurityOpt:    []string{noNewPrivileges},
 		CapDrop:        []string{"ALL"},
+		CapAdd:         []string{"KILL"},
 		Memory:         memoryBytes,
 		MemorySwap:     memorySwap,
 		CPUQuota:       100000, // Increase to 1.0 CPU
 		PidsLimit:      &pidsLimit,
 		Binds:          []string{workspaceBind},
+		Init:           true,
 		Tmpfs: map[string]string{
 			"/tmp": "rw,noexec,nosuid,nodev,size=512m",
 		},

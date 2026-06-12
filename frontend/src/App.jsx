@@ -94,7 +94,19 @@ function AppContent() {
         );
     };
 
-    const isAssessmentRoute = /^\/assessment-attempt\/[^/]+$/.test(location.pathname);
+    const isAssessmentRoute = location.pathname.includes('/assessment-attempt/') && !location.pathname.includes('/result');
+
+    useEffect(() => {
+        // Global handler to prevent scrolling over number inputs from changing their values
+        const handleWheel = (e) => {
+            if (document.activeElement.type === 'number') {
+                document.activeElement.blur();
+            }
+        };
+        window.addEventListener('wheel', handleWheel);
+        return () => window.removeEventListener('wheel', handleWheel);
+    }, []);
+
     const RequireAuth = ({ children }) => user ? children : <Navigate to="/login" replace />;
     const RequireRole = ({ roles, children }) => user && roles.includes(user.role)
         ? children

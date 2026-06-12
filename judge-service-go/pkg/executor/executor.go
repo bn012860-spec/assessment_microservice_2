@@ -83,11 +83,12 @@ func (s *ExecStream) Wait() (int, error) {
 }
 
 // runExecWithTimeout handles the full lifecycle of creating, running, and waiting for an exec instance.
-func (e *Executor) runExecWithTimeout(ctx context.Context, containerID string, workDir string, cmd []string, timeout time.Duration) (string, string, int, error) {
+func (e *Executor) runExecWithTimeout(ctx context.Context, containerID string, user string, workDir string, cmd []string, timeout time.Duration) (string, string, int, error) {
 	var stdoutBuf, stderrBuf bytes.Buffer
 
 	execOpts := docker.CreateExecOptions{
 		Container:    containerID,
+		User:         user,
 		Cmd:          cmd,
 		WorkingDir:   workDir,
 		AttachStdout: true,
@@ -239,9 +240,10 @@ func rewriteCommandForWorkspace(cmd []string, containerWorkDir string) []string 
 	return rewritten
 }
 
-func (e *Executor) runExecStreamWithTimeout(ctx context.Context, containerID string, workDir string, cmd []string, timeout time.Duration) (*ExecStream, error) {
+func (e *Executor) runExecStreamWithTimeout(ctx context.Context, containerID string, user string, workDir string, cmd []string, timeout time.Duration) (*ExecStream, error) {
 	execOpts := docker.CreateExecOptions{
 		Container:    containerID,
+		User:         user,
 		Cmd:          cmd,
 		WorkingDir:   workDir,
 		AttachStdout: true,
@@ -416,12 +418,19 @@ func (e *Executor) CompileInContainer(ctx context.Context, containerID string, f
 		}()
 	}
 
-	compileStdout, compileStderr, _, err := e.runExecWithTimeout(subCtx, containerID, containerWorkDir, rewriteCommandForWorkspace(compileCmd, containerWorkDir), timeout)
+	compileStdout, compileStderr, _, err := e.runExecWithTimeout(subCtx, containerID, getJudgeUser(), containerWorkDir, rewriteCommandForWorkspace(compileCmd, containerWorkDir), timeout)
 	if err != nil {
 		return compileStdout, compileStderr, NewExecutionError(ErrCompilationFailed, err.Error(), -1)
 	}
 
 	return compileStdout, compileStderr, nil
+}
+
+func getJudgeUser() string {
+	if u := os.Getenv("JUDGE_USER"); u != "" {
+		return u
+	}
+	return "judge"
 }
 
 func (e *Executor) RunInContainerStream(ctx context.Context, containerID string, files []string, hostWorkDir string, containerWorkDir string, compileCmd []string, runCmd []string, timeout time.Duration, memoryLimitMb int64) (*ExecStream, error) {
@@ -444,14 +453,14 @@ func (e *Executor) RunInContainerStream(ctx context.Context, containerID string,
 
 	if len(compileCmd) > 0 {
 		slog.Info("Compiling in container", "containerId", containerID, "cmd", compileCmd)
-		compileStdout, compileStderr, _, err := e.runExecWithTimeout(subCtx, containerID, containerWorkDir, rewriteCommandForWorkspace(compileCmd, containerWorkDir), timeout)
+		compileStdout, compileStderr, _, err := e.runExecWithTimeout(subCtx, containerID, getJudgeUser(), containerWorkDir, rewriteCommandForWorkspace(compileCmd, containerWorkDir), timeout)
 		if err != nil {
 			cancel()
 			return nil, NewExecutionError(ErrCompilationFailed, fmt.Sprintf("%v | stdout=%s stderr=%s", err, compileStdout, compileStderr), -1)
 		}
 	}
 
-	stream, err := e.runExecStreamWithTimeout(subCtx, containerID, containerWorkDir, rewriteCommandForWorkspace(runCmd, containerWorkDir), timeout)
+	stream, err := e.runExecStreamWithTimeout(subCtx, containerID, getJudgeUser(), containerWorkDir, rewriteCommandForWorkspace(runCmd, containerWorkDir), timeout)
 	if err != nil {
 		cancel()
 		return nil, err
@@ -476,8 +485,13 @@ func (e *Executor) RunInContainerStream(ctx context.Context, containerID string,
 			}
 		}
 
-		// Clear /tmp to prevent contamination between reused containers
-		_, _, _, _ = e.runExecWithTimeout(context.Background(), containerID, "/", []string{"sh", "-c", "rm -rf /tmp/*"}, 2*time.Second)
+		// Clear /tmp and kill leftover processes to prevent contamination between reused containers
+		// Since the container's PID 1 now runs as root, we can safely kill all processes
+		// owned by the 'judge' user without stopping the container.
+		cStdout, cStderr, cExit, cErr := e.runExecWithTimeout(context.Background(), containerID, "root", "/", []string{"sh", "-c", "rm -rf /tmp/* && (pkill -9 -u judge || true)"}, 5*time.Second)
+		if cErr != nil && cExit != 137 {
+			slog.Error("failed to cleanup container", "containerId", containerID, "error", cErr, "stdout", cStdout, "stderr", cStderr, "exitCode", cExit)
+		}
 
 		wrapped.waitCh <- execWaitResult{exitCode: exitCode, err: waitErr}
 	}()

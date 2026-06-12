@@ -8,6 +8,8 @@ const router = express.Router();
 router.get("/", async (req, res) => {
   const health = {
     status: "healthy",
+    version: "1.0.0",
+    env: process.env.NODE_ENV || "development",
     timestamp: new Date(),
     services: {
       mongodb: "unknown",

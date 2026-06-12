@@ -948,6 +948,18 @@ code {
   100% { transform: rotate(360deg); }
 }
 
+@keyframes pulse-red {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.05); opacity: 0.8; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes pulse-warning {
+  0% { background: rgba(245, 158, 11, 0.15); }
+  50% { background: rgba(245, 158, 11, 0.3); }
+  100% { background: rgba(245, 158, 11, 0.15); }
+}
+
 /* Responsive Utilities */
 .grid-2-col {
   display: grid;

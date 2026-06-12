@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Activity, Server, Database, Users, Code2, RefreshCw, AlertCircle, BookOpen, History, Target, TrendingUp, Trophy, AlertTriangle } from 'lucide-react';
+import { Activity, Server, Database, Users, Code2, RefreshCw, AlertCircle, BookOpen, History, Target, TrendingUp, Trophy, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { admin, submissions } from '../api';
 
 function formatTimestamp(ts) {
@@ -102,84 +102,6 @@ const SystemDashboardPage = ({ user }) => {
         </div>
       </div>
 
-      {/* Judge Service Metrics - Separate Card */}
-      <div className="problem-card judge-card" style={{ marginTop: 16 }}>
-        <h3 className="mb-6 flex-center gap-2" style={{ justifyContent: 'flex-start' }}>
-          <Code2 size={20} color="var(--primary)" /> Judge Service Metrics
-        </h3>
-        {stats?.judgeStats ? (() => {
-          const js = stats?.judgeStats || {};
-          const poolRoot = js.pool || { available: js.available || {}, in_use: js.in_use || {}, expected: js.expected || {} };
-          const poolAvailable = poolRoot.available || {};
-          const poolInUse = poolRoot.in_use || {};
-          const poolExpected = poolRoot.expected || {};
-          const langs = Array.from(new Set([
-            ...Object.keys(poolAvailable),
-            ...Object.keys(poolInUse),
-            ...Object.keys(poolExpected)
-          ]));
-
-          const hasPoolData = langs.length > 0;
-
-          if (!hasPoolData) {
-            return (
-              <div>
-                <p className="text-muted">Judge pool data unavailable.</p>
-                {stats?.status === 401 || stats?.error?.status === 401 ? (
-                  <p className="text-muted">Authorization required — log in as an admin.</p>
-                ) : null}
-              </div>
-            );
-          }
-
-          return (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div className="stat-card">
-                <div className="flex-between mb-2"><span className="text-muted" style={{ fontSize: '0.8rem' }}>Last GC</span><strong>{formatTimestamp(stats.judgeStats.metrics?.last_gc_run)}</strong></div>
-                <div className="flex-between mb-2"><span className="text-muted" style={{ fontSize: '0.8rem' }}>GC Removed</span><strong>{stats.judgeStats.metrics?.gc_removed_total || 0}</strong></div>
-                <div className="flex-between"><span className="text-muted" style={{ fontSize: '0.8rem' }}>GC Exited</span><strong>{stats.judgeStats.metrics?.gc_removed_exited || 0}</strong></div>
-              </div>
-              <div className="stat-card">
-                <div className="flex-between mb-2"><span className="text-muted" style={{ fontSize: '0.8rem' }}>Last Reconcile</span><strong>{formatTimestamp(stats.judgeStats.metrics?.last_reconcile_run)}</strong></div>
-                <div className="flex-between mb-2"><span className="text-muted" style={{ fontSize: '0.8rem' }}>Reconcile Repairs</span><strong>{stats.judgeStats.metrics?.reconcile_repairs_total || 0}</strong></div>
-                <div className="flex-between"><span className="text-muted" style={{ fontSize: '0.8rem' }}>Container Replacements</span><strong>{stats.judgeStats.metrics?.container_replacements_total || 0}</strong></div>
-              </div>
-
-              <div style={{ gridColumn: '1 / -1' }}>
-                <h4 style={{ margin: '8px 0' }}>Pools</h4>
-                <div className="table-container" style={{ border: 'none', background: 'var(--bg)' }}>
-                  <table className="table" style={{ border: 'none' }}>
-                    <thead>
-                      <tr>
-                        <th style={{ background: 'transparent' }}>Lang</th>
-                        <th style={{ background: 'transparent', textAlign: 'center' }}>Available</th>
-                        <th style={{ background: 'transparent', textAlign: 'center' }}>Busy</th>
-                        <th style={{ background: 'transparent', textAlign: 'center' }}>Expected</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {langs.map((lang) => {
-                        const avail = poolAvailable?.[lang] || 0;
-                        const busy = poolInUse?.[lang] || 0;
-                        const expected = poolExpected?.[lang] ?? '-';
-                        return (
-                          <tr key={lang} style={{ background: 'transparent' }}>
-                            <td style={{ textTransform: 'capitalize', fontWeight: '600' }}>{lang}</td>
-                            <td style={{ textAlign: 'center', color: 'var(--success)' }}>{avail}</td>
-                            <td style={{ textAlign: 'center', color: busy > 0 ? 'var(--warning)' : 'var(--text-muted)' }}>{busy}</td>
-                            <td style={{ textAlign: 'center' }}>{expected}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          );
-        })() : <p className="text-muted text-center py-4">Judge stats unavailable</p>}
-      </div>
-
       {error && (
         <div className="error-box mb-8 flex-center gap-2" style={{ justifyContent: 'flex-start' }}>
           <AlertCircle size={18} /> {error}
@@ -189,7 +111,6 @@ const SystemDashboardPage = ({ user }) => {
       {user?.role === 'student' ? (
         // STUDENT ANALYTICS VIEW
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {/* Overview Cards */}
           <div className="grid grid-cols-4 gap-6" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
             <div className="problem-card" style={{ textAlign: 'center' }}>
               <div className="text-muted mb-2 flex-center gap-2" style={{ fontSize: '0.8rem', textTransform: 'uppercase', fontWeight: '700' }}>
@@ -199,7 +120,7 @@ const SystemDashboardPage = ({ user }) => {
             </div>
             <div className="problem-card" style={{ textAlign: 'center' }}>
               <div className="text-muted mb-2 flex-center gap-2" style={{ fontSize: '0.8rem', textTransform: 'uppercase', fontWeight: '700' }}>
-                <CheckCircle size={14} color="var(--success)" /> Problems Solved
+                <CheckCircle2 size={14} color="var(--success)" /> Problems Solved
               </div>
               <div style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--success)' }}>{stats?.totalSolved || 0}</div>
             </div>
@@ -221,14 +142,12 @@ const SystemDashboardPage = ({ user }) => {
             </div>
           </div>
 
-          {/* Strong / Weak Areas */}
           <div className="grid grid-cols-2 gap-6" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
             <div className="problem-card" style={{ borderLeft: '4px solid var(--success)' }}>
               <h3 className="mb-4 flex-center gap-2" style={{ justifyContent: 'flex-start', margin: 0 }}>
                 <Trophy size={20} color="var(--success)" /> Strong Areas
               </h3>
               <p className="text-muted mb-6" style={{ fontSize: '0.85rem' }}>Topics where you consistently succeed.</p>
-              
               {stats?.strongAreas && stats.strongAreas.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {stats.strongAreas.map(area => (
@@ -255,7 +174,6 @@ const SystemDashboardPage = ({ user }) => {
                 <AlertTriangle size={20} color="var(--error)" /> Areas to Improve
               </h3>
               <p className="text-muted mb-6" style={{ fontSize: '0.85rem' }}>Topics that need more focus and practice.</p>
-
               {stats?.weakAreas && stats.weakAreas.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {stats.weakAreas.map(area => (
@@ -281,146 +199,179 @@ const SystemDashboardPage = ({ user }) => {
       ) : (
         // ADMIN / FACULTY DASHBOARD VIEW
         <>
-        <div className="grid grid-cols-2 gap-6 mb-8" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
-        {/* Left Column: Health & Logs */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          <div className="problem-card">
+          {/* Judge Service Metrics - Only for Staff */}
+          <div className="problem-card judge-card mb-8">
             <h3 className="mb-6 flex-center gap-2" style={{ justifyContent: 'flex-start' }}>
-              <Activity size={20} color="var(--primary)" /> System Health
+              <Code2 size={20} color="var(--primary)" /> Judge Service Metrics
             </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              {stats?.health ? Object.entries(stats.health).map(([service, status]) => (
-                <div key={service} className="flex-between" style={{ 
-                  padding: '12px 16px', 
-                  borderRadius: 'var(--radius-md)', 
-                  background: 'var(--bg)',
-                  border: '1px solid var(--border)'
-                }}>
-                  <span style={{ fontSize: '0.8rem', fontWeight: '600', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>{service}</span>
-                  <span style={{ fontSize: '0.8rem', fontWeight: '700', color: getHealthColor(status) }}>{status.toUpperCase()}</span>
-                </div>
-              )) : <p className="text-muted">Loading...</p>}
-            </div>
-          </div>
+            {stats?.judgeStats ? (() => {
+              const js = stats.judgeStats;
+              const poolRoot = js.pool || { available: js.available || js.Available || {}, in_use: js.in_use || js.InUse || {}, expected: js.expected || js.Expected || {} };
+              const poolAvailable = poolRoot.available || poolRoot.Available || {};
+              const poolInUse = poolRoot.in_use || poolRoot.InUse || {};
+              const poolExpected = poolRoot.expected || poolRoot.Expected || {};
+              
+              const langs = Array.from(new Set([
+                ...Object.keys(poolAvailable),
+                ...Object.keys(poolInUse),
+                ...Object.keys(poolExpected)
+              ])).sort();
 
-          <div className="problem-card" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <h3 className="mb-6 flex-center gap-2" style={{ justifyContent: 'flex-start' }}>
-              <History size={20} color="var(--primary)" /> Audit Logs
-            </h3>
-            <div style={{ flex: 1, maxHeight: '500px', overflowY: 'auto' }}>
-              {logs.map((log) => (
-                <div key={log._id} className="mb-4 pb-4" style={{ borderBottom: '1px solid var(--border)', fontSize: '0.85rem' }}>
-                  <div className="flex-between mb-1">
-                    <span className={`tag ${log.event.includes('FAILED') || log.event.includes('TIMEOUT') ? 'difficulty-hard' : 'difficulty-easy'}`} style={{ fontSize: '0.7rem' }}>
-                      {log.event}
-                    </span>
-                    <span className="text-muted" style={{ fontSize: '0.75rem' }}>{new Date(log.createdAt).toLocaleString()}</span>
-                  </div>
-                  <div className="flex-between">
-                    <span style={{ fontWeight: '600' }}>{log.userId?.name || 'System'}</span>
-                    <span className="text-muted" style={{ fontSize: '0.75rem' }}>{log.ip}</span>
-                  </div>
-                  {log.details && Object.keys(log.details).length > 0 && (
-                    <div className="mt-2 text-muted" style={{ fontSize: '0.8rem', background: 'var(--bg)', padding: '6px 10px', borderRadius: '4px', border: '1px dashed var(--border)' }}>
-                      {JSON.stringify(log.details)}
+              if (langs.length === 0) return <p className="text-muted py-4">Judge pool data unavailable.</p>;
+
+              return (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div className="stat-card">
+                      <div className="flex-between mb-2"><span className="text-muted" style={{ fontSize: '0.8rem' }}>Last GC</span><strong>{formatTimestamp(js.metrics?.last_gc_run)}</strong></div>
+                      <div className="flex-between mb-2"><span className="text-muted" style={{ fontSize: '0.8rem' }}>GC Removed</span><strong>{js.metrics?.gc_removed_total || 0}</strong></div>
+                      <div className="flex-between"><span className="text-muted" style={{ fontSize: '0.8rem' }}>GC Exited</span><strong>{js.metrics?.gc_removed_exited || 0}</strong></div>
                     </div>
-                  )}
+                    <div className="stat-card">
+                      <div className="flex-between mb-2"><span className="text-muted" style={{ fontSize: '0.8rem' }}>Last Reconcile</span><strong>{formatTimestamp(js.metrics?.last_reconcile_run)}</strong></div>
+                      <div className="flex-between mb-2"><span className="text-muted" style={{ fontSize: '0.8rem' }}>Reconcile Repairs</span><strong>{js.metrics?.reconcile_repairs_total || 0}</strong></div>
+                      <div className="flex-between"><span className="text-muted" style={{ fontSize: '0.8rem' }}>Container Replacements</span><strong>{js.metrics?.container_replacements_total || 0}</strong></div>
+                    </div>
+                  </div>
+                  <div className="table-container" style={{ border: 'none', background: 'var(--bg)', flex: 1 }}>
+                    <table className="table" style={{ border: 'none' }}>
+                      <thead>
+                        <tr>
+                          <th style={{ background: 'transparent' }}>Language Pool</th>
+                          <th style={{ background: 'transparent', textAlign: 'center' }}>Available</th>
+                          <th style={{ background: 'transparent', textAlign: 'center' }}>Busy</th>
+                          <th style={{ background: 'transparent', textAlign: 'center' }}>Expected</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {langs.map((lang) => (
+                          <tr key={lang} style={{ background: 'transparent' }}>
+                            <td style={{ textTransform: 'capitalize', fontWeight: '600' }}>{lang}</td>
+                            <td style={{ textAlign: 'center', color: (poolAvailable[lang] || 0) > 0 ? 'var(--success)' : 'var(--text-muted)' }}>{poolAvailable[lang] || 0}</td>
+                            <td style={{ textAlign: 'center', color: (poolInUse[lang] || 0) > 0 ? 'var(--warning)' : 'var(--text-muted)' }}>{poolInUse[lang] || 0}</td>
+                            <td style={{ textAlign: 'center' }}>{poolExpected[lang] ?? '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              ))}
-              {logs.length === 0 && <p className="text-muted text-center py-8">No logs found.</p>}
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column: Queue & Metrics */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          <div className="problem-card">
-            <h3 className="mb-6 flex-center gap-2" style={{ justifyContent: 'flex-start' }}>
-              <Server size={20} color="var(--primary)" /> Queue Monitoring
-            </h3>
-            <div style={{ textAlign: 'center', padding: '24px 0', background: 'var(--bg)', borderRadius: 'var(--radius-md)', marginBottom: '20px' }}>
-              <div style={{ fontSize: '3.5rem', fontWeight: '800', color: (stats?.queueLength || 0) > 50 ? 'var(--error)' : 'var(--primary)', lineHeight: 1 }}>
-                {stats?.queueLength || 0}
-              </div>
-              <p style={{ color: 'var(--text-muted)', marginTop: '8px', marginBottom: 0, fontWeight: '600', textTransform: 'uppercase', fontSize: '0.75rem' }}>Pending Submissions</p>
-            </div>
+              );
+            })() : <p className="text-muted text-center py-4">Judge stats unavailable</p>}
           </div>
 
-            <div className="problem-card">
-            <h3 className="mb-6 flex-center gap-2" style={{ justifyContent: 'flex-start' }}>
-              <Database size={20} color="var(--primary)" /> Metrics
-            </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <div style={{ background: 'var(--bg)', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-                <div className="flex-between mb-2"><span className="text-muted" style={{ fontSize: '0.8rem' }}>Problems</span><strong>{stats?.metrics?.totalProblems || 0}</strong></div>
-                <div className="flex-between mb-2"><span className="text-muted" style={{ fontSize: '0.8rem' }}>Assessments</span><strong>{stats?.metrics?.totalAssessments || 0}</strong></div>
-                <div className="flex-between"><span className="text-muted" style={{ fontSize: '0.8rem' }}>Users</span><strong>{stats?.metrics?.totalUsers || 0}</strong></div>
+          <div className="grid grid-cols-2 gap-6 mb-8" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              <div className="problem-card">
+                <h3 className="mb-6 flex-center gap-2" style={{ justifyContent: 'flex-start' }}>
+                  <Activity size={20} color="var(--primary)" /> System Health
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  {stats?.health ? Object.entries(stats.health).map(([service, status]) => (
+                    <div key={service} className="flex-between" style={{ padding: '12px 16px', borderRadius: 'var(--radius-md)', background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: '600', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>{service}</span>
+                      <span style={{ fontSize: '0.8rem', fontWeight: '700', color: getHealthColor(status) }}>{status.toUpperCase()}</span>
+                    </div>
+                  )) : <p className="text-muted">Loading...</p>}
+                </div>
               </div>
-              <div style={{ background: 'var(--bg)', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-                <div className="flex-between mb-2"><span className="text-muted" style={{ fontSize: '0.8rem' }}>Today</span><strong>{stats?.metrics?.submissionsToday || 0}</strong></div>
-                <div className="flex-between mb-2"><span className="text-muted" style={{ fontSize: '0.8rem' }}>Accepted</span><strong style={{ color: 'var(--success)' }}>{stats?.metrics?.acceptedToday || 0}</strong></div>
-                <div className="flex-between"><span className="text-muted" style={{ fontSize: '0.8rem' }}>Rate</span><strong>{stats?.metrics?.submissionsToday > 0 ? ((stats.metrics.acceptedToday / stats.metrics.submissionsToday) * 100).toFixed(1) : 0}%</strong></div>
+              <div className="problem-card" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <h3 className="mb-6 flex-center gap-2" style={{ justifyContent: 'flex-start' }}>
+                  <History size={20} color="var(--primary)" /> Audit Logs
+                </h3>
+                <div style={{ flex: 1, maxHeight: '500px', overflowY: 'auto' }}>
+                  {logs.map((log) => (
+                    <div key={log._id} className="mb-4 pb-4" style={{ borderBottom: '1px solid var(--border)', fontSize: '0.85rem' }}>
+                      <div className="flex-between mb-1">
+                        <span className={`tag ${log.event.includes('FAILED') || log.event.includes('TIMEOUT') ? 'difficulty-hard' : 'difficulty-easy'}`} style={{ fontSize: '0.7rem' }}>{log.event}</span>
+                        <span className="text-muted" style={{ fontSize: '0.75rem' }}>{new Date(log.createdAt).toLocaleString()}</span>
+                      </div>
+                      <div className="flex-between">
+                        <span style={{ fontWeight: '600' }}>{log.userId?.name || 'System'}</span>
+                        <span className="text-muted" style={{ fontSize: '0.75rem' }}>{log.ip}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {logs.length === 0 && <p className="text-muted text-center py-8">No logs found.</p>}
+                </div>
               </div>
             </div>
 
-            
-            
-            <div className="submissions-hero" style={{ marginTop: '20px', width: '100%' }}>
-              <div className="label">Submissions (All Time)</div>
-              <div className="value">{stats?.metrics?.totalSubmissions || 0}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              <div className="problem-card">
+                <h3 className="mb-6 flex-center gap-2" style={{ justifyContent: 'flex-start' }}>
+                  <Server size={20} color="var(--primary)" /> Queue Monitoring
+                </h3>
+                <div style={{ textAlign: 'center', padding: '24px 0', background: 'var(--bg)', borderRadius: 'var(--radius-md)' }}>
+                  <div style={{ fontSize: '3.5rem', fontWeight: '800', color: (stats?.queueLength || 0) > 50 ? 'var(--error)' : 'var(--primary)', lineHeight: 1 }}>{stats?.queueLength || 0}</div>
+                  <p style={{ color: 'var(--text-muted)', marginTop: '8px', fontWeight: '600', textTransform: 'uppercase', fontSize: '0.75rem' }}>Pending Submissions</p>
+                </div>
+              </div>
+              <div className="problem-card">
+                <h3 className="mb-6 flex-center gap-2" style={{ justifyContent: 'flex-start' }}>
+                  <Database size={20} color="var(--primary)" /> Metrics
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div style={{ background: 'var(--bg)', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+                    <div className="flex-between mb-2"><span className="text-muted" style={{ fontSize: '0.8rem' }}>Problems</span><strong>{stats?.metrics?.totalProblems || 0}</strong></div>
+                    <div className="flex-between mb-2"><span className="text-muted" style={{ fontSize: '0.8rem' }}>Assessments</span><strong>{stats?.metrics?.totalAssessments || 0}</strong></div>
+                    <div className="flex-between"><span className="text-muted" style={{ fontSize: '0.8rem' }}>Users</span><strong>{stats?.metrics?.totalUsers || 0}</strong></div>
+                  </div>
+                  <div style={{ background: 'var(--bg)', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+                    <div className="flex-between mb-2"><span className="text-muted" style={{ fontSize: '0.8rem' }}>Today</span><strong>{stats?.metrics?.submissionsToday || 0}</strong></div>
+                    <div className="flex-between mb-2"><span className="text-muted" style={{ fontSize: '0.8rem' }}>Accepted</span><strong style={{ color: 'var(--success)' }}>{stats?.metrics?.acceptedToday || 0}</strong></div>
+                    <div className="flex-between"><span className="text-muted" style={{ fontSize: '0.8rem' }}>Rate</span><strong>{stats?.metrics?.submissionsToday > 0 ? ((stats.metrics.acceptedToday / stats.metrics.submissionsToday) * 100).toFixed(1) : 0}%</strong></div>
+                  </div>
+                </div>
+                <div className="submissions-hero" style={{ marginTop: '20px', width: '100%' }}>
+                  <div className="label">Submissions (All Time)</div>
+                  <div className="value">{stats?.metrics?.totalSubmissions || 0}</div>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Live Submission Feed */}
-      <div className="problem-card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: '20px', borderBottom: '1px solid var(--border)' }}>
-          <h3 style={{ margin: 0 }}>Live Submission Feed</h3>
-        </div>
-        <div className="table-container" style={{ border: 'none', borderRadius: 0 }}>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Student</th>
-                <th>Problem</th>
-                <th>Lang</th>
-                <th>Verdict</th>
-                <th style={{ textAlign: 'right' }}>Time</th>
-              </tr>
-            </thead>
-            <tbody>
-              {stats?.recentSubmissions?.map((s) => (
-                <tr key={s._id}>
-                  <td>
-                    <div style={{ fontWeight: '600' }}>{s.userId?.name || 'Anonymous'}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{s.userId?.email}</div>
-                  </td>
-                  <td>{s.problemId?.title || 'Unknown'}</td>
-                  <td style={{ textTransform: 'capitalize' }}>{s.language}</td>
-                  <td>
-                    <span className={`tag ${s.status === 'Success' ? 'difficulty-easy' : (['Fail', 'Error'].includes(s.status) ? 'difficulty-hard' : '')}`}>
-                      {s.status}
-                    </span>
-                  </td>
-                  <td style={{ textAlign: 'right', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                    {new Date(s.createdAt).toLocaleTimeString()}
-                  </td>
-                </tr>
-              )) || <tr><td colSpan="5" className="text-center py-8">No recent activity</td></tr>}
-              </tbody>
+          <div className="problem-card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '20px', borderBottom: '1px solid var(--border)' }}>
+              <h3 style={{ margin: 0 }}>Live Submission Feed</h3>
+            </div>
+            <div className="table-container" style={{ border: 'none', borderRadius: 0 }}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Student</th>
+                    <th>Problem</th>
+                    <th>Lang</th>
+                    <th>Verdict</th>
+                    <th style={{ textAlign: 'right' }}>Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats?.recentSubmissions?.map((s) => (
+                    <tr key={s._id}>
+                      <td>
+                        <div style={{ fontWeight: '600' }}>{s.userId?.name || 'Anonymous'}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{s.userId?.email}</div>
+                      </td>
+                      <td>{s.problemId?.title || 'Unknown'}</td>
+                      <td style={{ textTransform: 'capitalize' }}>{s.language}</td>
+                      <td><span className={`tag ${s.status === 'Success' ? 'difficulty-easy' : (['Fail', 'Error'].includes(s.status) ? 'difficulty-hard' : '')}`}>{s.status}</span></td>
+                      <td style={{ textAlign: 'right', color: 'var(--text-muted)', fontSize: '0.8rem' }}>{new Date(s.createdAt).toLocaleTimeString()}</td>
+                    </tr>
+                  )) || <tr><td colSpan="5" className="text-center py-8">No recent activity</td></tr>}
+                </tbody>
               </table>
-              </div>
-              </div>
+            </div>
+          </div>
         </>
       )}
 
-              <style>{`
-              .spin { animation: spin 1s linear infinite; }
-              @keyframes spin { 100% { transform: rotate(360deg); } }
-              `}</style>
-              </div>
-              );
-              };
+      <style>{`
+        .spin { animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+      `}</style>
+    </div>
+  );
+};
 
-              export default SystemDashboardPage;
+export default SystemDashboardPage;

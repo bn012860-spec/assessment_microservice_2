@@ -5,6 +5,9 @@ import { v4 as uuidv4 } from "uuid";
 import routes from "./routes/index.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
+import swaggerUi from "swagger-ui-express";
+import { swaggerSpec } from "./config/swagger.js";
+
 const app = express();
 
 const generalLimiter = rateLimit({
@@ -51,13 +54,25 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: "100kb" }));
 app.use(express.urlencoded({ extended: true, limit: "100kb" }));
 
-app.use("/api/auth", authLimiter);
-app.use("/api/integration", integrationLimiter);
-app.use("/api", generalLimiter);
+// Swagger Documentation
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
+// Versioned Routes
+app.use("/api/v1/auth", authLimiter);
+app.use("/api/v1/integration", integrationLimiter);
+app.use("/api/v1", generalLimiter);
+app.use("/api/v1", routes);
+
+// Backward Compatibility / Default Prefix
 app.use("/api", routes);
+
 app.get("/", (req, res) => {
-  res.send("API is working 2");
+  res.json({
+    message: "Assessment Microservice API",
+    version: "1.0.0",
+    docs: "/api-docs",
+    v1: "/api/v1"
+  });
 });
 
 app.use(errorHandler);

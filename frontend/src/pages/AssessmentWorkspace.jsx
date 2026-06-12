@@ -483,36 +483,144 @@ const AssessmentWorkspace = () => {
   const isJudging = currentSubmission && ['Submitting...', 'Pending', 'Running'].includes(currentSubmission.status);
   const currentRunResult = runResultMap[currentProblem._id];
   
+  const [showInstructions, setShowInstructions] = useState(false);
+
   const currentTestCases = testCasesMap[currentProblem._id] || ['[]'];
   const currentActiveIdx = activeTestCaseIdxMap[currentProblem._id] || 0;
 
   return (
     <div className="ide-layout assessment-workspace fade-in">
+      {/* Instructions Modal */}
+      {showInstructions && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          zIndex: 10000,
+          background: 'rgba(0,0,0,0.7)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
+        }} onClick={() => setShowInstructions(false)}>
+          <div style={{
+            background: 'var(--surface)',
+            padding: '32px',
+            borderRadius: 'var(--radius-lg)',
+            maxWidth: '600px',
+            width: '100%',
+            border: '1px solid var(--border)',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.5)'
+          }} onClick={e => e.stopPropagation()}>
+            <h2 className="mb-4 flex-center gap-2" style={{ justifyContent: 'flex-start' }}>
+              <Info size={24} color="var(--primary)" /> Assessment Instructions
+            </h2>
+            <div style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
+              <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <li><strong>Environment:</strong> You are in a secure proctored environment.</li>
+                <li><strong>Fullscreen:</strong> Do not exit fullscreen. Doing so will trigger a countdown to automatic submission.</li>
+                <li><strong>Tab Switching:</strong> Switching tabs or applications is strictly prohibited and logged.</li>
+                <li><strong>Copy/Paste:</strong> Copying and pasting is disabled and will be recorded as a violation.</li>
+                <li><strong>Saving:</strong> Your code is automatically saved locally as you type.</li>
+                <li><strong>Submission:</strong> You can submit each problem multiple times; only your last successful submission counts.</li>
+                <li><strong>Auto-Submit:</strong> When the main timer reaches 00:00, your assessment will be submitted automatically.</li>
+              </ul>
+            </div>
+            <button className="button button-primary w-full mt-8" onClick={() => setShowInstructions(false)}>
+              Understood
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Fullscreen/Security Overlay Warning */}
+      {fsExitWarning && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 9999,
+          background: 'rgba(0, 0, 0, 0.85)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'white',
+          padding: '40px',
+          textAlign: 'center',
+          backdropFilter: 'blur(8px)'
+        }}>
+          <AlertCircle size={80} color="var(--warning)" style={{ marginBottom: '24px' }} />
+          <h1 style={{ fontSize: '2.5rem', marginBottom: '16px', color: 'var(--warning)' }}>Security Violation Detected</h1>
+          <p style={{ fontSize: '1.25rem', maxWidth: '600px', marginBottom: '32px', lineHeight: '1.6' }}>
+            {fsWarningReason === 'fullscreen exit'
+              ? `You have exited fullscreen mode. Please return to fullscreen immediately.`
+              : `A security violation (${fsWarningReason}) has been detected.`}
+          </p>
+          <div style={{ 
+            background: 'var(--error)', 
+            padding: '24px 48px', 
+            borderRadius: '12px', 
+            fontSize: '3rem', 
+            fontWeight: '800',
+            marginBottom: '16px',
+            boxShadow: '0 0 30px rgba(239, 68, 68, 0.4)'
+          }}>
+            {fsWarningTimeLeft}s
+          </div>
+          <p style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.7)' }}>
+            Assessment will be automatically submitted when the timer reaches zero.
+          </p>
+          <button 
+            className="button button-primary" 
+            style={{ marginTop: '40px', padding: '12px 32px', fontSize: '1.1rem' }}
+            onClick={() => {
+              if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(() => {});
+              }
+            }}
+          >
+            Return to Fullscreen
+          </button>
+        </div>
+      )}
+
       <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', minHeight: 0, minWidth: 0, flex: 1 }}>
         <div className="workspace-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flexWrap: 'wrap' }}>
             <div style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{assessment?.title || 'Assessment'}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              <span>Security violations: <strong style={{ color: securityWarningCount >= 10 ? 'var(--error)' : 'var(--warning)' }}>{securityWarningCount}</strong>/10</span>
+              <span>Violations: <strong style={{ color: securityWarningCount >= 10 ? 'var(--error)' : 'var(--warning)' }}>{securityWarningCount}</strong>/10</span>
               <span style={{ color: tabSwitchCount > 0 ? 'var(--error)' : 'var(--text-muted)', fontWeight: 600 }}>Tabs: {tabSwitchCount}</span>
-              <span style={{ color: copyCount > 0 ? 'var(--warning)' : 'var(--text-muted)', fontWeight: 600 }}>Copy: {copyCount}</span>
-              <span style={{ color: pasteCount > 0 ? 'var(--warning)' : 'var(--text-muted)', fontWeight: 600 }}>Paste: {pasteCount}</span>
             </div>
           </div>
-          <div style={{ fontSize: '0.85rem', color: showTabWarning || securityWarningCount > 0 ? 'var(--warning)' : 'var(--text-muted)', whiteSpace: 'nowrap', fontWeight: 700 }}>
-            {showTabWarning || securityWarningCount > 0 ? 'Warning active' : 'Monitoring active'}
+          <div className="flex-center gap-4">
+            <button 
+              className="button button-outline" 
+              style={{ padding: '6px 12px', fontSize: '0.8rem', borderColor: 'var(--primary)', color: 'var(--primary)' }}
+              onClick={() => setShowInstructions(true)}
+            >
+              <Info size={14} /> Instructions
+            </button>
+            {timeLeft < 300 && (
+              <div style={{ 
+                color: 'var(--error)', 
+                fontWeight: '800', 
+                fontSize: '0.9rem', 
+                background: 'rgba(239, 68, 68, 0.1)', 
+                padding: '4px 12px', 
+                borderRadius: '4px',
+                animation: timeLeft < 60 ? 'pulse-red 1s infinite' : 'none'
+              }}>
+                CLOSING SOON
+              </div>
+            )}
+            <div style={{ fontSize: '0.85rem', color: showTabWarning || securityWarningCount > 0 ? 'var(--warning)' : 'var(--text-muted)', whiteSpace: 'nowrap', fontWeight: 700 }}>
+              {showTabWarning || securityWarningCount > 0 ? 'Warning active' : 'Monitoring active'}
+            </div>
           </div>
         </div>
-        {fsExitWarning && (
-          <div style={{ position: 'sticky', top: '57px', zIndex: 1199, padding: '10px 20px', background: 'rgba(245, 158, 11, 0.15)', borderBottom: '1px solid rgba(245, 158, 11, 0.35)', color: 'var(--warning)', fontWeight: 700, display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', flexShrink: 0 }}>
-            <span>
-              {fsWarningReason === 'fullscreen exit'
-                ? `Fullscreen exited. Return within ${fsWarningTimeLeft} seconds or the assessment will be submitted.`
-                : `Warning: ${fsWarningReason} detected. Return within ${fsWarningTimeLeft} seconds or the assessment will be submitted.`}
-            </span>
-            <span style={{ whiteSpace: 'nowrap' }}>Countdown active</span>
-          </div>
-        )}
         <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
           {/* Sidebar: Navigation & Timer */}
           <div className="workspace-sidebar" style={{ width: '320px', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: 'var(--bg)', minHeight: 0 }}>
