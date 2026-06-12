@@ -14,17 +14,27 @@ function ProblemListPage({ user }) {
     tag: ''
   });
 
+  const [apiError, setApiError] = useState(null);
+
   const canManage = user && (user.role === 'admin' || user.role === 'faculty' || user.role === 'superadmin');
 
   useEffect(() => {
-    const params = new URLSearchParams();
-    if (filters.search) params.append('search', filters.search);
-    if (filters.difficulty) params.append('difficulty', filters.difficulty);
-    if (filters.tag) params.append('tag', filters.tag);
+    setApiError(null);
+    
+    // Clean up empty filters to avoid sending 'search='
+    const activeFilters = {};
+    if (filters.search) activeFilters.search = filters.search;
+    if (filters.difficulty) activeFilters.difficulty = filters.difficulty;
+    if (filters.tag) activeFilters.tag = filters.tag;
 
-    api.get(`/api/problems?${params.toString()}`)
-      .then(response => setProblems(response.data))
-      .catch(error => console.error('Error fetching problems:', error));
+    api.get('/api/v1/problems', { params: activeFilters })
+      .then(response => {
+        setProblems(response.data);
+      })
+      .catch(error => {
+        console.error('Error fetching problems:', error);
+        setApiError(error.message || 'Unknown error');
+      });
   }, [filters]);
 
   const handleFilterChange = (e) => {
@@ -89,6 +99,12 @@ function ProblemListPage({ user }) {
           />
         </div>
       </div>
+
+      {apiError && (
+        <div className="error-box mb-8 flex-center gap-2" style={{ justifyContent: 'flex-start' }}>
+          <X size={18} /> {apiError}
+        </div>
+      )}
 
       <div className="problem-card-grid">
         {problems.length > 0 ? problems.map(problem => {

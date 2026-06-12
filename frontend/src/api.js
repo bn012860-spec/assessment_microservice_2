@@ -69,48 +69,48 @@ if (storedToken) {
 }
 
 export const assessments = {
-  list: (params) => api.get("/api/assessments", { params }),
-  get: (id) => api.get(`/api/assessments/${id}`),
-  getMyAttempt: (id) => api.get(`/api/assessments/${id}/my-attempt`),
-  create: (data) => api.post("/api/assessments", data),
-  update: (id, data) => api.put(`/api/assessments/${id}`, data),
-  delete: (id) => api.delete(`/api/assessments/${id}`),
-  start: (id) => api.post(`/api/assessments/${id}/start`),
-  submitAttempt: (attemptId) => api.post(`/api/assessments/attempts/${attemptId}/submit`),
-  getAttempt: (attemptId) => api.get(`/api/assessments/attempts/${attemptId}`),
-  getAttemptSubmissions: (attemptId) => api.get(`/api/assessments/attempts/${attemptId}/submissions`),
-  listAttempts: (assessmentId) => api.get(`/api/assessments/${assessmentId}/attempts`),
-  getAttendance: (id) => api.get(`/api/assessments/${id}/attendance`),
-  logEvent: (attemptId, eventType) => api.post(`/api/assessments/attempts/${attemptId}/log-event`, { eventType })
+  list: (params) => api.get("/api/v1/assessments", { params }),
+  get: (id) => api.get(`/api/v1/assessments/${id}`),
+  getMyAttempt: (id) => api.get(`/api/v1/assessments/${id}/my-attempt`),
+  create: (data) => api.post("/api/v1/assessments", data),
+  update: (id, data) => api.put(`/api/v1/assessments/${id}`, data),
+  delete: (id) => api.delete(`/api/v1/assessments/${id}`),
+  start: (id) => api.post(`/api/v1/assessments/${id}/start`),
+  submitAttempt: (attemptId) => api.post(`/api/v1/assessments/attempts/${attemptId}/submit`),
+  getAttempt: (attemptId) => api.get(`/api/v1/assessments/attempts/${attemptId}`),
+  getAttemptSubmissions: (attemptId) => api.get(`/api/v1/assessments/attempts/${attemptId}/submissions`),
+  listAttempts: (assessmentId) => api.get(`/api/v1/assessments/${assessmentId}/attempts`),
+  getAttendance: (id) => api.get(`/api/v1/assessments/${id}/attendance`),
+  logEvent: (attemptId, eventType) => api.post(`/api/v1/assessments/attempts/${attemptId}/log-event`, { eventType })
 };
 
 export const problems = {
-  list: (params) => api.get("/api/problems", { params }),
-  get: (id) => api.get(`/api/problems/${id}`),
-  run: (id, data) => api.post(`/api/problems/${id}/run`, data),
-  getStats: (id) => api.get(`/api/problems/${id}/stats`),
-  delete: (id) => api.delete(`/api/problems/${id}`)
+  list: (params) => api.get("/api/v1/problems", { params }),
+  get: (id) => api.get(`/api/v1/problems/${id}`),
+  run: (id, data) => api.post(`/api/v1/problems/${id}/run`, data),
+  getStats: (id) => api.get(`/api/v1/problems/${id}/stats`),
+  delete: (id) => api.delete(`/api/v1/problems/${id}`)
 };
 
 export const submissions = {
-  getAnalytics: () => api.get('/api/submissions/analytics/my')
+  getAnalytics: () => api.get('/api/v1/submissions/analytics/my')
 };
 
 export const admin = {
-  getSystemStats: () => api.get("/api/admin/system-stats"),
-  getAuditLogs: (params) => api.get("/api/admin/audit-logs", { params }),
-  bulkImportStudents: (data) => api.post("/api/admin/bulk-import-students", data),
-  listUsers: (params) => api.get("/api/admin/users", { params }),
-  resetPassword: (userId, newPassword) => api.post(`/api/admin/users/${userId}/reset-password`, { newPassword })
+  getSystemStats: () => api.get("/api/v1/admin/system-stats"),
+  getAuditLogs: (params) => api.get("/api/v1/admin/audit-logs", { params }),
+  bulkImportStudents: (data) => api.post("/api/v1/admin/bulk-import-students", data),
+  listUsers: (params) => api.get("/api/v1/admin/users", { params }),
+  resetPassword: (userId, newPassword) => api.post(`/api/v1/admin/users/${userId}/reset-password`, { newPassword })
 };
 
 export const questions = {
-  list: (params) => api.get("/api/questions", { params }),
-  tags: () => api.get("/api/questions/tags"),
-  get: (id) => api.get(`/api/questions/${id}`),
-  create: (data) => api.post("/api/questions", data),
-  update: (id, data) => api.put(`/api/questions/${id}`, data),
-  delete: (id) => api.delete(`/api/questions/${id}`)
+  list: (params) => api.get("/api/v1/questions", { params }),
+  tags: () => api.get("/api/v1/questions/tags"),
+  get: (id) => api.get(`/api/v1/questions/${id}`),
+  create: (data) => api.post("/api/v1/questions", data),
+  update: (id, data) => api.put(`/api/v1/questions/${id}`, data),
+  delete: (id) => api.delete(`/api/v1/questions/${id}`)
 };
 
 export default api;

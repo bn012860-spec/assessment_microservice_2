@@ -21,7 +21,7 @@ const EditAssessmentPage = () => {
       try {
         const [assessmentRes, problemsRes] = await Promise.all([
           assessments.get(id),
-          api.get('/api/problems')
+          api.get('/api/v1/problems')
         ]);
         
         const assessmentData = assessmentRes.data;

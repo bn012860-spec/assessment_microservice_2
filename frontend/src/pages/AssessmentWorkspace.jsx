@@ -402,7 +402,7 @@ const AssessmentWorkspace = () => {
     }
 
     try {
-      const res = await api.post(`/api/problems/${currentProblem._id}/run`, {
+      const res = await api.post(`/api/v1/problems/${currentProblem._id}/run`, {
         code: codeMap[currentProblem._id],
         language: langMap[currentProblem._id],
         customTests: tests
@@ -426,7 +426,7 @@ const AssessmentWorkspace = () => {
     
     try {
       setSubmissionMap(prev => ({ ...prev, [problemId]: { status: 'Submitting...' } }));
-      const res = await api.post('/api/submissions', {
+      const res = await api.post('/api/v1/submissions', {
         problemId,
         code: codeMap[problemId],
         language: langMap[problemId],
@@ -873,3 +873,4 @@ const AssessmentWorkspace = () => {
 };
 
 export default AssessmentWorkspace;
+e;

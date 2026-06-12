@@ -37,7 +37,7 @@ const ProblemPage = ({ user }) => {
   useEffect(() => {
     if (activeTab === 'submissions' && isAuthed && mySubmissions.length === 0) {
       setLoadingSubmissions(true);
-      api.get('/api/submissions/my')
+      api.get('/api/v1/submissions/my')
         .then(res => {
           const filtered = res.data.filter(s => s.problemId?._id === _id || s.problemId === _id);
           // Sort by newest first
@@ -145,7 +145,7 @@ const ProblemPage = ({ user }) => {
     setConsoleTab('result');
 
     try {
-      const res = await api.post('/api/submissions', { problemId: _id, code, language: selectedLanguage });
+      const res = await api.post('/api/v1/submissions', { problemId: _id, code, language: selectedLanguage });
       const newSubmission = res.data;
       setSubmission(newSubmission);
       intervalRef.current = setInterval(() => checkStatus(newSubmission._id), 2000);

@@ -25,7 +25,7 @@ const AddAssessmentPage = () => {
   useEffect(() => {
     const fetchProblems = async () => {
       try {
-        const res = await api.get('/api/problems');
+        const res = await api.get('/api/v1/problems');
         setProblems(res.data);
       } catch (err) {
         setError(getApiErrorMessage(err, 'Failed to fetch problems'));

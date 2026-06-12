@@ -36,7 +36,7 @@ const MySubmissionsPage = () => {
     }
 
     try {
-      const res = await api.get(`/api/submissions/${submissionId}`);
+      const res = await api.get(`/api/v1/submissions/${submissionId}`);
       setSelectedSubmission(res.data);
       // Scroll to details on mobile/small screens if needed
       setTimeout(() => {

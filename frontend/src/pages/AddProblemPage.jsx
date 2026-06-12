@@ -110,7 +110,7 @@ const AddProblemPage = () => {
     setFormErrors({});
 
     try {
-      const res = await api.post('/api/problems', payload);
+      const res = await api.post('/api/v1/problems', payload);
       const newProblemId = res.data.problem?._id || res.data._id;
       navigate(`/problems/${newProblemId}`, { state: { successMessage: 'Problem created successfully!' } });
     } catch (err) {
@@ -138,7 +138,7 @@ const AddProblemPage = () => {
     setFormErrors({});
 
     try {
-      const resp = await api.post('/api/preview/validate', payload);
+      const resp = await api.post('/api/v1/preview/validate', payload);
       setValidationReport(resp.data);
       if (resp.data.schemaValid && resp.data.typeValidation && resp.data.wrapperGeneration && resp.data.referenceSolutionPassed) {
         setIsValidated(true);
