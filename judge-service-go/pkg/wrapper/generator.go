@@ -467,26 +467,39 @@ func buildCCall(p models.Problem, funcName string) string {
 	var sb strings.Builder
 	for i, param := range p.Parameters {
 		t := cType(param.Type)
-		switch param.Type {
-		case "number":
+		parsed, _ := types.ParseType(param.Type)
+		switch parsed.Kind {
+		case types.NumberKind:
 			sb.WriteString(fmt.Sprintf("        %s arg%d = json_object_get_int(json_object_array_get_idx(inputs, %d));\n", t, i, i))
-		case "string":
+		case types.StringKind:
 			sb.WriteString(fmt.Sprintf("        %s arg%d = json_object_get_string(json_object_array_get_idx(inputs, %d));\n", t, i, i))
-		case "boolean":
+		case types.BooleanKind:
 			sb.WriteString(fmt.Sprintf("        %s arg%d = json_object_get_boolean(json_object_array_get_idx(inputs, %d));\n", t, i, i))
-		case "linkedlist<number>":
+		case types.LinkedListKind:
 			sb.WriteString(fmt.Sprintf("        %s arg%d = list_from_json(json_object_array_get_idx(inputs, %d));\n", t, i, i))
-		case "tree<number>":
+		case types.TreeKind:
 			sb.WriteString(fmt.Sprintf("        %s arg%d = tree_from_json(json_object_array_get_idx(inputs, %d));\n", t, i, i))
-		case "graph<number>":
+		case types.GraphKind:
 			sb.WriteString(fmt.Sprintf("        %s arg%d = graph_from_json(json_object_array_get_idx(inputs, %d));\n", t, i, i))
-		case "array<number>":
+		case types.ArrayKind:
 			sb.WriteString(fmt.Sprintf("        int arg%d_size;\n", i))
-			sb.WriteString(fmt.Sprintf("        %s arg%d = array_from_json(json_object_array_get_idx(inputs, %d), &arg%d_size);\n", t, i, i, i))
-		case "matrix<number>":
+			helper := "array_from_json"
+			if parsed.Element.Kind == types.StringKind {
+				helper = "string_array_from_json"
+			} else if parsed.Element.Kind == types.BooleanKind {
+				helper = "bool_array_from_json"
+			}
+			sb.WriteString(fmt.Sprintf("        %s arg%d = %s(json_object_array_get_idx(inputs, %d), &arg%d_size);\n", t, i, helper, i, i))
+		case types.MatrixKind:
 			sb.WriteString(fmt.Sprintf("        int arg%d_rows;\n", i))
 			sb.WriteString(fmt.Sprintf("        int* arg%d_cols;\n", i))
-			sb.WriteString(fmt.Sprintf("        %s arg%d = matrix_from_json(json_object_array_get_idx(inputs, %d), &arg%d_rows, &arg%d_cols);\n", t, i, i, i, i))
+			helper := "matrix_from_json"
+			if parsed.Element.Kind == types.StringKind {
+				helper = "string_matrix_from_json"
+			} else if parsed.Element.Kind == types.BooleanKind {
+				helper = "bool_matrix_from_json"
+			}
+			sb.WriteString(fmt.Sprintf("        %s arg%d = %s(json_object_array_get_idx(inputs, %d), &arg%d_rows, &arg%d_cols);\n", t, i, helper, i, i, i))
 		default:
 			sb.WriteString(fmt.Sprintf("        %s arg%d = NULL; // Unsupported type\n", t, i))
 		}
@@ -499,19 +512,33 @@ func buildCCall(p models.Problem, funcName string) string {
 				sb.WriteString(", ")
 			}
 			sb.WriteString(fmt.Sprintf("arg%d", i))
-			if param.Type == "array<number>" {
+			parsed, _ := types.ParseType(param.Type)
+			if parsed.Kind == types.ArrayKind {
 				sb.WriteString(fmt.Sprintf(", arg%d_size", i))
-			} else if param.Type == "matrix<number>" {
+			} else if parsed.Kind == types.MatrixKind {
 				sb.WriteString(fmt.Sprintf(", arg%d_rows, arg%d_cols", i, i))
 			}
 		}
 		sb.WriteString(");\n")
-		jsonAddOutput(&sb, p.ReturnType, "NULL")
+		if len(p.Parameters) > 0 {
+			param0 := p.Parameters[0]
+			parsed0, _ := types.ParseType(param0.Type)
+			if parsed0.Kind == types.ArrayKind {
+				sb.WriteString("        int output_size = arg0_size;\n")
+			} else if parsed0.Kind == types.MatrixKind {
+				sb.WriteString("        int output_rows = arg0_rows;\n")
+				sb.WriteString("        int* output_cols = arg0_cols;\n")
+			}
+			jsonAddOutput(&sb, param0.Type, "arg0")
+		} else {
+			jsonAddOutput(&sb, p.ReturnType, "NULL")
+		}
 	} else {
 		retType := cType(p.ReturnType)
-		if p.ReturnType == "array<number>" {
+		parsedReturn, _ := types.ParseType(p.ReturnType)
+		if parsedReturn.Kind == types.ArrayKind {
 			sb.WriteString("        int output_size = 0;\n")
-		} else if p.ReturnType == "matrix<number>" {
+		} else if parsedReturn.Kind == types.MatrixKind {
 			sb.WriteString("        int output_rows = 0;\n")
 			sb.WriteString("        int* output_cols = NULL;\n")
 		}
@@ -522,19 +549,20 @@ func buildCCall(p models.Problem, funcName string) string {
 				sb.WriteString(", ")
 			}
 			sb.WriteString(fmt.Sprintf("arg%d", i))
-			if param.Type == "array<number>" {
+			parsedParam, _ := types.ParseType(param.Type)
+			if parsedParam.Kind == types.ArrayKind {
 				sb.WriteString(fmt.Sprintf(", arg%d_size", i))
-			} else if param.Type == "matrix<number>" {
+			} else if parsedParam.Kind == types.MatrixKind {
 				sb.WriteString(fmt.Sprintf(", arg%d_rows, arg%d_cols", i, i))
 			}
 		}
-		if p.ReturnType == "array<number>" {
+		if parsedReturn.Kind == types.ArrayKind {
 			if len(p.Parameters) > 0 {
 				sb.WriteString(", &output_size")
 			} else {
 				sb.WriteString("&output_size")
 			}
-		} else if p.ReturnType == "matrix<number>" {
+		} else if parsedReturn.Kind == types.MatrixKind {
 			if len(p.Parameters) > 0 {
 				sb.WriteString(", &output_rows, &output_cols")
 			} else {
@@ -551,23 +579,36 @@ func buildCCall(p models.Problem, funcName string) string {
 }
 
 func jsonAddOutput(sb *strings.Builder, returnType string, varName string) {
-	switch returnType {
-	case "number":
+	parsed, _ := types.ParseType(returnType)
+	switch parsed.Kind {
+	case types.NumberKind:
 		sb.WriteString(fmt.Sprintf("        json_object_object_add(result, \"output\", json_object_new_int(%s));\n", varName))
-	case "string":
+	case types.StringKind:
 		sb.WriteString(fmt.Sprintf("        json_object_object_add(result, \"output\", json_object_new_string(%s));\n", varName))
-	case "boolean":
+	case types.BooleanKind:
 		sb.WriteString(fmt.Sprintf("        json_object_object_add(result, \"output\", json_object_new_boolean(%s));\n", varName))
-	case "linkedlist<number>":
+	case types.LinkedListKind:
 		sb.WriteString(fmt.Sprintf("        json_object_object_add(result, \"output\", list_to_json(%s));\n", varName))
-	case "tree<number>":
+	case types.TreeKind:
 		sb.WriteString(fmt.Sprintf("        json_object_object_add(result, \"output\", tree_to_json(%s));\n", varName))
-	case "graph<number>":
+	case types.GraphKind:
 		sb.WriteString(fmt.Sprintf("        json_object_object_add(result, \"output\", graph_to_json(%s));\n", varName))
-	case "array<number>":
-		sb.WriteString(fmt.Sprintf("        json_object_object_add(result, \"output\", array_to_json(%s, output_size));\n", varName))
-	case "matrix<number>":
-		sb.WriteString(fmt.Sprintf("        json_object_object_add(result, \"output\", matrix_to_json(%s, output_rows, output_cols));\n", varName))
+	case types.ArrayKind:
+		helper := "array_to_json"
+		if parsed.Element.Kind == types.StringKind {
+			helper = "string_array_to_json"
+		} else if parsed.Element.Kind == types.BooleanKind {
+			helper = "bool_array_to_json"
+		}
+		sb.WriteString(fmt.Sprintf("        json_object_object_add(result, \"output\", %s(%s, output_size));\n", helper, varName))
+	case types.MatrixKind:
+		helper := "matrix_to_json"
+		if parsed.Element.Kind == types.StringKind {
+			helper = "string_matrix_to_json"
+		} else if parsed.Element.Kind == types.BooleanKind {
+			helper = "bool_matrix_to_json"
+		}
+		sb.WriteString(fmt.Sprintf("        json_object_object_add(result, \"output\", %s(%s, output_rows, output_cols));\n", helper, varName))
 	default:
 		sb.WriteString("        json_object_object_add(result, \"output\", NULL);\n")
 	}

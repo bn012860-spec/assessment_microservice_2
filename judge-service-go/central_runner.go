@@ -100,7 +100,7 @@ func compileCentralSubmission(ctx context.Context, exec *executor.Executor, pool
 		submissionWorkspace.HostPath,
 		submissionWorkspace.ContainerPath,
 		compilingAdapter.CompileCommand(),
-		60*time.Second,
+		120*time.Second,
 		problem.MemoryLimitMb,
 	)
 	if err != nil {

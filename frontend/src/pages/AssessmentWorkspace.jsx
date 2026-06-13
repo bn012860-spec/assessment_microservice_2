@@ -873,4 +873,3 @@ const AssessmentWorkspace = () => {
 };
 
 export default AssessmentWorkspace;
-e;

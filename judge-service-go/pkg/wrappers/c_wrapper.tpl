@@ -18,7 +18,7 @@ struct TreeNode {
 
 struct Node {
     int val;
-    int num_neighbors;
+    int numNeighbors;
     struct Node **neighbors;
 };
 
@@ -41,6 +41,22 @@ struct json_object* array_to_json(int* arr, int size) {
     return res;
 }
 
+struct json_object* string_array_to_json(const char** arr, int size) {
+    struct json_object* res = json_object_new_array();
+    for (int i = 0; i < size; i++) {
+        json_object_array_add(res, json_object_new_string(arr[i]));
+    }
+    return res;
+}
+
+struct json_object* bool_array_to_json(bool* arr, int size) {
+    struct json_object* res = json_object_new_array();
+    for (int i = 0; i < size; i++) {
+        json_object_array_add(res, json_object_new_boolean(arr[i]));
+    }
+    return res;
+}
+
 int* array_from_json(struct json_object* j, int* size) {
     if (!j || json_object_get_type(j) != json_type_array) {
         if (size) *size = 0;
@@ -56,13 +72,73 @@ int* array_from_json(struct json_object* j, int* size) {
     return res;
 }
 
+bool* bool_array_from_json(struct json_object* j, int* size) {
+    if (!j || json_object_get_type(j) != json_type_array) {
+        if (size) *size = 0;
+        return NULL;
+    }
+    int n = json_object_array_length(j);
+    if (size) *size = n;
+    if (n == 0) return NULL;
+    bool* res = safe_malloc(n * sizeof(bool));
+    for (int i = 0; i < n; i++) {
+        res[i] = json_object_get_boolean(json_object_array_get_idx(j, i));
+    }
+    return res;
+}
+
+const char** string_array_from_json(struct json_object* j, int* size) {
+    if (!j || json_object_get_type(j) != json_type_array) {
+        if (size) *size = 0;
+        return NULL;
+    }
+    int n = json_object_array_length(j);
+    if (size) *size = n;
+    if (n == 0) return NULL;
+    const char** res = safe_malloc(n * sizeof(char*));
+    for (int i = 0; i < n; i++) {
+        res[i] = json_object_get_string(json_object_array_get_idx(j, i));
+    }
+    return res;
+}
+
 // JSON conversions for Matrices
 struct json_object* matrix_to_json(int** mat, int rows, int* cols) {
     struct json_object* res = json_object_new_array();
     for (int i = 0; i < rows; i++) {
         struct json_object* row = json_object_new_array();
-        for (int j = 0; j < cols[i]; j++) {
-            json_object_array_add(row, json_object_new_int(mat[i][j]));
+        if (mat[i]) {
+            for (int j = 0; j < cols[i]; j++) {
+                json_object_array_add(row, json_object_new_int(mat[i][j]));
+            }
+        }
+        json_object_array_add(res, row);
+    }
+    return res;
+}
+
+struct json_object* bool_matrix_to_json(bool** mat, int rows, int* cols) {
+    struct json_object* res = json_object_new_array();
+    for (int i = 0; i < rows; i++) {
+        struct json_object* row = json_object_new_array();
+        if (mat[i]) {
+            for (int j = 0; j < cols[i]; j++) {
+                json_object_array_add(row, json_object_new_boolean(mat[i][j]));
+            }
+        }
+        json_object_array_add(res, row);
+    }
+    return res;
+}
+
+struct json_object* string_matrix_to_json(const char*** mat, int rows, int* cols) {
+    struct json_object* res = json_object_new_array();
+    for (int i = 0; i < rows; i++) {
+        struct json_object* row = json_object_new_array();
+        if (mat[i]) {
+            for (int j = 0; j < cols[i]; j++) {
+                json_object_array_add(row, json_object_new_string(mat[i][j]));
+            }
         }
         json_object_array_add(res, row);
     }
@@ -95,6 +171,70 @@ int** matrix_from_json(struct json_object* j, int* rows, int** cols) {
         res[i] = safe_malloc(c * sizeof(int));
         for (int k = 0; k < c; k++) {
             res[i][k] = json_object_get_int(json_object_array_get_idx(row_obj, k));
+        }
+    }
+    if (cols) *cols = c_arr;
+    return res;
+}
+
+bool** bool_matrix_from_json(struct json_object* j, int* rows, int** cols) {
+    if (!j || json_object_get_type(j) != json_type_array) {
+        if (rows) *rows = 0;
+        if (cols) *cols = NULL;
+        return NULL;
+    }
+    int r = json_object_array_length(j);
+    if (rows) *rows = r;
+    if (r == 0) {
+        if (cols) *cols = NULL;
+        return NULL;
+    }
+    bool** res = safe_malloc(r * sizeof(bool*));
+    int* c_arr = safe_malloc(r * sizeof(int));
+    for (int i = 0; i < r; i++) {
+        struct json_object* row_obj = json_object_array_get_idx(j, i);
+        if (!row_obj || json_object_get_type(row_obj) != json_type_array) {
+            c_arr[i] = 0;
+            res[i] = NULL;
+            continue;
+        }
+        int c = json_object_array_length(row_obj);
+        c_arr[i] = c;
+        res[i] = safe_malloc(c * sizeof(bool));
+        for (int k = 0; k < c; k++) {
+            res[i][k] = json_object_get_boolean(json_object_array_get_idx(row_obj, k));
+        }
+    }
+    if (cols) *cols = c_arr;
+    return res;
+}
+
+const char*** string_matrix_from_json(struct json_object* j, int* rows, int** cols) {
+    if (!j || json_object_get_type(j) != json_type_array) {
+        if (rows) *rows = 0;
+        if (cols) *cols = NULL;
+        return NULL;
+    }
+    int r = json_object_array_length(j);
+    if (rows) *rows = r;
+    if (r == 0) {
+        if (cols) *cols = NULL;
+        return NULL;
+    }
+    const char*** res = safe_malloc(r * sizeof(char**));
+    int* c_arr = safe_malloc(r * sizeof(int));
+    for (int i = 0; i < r; i++) {
+        struct json_object* row_obj = json_object_array_get_idx(j, i);
+        if (!row_obj || json_object_get_type(row_obj) != json_type_array) {
+            c_arr[i] = 0;
+            res[i] = NULL;
+            continue;
+        }
+        int c = json_object_array_length(row_obj);
+        c_arr[i] = c;
+        res[i] = safe_malloc(c * sizeof(char*));
+        for (int k = 0; k < c; k++) {
+            res[i][k] = json_object_get_string(json_object_array_get_idx(row_obj, k));
         }
     }
     if (cols) *cols = c_arr;
@@ -191,9 +331,44 @@ struct TreeNode* tree_from_json(struct json_object* j) {
 // JSON conversions for Node (Graph)
 struct json_object* graph_to_json(struct Node* node) {
     if (!node) return NULL;
-    // This is more complex to implement in C without a hash map.
-    // For now, return a simple representation or placeholder.
-    return json_object_new_string("graph_to_json_not_implemented");
+    struct Node* queue[1000];
+    struct Node* visited[1000];
+    int num_visited = 0;
+    int head = 0, tail = 0;
+    queue[tail++] = node;
+    visited[num_visited++] = node;
+    
+    int max_val = node->val;
+    while (head < tail) {
+        struct Node* curr = queue[head++];
+        if (curr->val > max_val) max_val = curr->val;
+        for (int i = 0; i < curr->numNeighbors; i++) {
+            bool already_visited = false;
+            for (int j = 0; j < num_visited; j++) {
+                if (visited[j] == curr->neighbors[i]) { already_visited = true; break; }
+            }
+            if (!already_visited && num_visited < 1000) {
+                visited[num_visited++] = curr->neighbors[i];
+                queue[tail++] = curr->neighbors[i];
+            }
+        }
+    }
+    
+    struct json_object* res = json_object_new_array();
+    for (int i = 1; i <= max_val; i++) {
+        struct Node* found = NULL;
+        for (int j = 0; j < num_visited; j++) {
+            if (visited[j]->val == i) { found = visited[j]; break; }
+        }
+        struct json_object* neighbors_json = json_object_new_array();
+        if (found) {
+            for (int k = 0; k < found->numNeighbors; k++) {
+                json_object_array_add(neighbors_json, json_object_new_int(found->neighbors[k]->val));
+            }
+        }
+        json_object_array_add(res, neighbors_json);
+    }
+    return res;
 }
 
 struct Node* graph_from_json(struct json_object* j) {
@@ -207,10 +382,10 @@ struct Node* graph_from_json(struct json_object* j) {
     }
     for (int i = 0; i < n; i++) {
         struct json_object* neighbors_json = json_object_array_get_idx(j, i);
-        int num_neighbors = json_object_array_length(neighbors_json);
-        nodes[i]->num_neighbors = num_neighbors;
-        nodes[i]->neighbors = safe_malloc(num_neighbors * sizeof(struct Node*));
-        for (int k = 0; k < num_neighbors; k++) {
+        int numNeighbors = json_object_array_length(neighbors_json);
+        nodes[i]->numNeighbors = numNeighbors;
+        nodes[i]->neighbors = safe_malloc(numNeighbors * sizeof(struct Node*));
+        for (int k = 0; k < numNeighbors; k++) {
             int neighbor_idx = json_object_get_int(json_object_array_get_idx(neighbors_json, k));
             nodes[i]->neighbors[k] = nodes[neighbor_idx - 1];
         }

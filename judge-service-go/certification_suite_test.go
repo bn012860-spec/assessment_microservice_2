@@ -8,7 +8,7 @@ import (
 )
 
 func TestCertificationSuite(t *testing.T) {
-	languagesToTest := []string{"python", "javascript", "java", "go", "cpp", "csharp", "typescript"}
+	languagesToTest := []string{"python", "javascript", "java", "go", "cpp", "csharp", "typescript", "c"}
 
 	problems := []struct {
 		Problem   models.Problem
@@ -49,6 +49,10 @@ func TestCertificationSuite(t *testing.T) {
 				"typescript": {
 					Correct: "function add(a: number, b: number): number { return a + b; }",
 					Wrong:   "function add(a: number, b: number): number { return a - b; }",
+				},
+				"c": {
+					Correct: "int add(int a, int b) { return a + b; }",
+					Wrong:   "int add(int a, int b) { return a - b; }",
 				},
 			},
 		},
@@ -100,6 +104,10 @@ func TestCertificationSuite(t *testing.T) {
 					Correct: "function twoSum(nums: number[], target: number): number[] {\n    const m = new Map<number, number>();\n    for (let i = 0; i < nums.length; i++) {\n        if (m.has(target - nums[i])) return [m.get(target - nums[i])!, i];\n        m.set(nums[i], i);\n    }\n    return [];\n}",
 					Wrong:   "function twoSum(nums: number[], target: number): number[] { return [0, 0]; }",
 				},
+				"c": {
+					Correct: "int* twoSum(int* nums, int numsSize, int target, int* outputSize) {\n    *outputSize = 2;\n    int* res = malloc(2 * sizeof(int));\n    for (int i = 0; i < numsSize; i++) {\n        for (int j = i + 1; j < numsSize; j++) {\n            if (nums[i] + nums[j] == target) {\n                res[0] = i; res[1] = j; return res;\n            }\n        }\n    }\n    return NULL;\n}",
+					Wrong:   "int* twoSum(int* nums, int numsSize, int target, int* outputSize) {\n    *outputSize = 2;\n    int* res = malloc(2 * sizeof(int));\n    res[0] = 0; res[1] = 0;\n    return res;\n}",
+				},
 			},
 		},
 		{
@@ -108,7 +116,7 @@ func TestCertificationSuite(t *testing.T) {
 				FunctionName: "rotate",
 				ReturnType:   "void",
 				Parameters: []models.Parameter{
-					{Name: "matrix", Type: "array<array<number>>"},
+					{Name: "matrix", Type: "matrix<number>"},
 				},
 				TestCases: []models.TestCase{
 					{
@@ -156,6 +164,10 @@ func TestCertificationSuite(t *testing.T) {
 				"typescript": {
 					Correct: "function rotate(matrix: number[][]): void {\n    const n = matrix.length;\n    for (let i = 0; i < Math.floor(n / 2); i++) {\n        for (let j = i; j < n - i - 1; j++) {\n            let temp = matrix[i][j];\n            matrix[i][j] = matrix[n - j - 1][i];\n            matrix[n - j - 1][i] = matrix[n - i - 1][n - j - 1];\n            matrix[n - i - 1][n - j - 1] = matrix[j][n - i - 1];\n            matrix[j][n - i - 1] = temp;\n        }\n    }\n}",
 					Wrong:   "function rotate(matrix: number[][]): void { }",
+				},
+				"c": {
+					Correct: "void rotate(int** matrix, int matrixRows, int* matrixCols) {\n    int n = matrixRows;\n    for (int i = 0; i < n / 2; i++) {\n        for (int j = i; j < n - i - 1; j++) {\n            int temp = matrix[i][j];\n            matrix[i][j] = matrix[n - j - 1][i];\n            matrix[n - j - 1][i] = matrix[n - i - 1][n - j - 1];\n            matrix[n - i - 1][n - j - 1] = matrix[j][n - i - 1];\n            matrix[j][n - i - 1] = temp;\n        }\n    }\n}",
+					Wrong:   "void rotate(int** matrix, int matrixRows, int* matrixCols) { }",
 				},
 			},
 		},
@@ -206,6 +218,10 @@ func TestCertificationSuite(t *testing.T) {
 					Correct: "function reverseList(head: ListNode | null): ListNode | null {\n    let prev: ListNode | null = null;\n    let curr = head;\n    while (curr) {\n        let next: ListNode | null = curr.next;\n        curr.next = prev;\n        prev = curr;\n        curr = next;\n    }\n    return prev;\n}",
 					Wrong:   "function reverseList(head: ListNode | null): ListNode | null { return head; }",
 				},
+				"c": {
+					Correct: "struct ListNode* reverseList(struct ListNode* head) {\n    struct ListNode *prev = NULL, *curr = head, *next;\n    while (curr) {\n        next = curr->next;\n        curr->next = prev;\n        prev = curr;\n        curr = next;\n    }\n    return prev;\n}",
+					Wrong:   "struct ListNode* reverseList(struct ListNode* head) { return head; }",
+				},
 			},
 		},
 		{
@@ -255,13 +271,17 @@ func TestCertificationSuite(t *testing.T) {
 					Correct: "function maxDepth(root: TreeNode | null): number {\n    if (!root) return 0;\n    return 1 + Math.max(maxDepth(root.left), maxDepth(root.right));\n}",
 					Wrong:   "function maxDepth(root: TreeNode | null): number { return 1; }",
 				},
+				"c": {
+					Correct: "int maxDepth(struct TreeNode* root) {\n    if (!root) return 0;\n    int l = maxDepth(root->left);\n    int r = maxDepth(root->right);\n    return 1 + (l > r ? l : r);\n}",
+					Wrong:   "int maxDepth(struct TreeNode* root) { return 1; }",
+				},
 			},
 		},
 		{
 			Problem: models.Problem{
 				Title:        "Binary Tree Level Order Traversal",
 				FunctionName: "levelOrder",
-				ReturnType:   "array<array<number>>",
+				ReturnType:   "matrix<number>",
 				Parameters: []models.Parameter{
 					{Name: "root", Type: "tree<number>"},
 				},
@@ -304,6 +324,10 @@ func TestCertificationSuite(t *testing.T) {
 					Correct: "function levelOrder(root: TreeNode | null): number[][] {\n    if (!root) return [];\n    const res: number[][] = [], q: TreeNode[] = [root];\n    while (q.length > 0) {\n        const level: number[] = [], size = q.length;\n        for (let i = 0; i < size; i++) {\n            const node = q.shift()!;\n            level.push(node.val);\n            if (node.left) q.push(node.left);\n            if (node.right) q.push(node.right);\n        }\n        res.push(level);\n    }\n    return res;\n}",
 					Wrong:   "function levelOrder(root: TreeNode | null): number[][] { return []; }",
 				},
+				"c": {
+					Correct: "int** levelOrder(struct TreeNode* root, int* outputRows, int** outputCols) {\n    if (!root) { *outputRows = 0; return NULL; }\n    int** res = malloc(100 * sizeof(int*));\n    int* cols = malloc(100 * sizeof(int));\n    struct TreeNode* queue[1000];\n    int head = 0, tail = 0;\n    queue[tail++] = root;\n    int row = 0;\n    while (head < tail) {\n        int size = tail - head;\n        cols[row] = size;\n        res[row] = malloc(size * sizeof(int));\n        for (int i = 0; i < size; i++) {\n            struct TreeNode* node = queue[head++];\n            res[row][i] = node->val;\n            if (node->left) queue[tail++] = node->left;\n            if (node->right) queue[tail++] = node->right;\n        }\n        row++;\n    }\n    *outputRows = row;\n    *outputCols = cols;\n    return res;\n}",
+					Wrong:   "int** levelOrder(struct TreeNode* root, int* outputRows, int** outputCols) { *outputRows = 0; return NULL; }",
+				},
 			},
 		},
 		{
@@ -340,6 +364,10 @@ func TestCertificationSuite(t *testing.T) {
 				"typescript": {
 					Correct: "function echo(words: string[]): string[] { return words; }",
 					Wrong:   "function echo(words: string[]): string[] { return []; }",
+				},
+				"c": {
+					Correct: "const char** echo(const char** words, int wordsSize, int* outputSize) {\n    *outputSize = wordsSize;\n    return words;\n}",
+					Wrong:   "const char** echo(const char** words, int wordsSize, int* outputSize) {\n    *outputSize = 0;\n    return NULL;\n}",
 				},
 			},
 		},
@@ -386,6 +414,10 @@ func TestCertificationSuite(t *testing.T) {
 					Correct: "function matrixEcho(matrix: string[][]): string[][] { return matrix; }",
 					Wrong:   "function matrixEcho(matrix: string[][]): string[][] { return []; }",
 				},
+				"c": {
+					Correct: "const char*** matrixEcho(const char*** matrix, int matrixRows, int* matrixCols, int* outputRows, int** outputCols) {\n    *outputRows = matrixRows;\n    *outputCols = matrixCols;\n    return matrix;\n}",
+					Wrong:   "const char*** matrixEcho(const char*** matrix, int matrixRows, int* matrixCols, int* outputRows, int** outputCols) {\n    *outputRows = 0;\n    return NULL;\n}",
+				},
 			},
 		},
 		{
@@ -422,6 +454,10 @@ func TestCertificationSuite(t *testing.T) {
 				"typescript": {
 					Correct: "function boolEcho(vals: boolean[]): boolean[] { return vals; }",
 					Wrong:   "function boolEcho(vals: boolean[]): boolean[] { return []; }",
+				},
+				"c": {
+					Correct: "bool* boolEcho(bool* vals, int valsSize, int* outputSize) {\n    *outputSize = valsSize;\n    return vals;\n}",
+					Wrong:   "bool* boolEcho(bool* vals, int valsSize, int* outputSize) {\n    *outputSize = 0;\n    return NULL;\n}",
 				},
 			},
 		},
@@ -467,6 +503,10 @@ func TestCertificationSuite(t *testing.T) {
 				"typescript": {
 					Correct: "function boolMatrixEcho(matrix: boolean[][]): boolean[][] { return matrix; }",
 					Wrong:   "function boolMatrixEcho(matrix: boolean[][]): boolean[][] { return []; }",
+				},
+				"c": {
+					Correct: "bool** boolMatrixEcho(bool** matrix, int matrixRows, int* matrixCols, int* outputRows, int** outputCols) {\n    *outputRows = matrixRows;\n    *outputCols = matrixCols;\n    return matrix;\n}",
+					Wrong:   "bool** boolMatrixEcho(bool** matrix, int matrixRows, int* matrixCols, int* outputRows, int** outputCols) {\n    *outputRows = 0;\n    return NULL;\n}",
 				},
 			},
 		},
@@ -529,6 +569,10 @@ func TestCertificationSuite(t *testing.T) {
 					Correct: "function cloneGraph(node: Node | null): Node | null {\n    if (!node) return null;\n    const m = new Map<Node, Node>();\n    const dfs = (n: Node): Node => {\n        if (m.has(n)) return m.get(n)!;\n        const clone = new Node(n.val);\n        m.set(n, clone);\n        for (const nei of n.neighbors) {\n            clone.neighbors.push(dfs(nei));\n        }\n        return clone;\n    };\n    return dfs(node);\n}",
 					Wrong:   "function cloneGraph(node: Node | null): Node | null { return new Node(999); }",
 				},
+				"c": {
+					Correct: "struct Node* cloneGraph(struct Node* node) {\n    if (!node) return NULL;\n    struct Node* nodes[100];\n    for (int i = 0; i < 100; i++) nodes[i] = NULL;\n    struct Node* queue[100];\n    int head = 0, tail = 0;\n    queue[tail++] = node;\n    nodes[node->val - 1] = malloc(sizeof(struct Node));\n    nodes[node->val - 1]->val = node->val;\n    while (head < tail) {\n        struct Node* curr = queue[head++];\n        nodes[curr->val - 1]->numNeighbors = curr->numNeighbors;\n        nodes[curr->val - 1]->neighbors = malloc(curr->numNeighbors * sizeof(struct Node*));\n        for (int i = 0; i < curr->numNeighbors; i++) {\n            struct Node* nei = curr->neighbors[i];\n            if (!nodes[nei->val - 1]) {\n                nodes[nei->val - 1] = malloc(sizeof(struct Node));\n                nodes[nei->val - 1]->val = nei->val;\n                queue[tail++] = nei;\n            }\n            nodes[curr->val - 1]->neighbors[i] = nodes[nei->val - 1];\n        }\n    }\n    return nodes[node->val - 1];\n}",
+					Wrong:   "struct Node* cloneGraph(struct Node* node) { return NULL; }",
+				},
 			},
 		},
 	}
@@ -555,24 +599,26 @@ func TestCertificationSuite(t *testing.T) {
 				"cpp":        "class Solution { public: void run(int n) { while(true); } };",
 				"csharp":     "public class Solution { public void run(int n) { while(true); } }",
 				"typescript": "function run(n: number): void { while(true); }",
+				"c":          "void run(int n) { while(1); }",
 			},
 		},
 		{
 			Name: "Memory Limit Exceeded",
 			Problem: models.Problem{
-				Title: "Memory Bomb", FunctionName: "run", ReturnType: "void", MemoryLimitMb: 128,
+				Title: "Memory Bomb", FunctionName: "run", ReturnType: "void", MemoryLimitMb: 256,
 				Parameters: []models.Parameter{{Name: "n", Type: "number"}},
 				TestCases: []models.TestCase{{Input: []interface{}{float64(0)}, Expected: nil}},
 			},
 			Expected: models.SubmissionStatusMemoryLimitExceeded,
 			Solutions: map[string]string{
-				"python":     "def run(n): a = [0.1] * 20000000",
-				"javascript": "function run(n) { const a = new Array(20000000).fill(0.1); }",
-				"java":       "import java.util.*;\npublic class Solution { public void run(int n) { long[] a = new long[20000000]; Arrays.fill(a, 1L); } }",
-				"go":         "func run(n int) { a := make([]byte, 200*1024*1024); for i := range a { a[i] = 1 } }",
-				"cpp":        "class Solution { public: void run(int n) { std::vector<char> a(200*1024*1024, 1); } };",
-				"csharp":     "public class Solution { public void run(int n) { var a = new byte[200*1024*1024]; for(int i=0; i<a.Length; i++) a[i]=1; } }",
-				"typescript": "function run(n: number): void { const a = new Array(20000000).fill(0.1); }",
+				"python":     "def run(n): a = [0.1] * 40000000",
+				"javascript": "function run(n) { const a = new Array(40000000).fill(0.1); }",
+				"java":       "import java.util.*;\npublic class Solution { public void run(int n) { long[] a = new long[40000000]; Arrays.fill(a, 1L); } }",
+				"go":         "func run(n int) { a := make([]byte, 400*1024*1024); for i := range a { a[i] = 1 } }",
+				"cpp":        "class Solution { public: void run(int n) { std::vector<char> a(400*1024*1024, 1); } };",
+				"csharp":     "public class Solution { public void run(int n) { var a = new byte[400*1024*1024]; for(int i=0; i<a.Length; i++) a[i]=1; } }",
+				"typescript": "function run(n: number): void { const a = new Array(40000000).fill(0.1); }",
+				"c":          "#include <stdlib.h>\n#include <string.h>\nvoid run(int n) { void* p = malloc(400*1024*1024); memset(p, 1, 400*1024*1024); }",
 			},
 		},
 		{
@@ -591,6 +637,7 @@ func TestCertificationSuite(t *testing.T) {
 				"cpp":        "class Solution { public: int run(int n) { throw std::runtime_error(\"boom\"); } };",
 				"csharp":     "public class Solution { public int run(int n) { return 1 / n; } }",
 				"typescript": "function run(n: number): number { throw new Error('boom'); }",
+				"c":          "int run(int n) { return 1 / n; }",
 			},
 		},
 		{
@@ -607,6 +654,7 @@ func TestCertificationSuite(t *testing.T) {
 				"cpp":        "class Solution { public: void run(int n) { return 1 + ; } };",
 				"csharp":     "public class Solution { public void run(int n) { return 1 + ; } }",
 				"typescript": "function run(n: number): void { return 1 + ; }",
+				"c":          "void run(int n) { return 1 + ; }",
 			},
 		},
 	}

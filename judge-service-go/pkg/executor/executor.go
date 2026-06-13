@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -444,10 +445,14 @@ func (e *Executor) RunInContainerStream(ctx context.Context, containerID string,
 		}
 	}
 
-	// Apply memory limit BEFORE compilation
+	// Apply a reasonable limit during compilation if a strict limit is requested for run
 	if memoryLimitMb > 0 {
-		if err := e.UpdateContainerResources(subCtx, containerID, memoryLimitMb); err != nil {
-			slog.Warn("failed to apply memory limit", "containerId", containerID, "error", err)
+		compilationLimit := memoryLimitMb
+		if compilationLimit < 1024 {
+			compilationLimit = 1024
+		}
+		if err := e.UpdateContainerResources(subCtx, containerID, compilationLimit); err != nil {
+			slog.Warn("failed to apply compilation memory limit", "containerId", containerID, "error", err)
 		}
 	}
 
@@ -457,6 +462,13 @@ func (e *Executor) RunInContainerStream(ctx context.Context, containerID string,
 		if err != nil {
 			cancel()
 			return nil, NewExecutionError(ErrCompilationFailed, fmt.Sprintf("%v | stdout=%s stderr=%s", err, compileStdout, compileStderr), -1)
+		}
+	}
+
+	// Apply strict memory limit BEFORE execution
+	if memoryLimitMb > 0 {
+		if err := e.UpdateContainerResources(subCtx, containerID, memoryLimitMb); err != nil {
+			slog.Warn("failed to apply execution memory limit", "containerId", containerID, "error", err)
 		}
 	}
 

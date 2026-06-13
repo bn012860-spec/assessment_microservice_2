@@ -119,12 +119,25 @@ export function mapType(language, typeStr) {
     graph: () => 'Node | null',
   };
 
+  const cMap = {
+    number: 'int',
+    string: 'const char*',
+    boolean: 'bool',
+    void: 'void',
+    array: (t) => `${mapType('c', t)}*`,
+    matrix: (t) => `${mapType('c', t)}**`,
+    tree: () => 'struct TreeNode*',
+    linkedlist: () => 'struct ListNode*',
+    graph: () => 'struct Node*',
+  };
+
   const maps = {
     cpp: cppMap,
     java: javaMap,
     csharp: csharpMap,
     go: goMap,
-    typescript: tsMap
+    typescript: tsMap,
+    c: cMap
   };
 
   const currentMap = maps[language];

@@ -158,8 +158,34 @@ export default function buildTemplate(language, functionName, parameters = [], r
   }
 
   if (lang === 'c') {
-    // C wrapper expects: long <function>(long *args, int argc)
-    return `#include <stdint.h>\n\nlong ${functionName}(long *args, int argc) {\n    // your code here\n    return 0;\n}`;
+    const cReturn = mapType('c', returnType) || 'int';
+    const paramsList = [];
+    (parameters || []).forEach(p => {
+      paramsList.push(`${mapType('c', p.type)} ${p.name}`);
+      if (p.type.startsWith('array<')) {
+        paramsList.push(`int ${p.name}Size`);
+      } else if (p.type.startsWith('matrix<')) {
+        paramsList.push(`int ${p.name}Rows`);
+        paramsList.push(`int* ${p.name}Cols`);
+      }
+    });
+
+    if (returnType.startsWith('array<')) {
+      paramsList.push(`int* outputSize`);
+    } else if (returnType.startsWith('matrix<')) {
+      paramsList.push(`int* outputRows`);
+      paramsList.push(`int** outputCols`);
+    }
+
+    const cParams = paramsList.join(', ');
+
+    let defsC = `#include <stdbool.h>\n#include <stddef.h>\n#include <stdlib.h>\n\n`;
+    if (usesList) defsC += `/*\nstruct ListNode {\n    int val;\n    struct ListNode *next;\n};\n*/\n\n`;
+    if (usesTree) defsC += `/*\nstruct TreeNode {\n    int val;\n    struct TreeNode *left;\n    struct TreeNode *right;\n};\n*/\n\n`;
+    if (usesGraph) defsC += `/*\nstruct Node {\n    int val;\n    int numNeighbors;\n    struct Node **neighbors;\n};\n*/\n\n`;
+    
+    defsC += `${cReturn} ${functionName}(${cParams}) {\n    // your code here\n    return ${cReturn.includes('*') ? 'NULL' : '0'};\n}`;
+    return defsC;
   }
 
   // Generic fallback: include brief placeholders
