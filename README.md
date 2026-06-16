@@ -39,20 +39,20 @@ Supports the full journey of an assessment:
 
 ## 📸 Screenshots
 
-| Student Dashboard | Problem Workspace |
-|:---:|:---:|
-| ![Dashboard](image-2.png) | ![Problem](image-3.png) |
-| *View and access assigned assessments* | *Real-time coding with instant results* |
+| Authentication | Student Dashboard | Problem Workspace |
+|:---:|:---:|:---:|
+| ![Login](docs/images/image-1.png) | ![Dashboard](docs/images/image-2.png) | ![Problem](docs/images/image-3.png) |
+| *Secure role-based login* | *Assessment overview* | *Interactive coding IDE* |
 
-| Manage Assessments | Assessment Analytics |
-|:---:|:---:|
-| ![Manage](image-4.png) | ![Analytics](image-5.png) |
-| *Faculty view for controlling lifecycle* | *Student-wise attendance and performance* |
+| Manage Assessments | Assessment Analytics | Monitoring Dashboard |
+|:---:|:---:|:---:|
+| ![Manage](docs/images/image-4.png) | ![Analytics](docs/images/image-5.png) | ![Monitoring](docs/images/image-6.png) |
+| *Lifecycle control* | *Performance tracking* | *Real-time status* |
 
-| System Health | User Management |
-|:---:|:---:|
-| ![System](image-7.png) | ![Users](image-9.png) |
-| *Real-time monitoring of queues and judge* | *Student and Faculty role management* |
+| System Health (I) | System Health (II) | User Management |
+|:---:|:---:|:---:|
+| ![System 1](docs/images/image-7.png) | ![System 2](docs/images/image-8.png) | ![Users](docs/images/image-9.png) |
+| *Queue & Broker metrics* | *Judge service health* | *Role & Access control* |
 
 ---
 
