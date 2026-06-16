@@ -33,6 +33,19 @@ router.get("/", optionalVerifyToken, listAssessments);
 
 /**
  * @openapi
+ * /assessments:
+ *   post:
+ *     tags:
+ *       - Assessments
+ *     summary: Create a new assessment
+ *     responses:
+ *       201:
+ *         description: Assessment created
+ */
+router.post("/", verifyToken, authorizeRoles("admin", "faculty", "superadmin"), createAssessment);
+
+/**
+ * @openapi
  * /assessments/{_id}:
  *   get:
  *     tags:
@@ -49,6 +62,44 @@ router.get("/", optionalVerifyToken, listAssessments);
  *         description: Assessment details
  */
 router.get("/:_id", verifyToken, getAssessmentById);
+
+/**
+ * @openapi
+ * /assessments/{_id}:
+ *   put:
+ *     tags:
+ *       - Assessments
+ *     summary: Update an assessment
+ *     parameters:
+ *       - in: path
+ *         name: _id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Assessment updated
+ */
+router.put("/:_id", verifyToken, authorizeRoles("admin", "faculty", "superadmin"), updateAssessment);
+
+/**
+ * @openapi
+ * /assessments/{_id}:
+ *   delete:
+ *     tags:
+ *       - Assessments
+ *     summary: Delete an assessment
+ *     parameters:
+ *       - in: path
+ *         name: _id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Assessment deleted
+ */
+router.delete("/:_id", verifyToken, authorizeRoles("admin", "superadmin"), deleteAssessment);
 
 /**
  * @openapi

@@ -1,106 +1,131 @@
-# Online Judge System
+# 🏆 Coding Assessment Microservice Platform
 
-This project is a microservices-based online judge system for coding assessments. It allows users to submit code to solve programming problems and have it evaluated automatically.
+A robust, enterprise-grade online judge and coding assessment platform. Designed for scalability, security, and high performance, this system allows organizations to host coding contests, evaluate student performance, and automate the grading of programming tasks across multiple languages.
 
-## Architecture
+## 🏗️ High-Level Architecture
 
-The system is composed of three main services that communicate asynchronously:
+The system follows a microservices architecture, leveraging asynchronous processing to handle resource-intensive code execution without blocking the main API.
 
-- **`frontend`**: A React-based single-page application that provides the user interface for viewing problems, submitting code, and seeing the results.
-- **`assessment-api`**: A Node.js/Express backend that serves as the main entry point for the frontend. It handles user submissions, manages problems, and provides status updates on submissions.
-- **`judge-service-go`**: A Go service that acts as an asynchronous worker. It is responsible for securely executing user-submitted code in isolated Docker containers and evaluating the output against the problem's test cases. It is designed for high performance and scalability, using a container pool and `tmpfs` volumes to optimize execution time and resource usage.
+- **`Frontend` (React 19 + Vite)**: A modern, responsive dashboard for students and faculty. Features include a powerful code editor (Monaco), real-time feedback, and comprehensive assessment management.
+- **`Assessment API` (Node.js + Express)**: The central orchestrator handling user authentication, assessment lifecycles, problem management, and result aggregation.
+- **`Judge Service` (Go)**: A high-performance execution engine that securely runs user code in isolated Docker containers. It uses **Container Pooling** to achieve near-zero cold-start latency.
+- **`Infrastructure`**:
+    - **Messaging**: RabbitMQ handles the asynchronous distribution of grading tasks.
+    - **Persistence**: MongoDB for core data (users, problems, submissions); Redis for caching and real-time state.
+    - **Security**: Strict container isolation, no-network access for user code, and resource quotas (CPU/Memory).
 
-### Service Communication
+---
 
-1.  **Frontend to API**: The frontend communicates with the `assessment-api` via standard REST API calls to submit code and poll for results.
-2.  **API to Judge**: When a new submission is received, the `assessment-api` publishes a job to a **RabbitMQ** message queue (`submission_queue`).
-3.  **Judge Service**: The `judge-service-go` consumes jobs from the queue, executes the code, and writes the results directly to a **MongoDB** database and a **Redis** cache.
-4.  **Result Retrieval**: The `assessment-api` reads the results from the database/cache when the frontend polls for an update.
+## ✨ Key Features
 
-![Architecture Diagram](https://user-images.githubusercontent.com/1213322/153285329-3733c758-1815-4148-9f37-013e53697920.png)
+### 📝 Assessment Lifecycle Management
+Supports the full journey of an assessment:
+- **Drafting**: Faculty can curate problems, set scoring rules, and define time windows.
+- **Live Mode**: Students participate in a secure environment.
+- **Anti-Cheating**: Tracks tab switches, copy-paste events, and fullscreen exits. Shuffles problem order per student.
+- **Auto-Grading**: Real-time evaluation of submissions with instant feedback.
 
-## Key Technologies
+### 🚀 High-Performance Judge (Go-based)
+- **Container Pooling**: Pre-warms Docker environments for Python, Java, C++, JavaScript, and Go.
+- **Central Compare**: Robust structural and exact comparison modes for complex return types (e.g., matrices, linked lists, trees).
+- **Resource Management**: Uses `tmpfs` for lightning-fast file I/O and strict memory/CPU limits.
 
-- **Frontend**: React, Vite, Axios, React Router
-- **Backend API**: Node.js, Express, Mongoose
-- **Judge Service**: Go, Docker SDK
-- **Messaging**: RabbitMQ
-- **Database**: MongoDB
-- **Caching**: Redis
-- **Containerization**: Docker, Docker Compose
+### 📊 Real-Time Monitoring & Admin
+- **System Stats**: Live health monitoring of all microservices, queue lengths, and judge throughput.
+- **Audit Logs**: Comprehensive tracking of all administrative actions.
+- **User Management**: Bulk import students and manage roles (Student, Faculty, Admin).
 
-## Getting Started
+---
 
-The entire project is containerized and can be run easily using Docker Compose.
+## 📸 Screenshots
+
+| Student Dashboard | Problem Workspace |
+|:---:|:---:|
+| ![Dashboard](image-2.png) | ![Problem](image-3.png) |
+| *View and access assigned assessments* | *Real-time coding with instant results* |
+
+| Manage Assessments | Assessment Analytics |
+|:---:|:---:|
+| ![Manage](image-4.png) | ![Analytics](image-5.png) |
+| *Faculty view for controlling lifecycle* | *Student-wise attendance and performance* |
+
+| System Health | User Management |
+|:---:|:---:|
+| ![System](image-7.png) | ![Users](image-9.png) |
+| *Real-time monitoring of queues and judge* | *Student and Faculty role management* |
+
+---
+
+## 🛠️ Technology Stack
+
+| Layer | Technologies |
+|:---|:---|
+| **Frontend** | React 19, Vite, Tailwind CSS, Monaco Editor, Lucide Icons |
+| **Backend API** | Node.js, Express, Mongoose, JWT, AJV (Schema Validation) |
+| **Judge Service** | Go (Golang), Docker SDK, RabbitMQ AMQP |
+| **Database** | MongoDB 6.0 |
+| **Cache/State** | Redis 7.0 |
+| **Infrastructure** | Docker, Docker Compose |
+
+---
+
+## 🚀 Getting Started
 
 ### Prerequisites
+- [Docker](https://docs.docker.com/get-docker/) & [Docker Compose](https://docs.docker.com/compose/install/)
 
-- [Docker](https://docs.docker.com/get-docker/)
-- [Docker Compose](https://docs.docker.com/compose/install/)
+### Installation & Deployment
 
-### Running the Application
+1. **Clone & Setup**:
+   ```bash
+   git clone https://github.com/Nakul-26/leetcode-clone
+   cd assessment_microservice_2
+   ```
 
-1.  Clone the repository:
-    ```bash
-    git clone <repository-url>
-    cd assessment_microservice_2
-    ```
+2. **Environment Configuration**:
+   Create a `.env` file in the root if you wish to use an external MongoDB (like Atlas):
+   ```env
+   MONGO_URI=mongodb+srv://...
+   JWT_SECRET=your_secret_key
+   ```
 
-2.  Optional: if you want persistent cloud-backed data instead of the local Docker Mongo volume, create a root `.env` file with your Atlas connection string:
-    ```bash
-    MONGO_URI=mongodb+srv://<username>:<password>@<cluster>/<dbname>?retryWrites=true&w=majority
-    ```
+3. **Spin up the Cluster**:
+   ```bash
+   docker-compose up -d --build
+   ```
 
-    The API and judge services will use `MONGO_URI` from `.env`. If it is not set, they fall back to the local `mongo` container.
+4. **Seed Initial Data**:
+   The system includes a certification seed for the Judge:
+   ```bash
+   # Run inside the assessment-api container
+   docker exec -it codespace_assessment_api node scripts/seed_certification_set.mjs
+   ```
 
-3.  Build and start all the services:
-    ```bash
-    docker-compose up --build
-    ```
-
-This command will build the Docker images for each service and start the necessary containers for the application and its infrastructure. If `MONGO_URI` is set to Atlas, the local `mongo` container may still start, but application data will be stored in Atlas instead of the local Docker volume.
-
-4.  Seed some starter problems:
-    ```bash
-    npm run seed:problems
-    ```
-
-    This runs the seeding script inside the running `assessment-api` container, so it uses the same network and environment as the API service itself.
-
-Once everything is running, you can access the services at the following locations:
-
+### Accessing the Platform
 - **Frontend**: [http://localhost:5173](http://localhost:5173)
-- **API**: [http://localhost:3000](http://localhost:3000)
+- **API Docs (Swagger)**: [http://localhost:3000/api-docs](http://localhost:3000/api-docs)
 
-You can verify seeded problems with:
+---
 
-```bash
-curl http://localhost:3000/api/problems
-```
+## 🧪 Testing & Validation
 
-## Submission Harness
-
-The submission harness lives at `scripts/test_submission.js`.
-
-If you are running the app on your own machine and the API is exposed on port 3000:
-
+### Submission Harness
+Verify the end-to-end flow (API -> Queue -> Judge -> DB):
 ```bash
 npm run test:submission
 ```
 
-If Docker is running in a different environment from the shell where you invoke the harness, `localhost` may not resolve to the API container. In that case, run the harness inside the Compose network:
+### Chaos & Soak Testing
+Documentation for production-grade validation can be found in `docs/VALIDATION_PLAN.md`.
 
+---
+
+## 🧹 Maintenance
+
+**Cleanup Docker resources**:
 ```bash
-npm run test:submission:docker
+docker system prune -a -f
+docker rm -f $(docker ps -aq)
 ```
 
-That command uses the `harness` Compose service and targets `http://assessment-api:3000/api`.
-
-
-# for clean up:
-
-'''
-docker system prune -a -f
-docker builder prune -a -f
-docker rm -f $(docker ps -aq)
-'''
+---
